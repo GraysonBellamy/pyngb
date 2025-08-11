@@ -1,0 +1,18 @@
+[project]
+name = "pynetzsch"
+version = "0.0.1"
+description = "Python package for retrieving data from Netzsch STA files."
+readme = "README.md"
+authors = [
+    { name = "Grayson Bellamy", email = "gbellamy@umd.edu" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "polars",
+    "pyarrow",
+    "numpy",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
