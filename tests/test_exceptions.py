@@ -53,7 +53,7 @@ class TestNGBExceptions:
         except ValueError as e:
             with pytest.raises(NGBCorruptedFileError) as exc_info:
                 raise NGBCorruptedFileError("Wrapped error") from e
-            
+
             assert str(exc_info.value) == "Wrapped error"
             assert exc_info.value.__cause__ is e
 
@@ -66,11 +66,11 @@ class TestNGBExceptions:
             NGBDataTypeError,
             NGBStreamNotFoundError,
         ]
-        
+
         for exc_class in exceptions:
             assert callable(exc_class)
             assert issubclass(exc_class, Exception)
-            
+
             # Test instantiation
             instance = exc_class("test message")
             assert str(instance) == "test message"
