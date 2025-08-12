@@ -149,18 +149,18 @@ class PatternConfig:
     column_map: dict[str, str] = field(
         default_factory=lambda: {
             "8d": "time",
-            "8e": "temperature",
-            "9c": "dsc",
+            "8e": "sample_temperature",
+            "9c": "dsc_signal",
             "9e": "purge_flow",
             "90": "protective_flow",
-            "87": "sample_mass",
+            "87": "mass",
             "30": "furnace_temperature",
             "32": "furnace_power",
-            "33": "h_foil_temp",
+            "33": "h_foil_temperature",
             "34": "uc_module",
-            "35": "env_pressure",
-            "36": "env_accel_x",
-            "37": "env_accel_y",
-            "38": "env_accel_z",
+            "35": "environmental_pressure",
+            "36": "environmental_acceleration_x",
+            "37": "environmental_acceleration_y",
+            "38": "environmental_acceleration_z",
         }
     )

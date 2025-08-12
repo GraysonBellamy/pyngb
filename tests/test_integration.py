@@ -153,7 +153,7 @@ class TestEndToEndIntegration:
         )
 
         # Verify we have typical STA columns
-        expected_columns = {"time", "temperature", "dsc", "sample_mass"}
+        expected_columns = {"time", "sample_temperature", "dsc_signal", "mass"}
         actual_columns = set(table.column_names)
         assert expected_columns.issubset(actual_columns), (
             f"Missing expected columns: {expected_columns - actual_columns}"
@@ -197,8 +197,8 @@ class TestEndToEndIntegration:
             )
             print(f"  ✓ Time range: {min(time_col):.1f} to {max(time_col):.1f}")
 
-        if "temperature" in table.column_names:
-            temp_col = table.column("temperature").to_pylist()
+        if "sample_temperature" in table.column_names:
+            temp_col = table.column("sample_temperature").to_pylist()
             assert len(temp_col) == table.num_rows
             assert all(isinstance(x, (int, float)) for x in temp_col[:10]), (
                 "Temperature should be numeric"

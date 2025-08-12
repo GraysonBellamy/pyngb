@@ -195,16 +195,16 @@ class QualityChecker:
         self._check_data_structure()
 
         # Column-specific checks
-        if "temperature" in self.df.columns:
+        if "sample_temperature" in self.df.columns:
             self._check_temperature_data()
 
         if "time" in self.df.columns:
             self._check_time_data()
 
-        if "sample_mass" in self.df.columns:
+        if "mass" in self.df.columns:
             self._check_mass_data()
 
-        if "dsc" in self.df.columns:
+        if "dsc_signal" in self.df.columns:
             self._check_dsc_data()
 
         # Cross-column consistency checks
@@ -228,7 +228,7 @@ class QualityChecker:
         issues = []
 
         # Check for required columns
-        required_cols = ["time", "temperature"]
+        required_cols = ["time", "sample_temperature"]
         missing_cols = [col for col in required_cols if col not in self.df.columns]
         if missing_cols:
             issues.append(f"Missing required columns: {missing_cols}")
@@ -249,10 +249,14 @@ class QualityChecker:
                     )
 
         # Quick temperature check
-        if "temperature" in self.df.columns:
-            temp_stats = self.df.select("temperature").describe()
-            temp_min = temp_stats.filter(pl.col("statistic") == "min")["temperature"][0]
-            temp_max = temp_stats.filter(pl.col("statistic") == "max")["temperature"][0]
+        if "sample_temperature" in self.df.columns:
+            temp_stats = self.df.select("sample_temperature").describe()
+            temp_min = temp_stats.filter(pl.col("statistic") == "min")[
+                "sample_temperature"
+            ][0]
+            temp_max = temp_stats.filter(pl.col("statistic") == "max")[
+                "sample_temperature"
+            ][0]
 
             if temp_min == temp_max:
                 issues.append("Temperature is constant (no heating/cooling)")
@@ -271,7 +275,7 @@ class QualityChecker:
             return
 
         # Check for required columns
-        required_cols = ["time", "temperature"]
+        required_cols = ["time", "sample_temperature"]
         missing_cols = [col for col in required_cols if col not in self.df.columns]
         if missing_cols:
             self.result.add_error(f"Missing required columns: {missing_cols}")
@@ -293,7 +297,7 @@ class QualityChecker:
 
     def _check_temperature_data(self) -> None:
         """Validate temperature measurements."""
-        temp_col = self.df.select("temperature")
+        temp_col = self.df.select("sample_temperature")
 
         # Check for null values
         null_count = temp_col.null_count().item()
@@ -305,8 +309,12 @@ class QualityChecker:
 
         # Get temperature statistics
         temp_stats = temp_col.describe()
-        temp_min = temp_stats.filter(pl.col("statistic") == "min")["temperature"][0]
-        temp_max = temp_stats.filter(pl.col("statistic") == "max")["temperature"][0]
+        temp_min = temp_stats.filter(pl.col("statistic") == "min")[
+            "sample_temperature"
+        ][0]
+        temp_max = temp_stats.filter(pl.col("statistic") == "max")[
+            "sample_temperature"
+        ][0]
 
         # Check temperature range
         if temp_min == temp_max:
@@ -383,7 +391,7 @@ class QualityChecker:
 
     def _check_mass_data(self) -> None:
         """Validate mass measurements."""
-        mass_col = self.df.select("sample_mass")
+        mass_col = self.df.select("mass")
 
         # Check for null values
         null_count = mass_col.null_count().item()
@@ -395,8 +403,8 @@ class QualityChecker:
 
         # Get mass statistics
         mass_stats = mass_col.describe()
-        mass_min = mass_stats.filter(pl.col("statistic") == "min")["sample_mass"][0]
-        mass_max = mass_stats.filter(pl.col("statistic") == "max")["sample_mass"][0]
+        mass_min = mass_stats.filter(pl.col("statistic") == "min")["mass"][0]
+        mass_max = mass_stats.filter(pl.col("statistic") == "max")["mass"][0]
 
         # Check for physically reasonable mass values
         if mass_min <= 0:
@@ -425,7 +433,7 @@ class QualityChecker:
 
     def _check_dsc_data(self) -> None:
         """Validate DSC measurements."""
-        dsc_col = self.df.select("dsc")
+        dsc_col = self.df.select("dsc_signal")
 
         # Check for null values
         null_count = dsc_col.null_count().item()
@@ -437,9 +445,9 @@ class QualityChecker:
 
         # Get DSC statistics
         dsc_stats = dsc_col.describe()
-        dsc_min = dsc_stats.filter(pl.col("statistic") == "min")["dsc"][0]
-        dsc_max = dsc_stats.filter(pl.col("statistic") == "max")["dsc"][0]
-        dsc_std = dsc_stats.filter(pl.col("statistic") == "std")["dsc"][0]
+        dsc_min = dsc_stats.filter(pl.col("statistic") == "min")["dsc_signal"][0]
+        dsc_max = dsc_stats.filter(pl.col("statistic") == "max")["dsc_signal"][0]
+        dsc_std = dsc_stats.filter(pl.col("statistic") == "std")["dsc_signal"][0]
 
         # Check for constant DSC signal (no thermal events)
         if dsc_std < 0.001:
@@ -461,10 +469,10 @@ class QualityChecker:
         self.result.add_pass("All columns have consistent length")
 
         # Check for synchronized time/temperature if both present
-        if "time" in self.df.columns and "temperature" in self.df.columns:
+        if "time" in self.df.columns and "sample_temperature" in self.df.columns:
             # Check if temperature changes correlate with time
             time_data = self.df.select("time").to_numpy().flatten()
-            temp_data = self.df.select("temperature").to_numpy().flatten()
+            temp_data = self.df.select("sample_temperature").to_numpy().flatten()
 
             # Simple correlation check
             if len(time_data) > 1 and len(temp_data) > 1:
@@ -491,9 +499,9 @@ class QualityChecker:
             self.result.add_pass("Essential metadata fields present")
 
         # Check sample mass consistency
-        if "sample_mass" in self.metadata and "sample_mass" in self.df.columns:
+        if "sample_mass" in self.metadata and "mass" in self.df.columns:
             metadata_mass = self.metadata.get("sample_mass")
-            data_initial_mass = self.df.select("sample_mass")[0, 0]
+            data_initial_mass = self.df.select("mass")[0, 0]
 
             if metadata_mass and abs(metadata_mass - data_initial_mass) > 0.1:
                 self.result.add_warning(
@@ -583,10 +591,10 @@ def check_temperature_profile(
     else:
         df = data
 
-    if "temperature" not in df.columns:
-        return {"error": "No temperature column found"}
+    if "sample_temperature" not in df.columns:
+        return {"error": "No sample_temperature column found"}
 
-    temp_data = df.select("temperature").to_numpy().flatten()
+    temp_data = df.select("sample_temperature").to_numpy().flatten()
 
     analysis: dict[str, str | float | bool] = {
         "temperature_range": float(np.ptp(temp_data)),
@@ -618,10 +626,10 @@ def check_mass_data(
     if isinstance(df, pl.Series):
         df = pl.DataFrame(df)
 
-    if "sample_mass" not in df.columns:
-        return {"error": "No sample_mass column found"}
+    if "mass" not in df.columns:
+        return {"error": "No mass column found"}
 
-    mass_data = df.select("sample_mass").to_numpy().flatten()
+    mass_data = df.select("mass").to_numpy().flatten()
 
     initial_mass = mass_data[0]
     final_mass = mass_data[-1]
@@ -652,10 +660,10 @@ def check_dsc_data(data: Union[pa.Table, pl.DataFrame]) -> dict[str, str | float
     if isinstance(df, pl.Series):
         df = pl.DataFrame(df)
 
-    if "dsc" not in df.columns:
-        return {"error": "No dsc column found"}
+    if "dsc_signal" not in df.columns:
+        return {"error": "No dsc_signal column found"}
 
-    dsc_data = df.select("dsc").to_numpy().flatten()
+    dsc_data = df.select("dsc_signal").to_numpy().flatten()
 
     # Simple peak detection
     peaks_positive = 0

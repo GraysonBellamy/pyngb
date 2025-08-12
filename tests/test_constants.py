@@ -87,7 +87,7 @@ class TestPatternConfig:
         # Test column map
         assert "8d" in config.column_map
         assert config.column_map["8d"] == "time"
-        assert config.column_map["8e"] == "temperature"
+        assert config.column_map["8e"] == "sample_temperature"
 
         # Test temperature program patterns
         assert "stage_type" in config.temp_prog_patterns

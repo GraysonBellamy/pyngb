@@ -80,12 +80,12 @@ class STAAnalyzer:
             self.df = data.clone()
 
         # Validate required columns
-        required_cols = {"time", "temperature"}
+        required_cols = {"time", "sample_temperature"}
         if not required_cols.issubset(set(self.df.columns)):
             missing = required_cols - set(self.df.columns)
             raise ValueError(f"Missing required columns: {missing}")
 
-    def mass_loss_percent(self, column: str = "sample_mass") -> float:
+    def mass_loss_percent(self, column: str = "mass") -> float:
         """Calculate total mass loss percentage.
 
         Args:
@@ -103,7 +103,7 @@ class STAAnalyzer:
 
         return (initial_mass - final_mass) / initial_mass * 100  # type: ignore[no-any-return]
 
-    def derivative_mass_loss(self, column: str = "sample_mass") -> pl.DataFrame:
+    def derivative_mass_loss(self, column: str = "mass") -> pl.DataFrame:
         """Calculate derivative mass loss (DTG).
 
         Args:
@@ -116,7 +116,7 @@ class STAAnalyzer:
             raise ValueError(f"Column '{column}' not found")
 
         # Calculate derivative using temperature as x-axis
-        temp = self.df.select("temperature").to_numpy().flatten()
+        temp = self.df.select("sample_temperature").to_numpy().flatten()
         mass = self.df.select(column).to_numpy().flatten()
 
         dtg = np.gradient(mass, temp)
@@ -125,8 +125,8 @@ class STAAnalyzer:
 
     def find_thermal_events(
         self,
-        dsc_column: str = "dsc",
-        mass_column: str = "sample_mass",
+        dsc_column: str = "dsc_signal",
+        mass_column: str = "mass",
         min_peak_height: float = 0.1,
         min_mass_change: float = 1.0,
     ) -> list[dict[str, Union[str, float]]]:
@@ -173,7 +173,7 @@ class STAAnalyzer:
     def _find_peaks(self, column: str, min_height: float) -> list[dict[str, float]]:
         """Internal peak detection method."""
         # Simple peak detection - could be enhanced with scipy.signal
-        data = self.df.select([column, "temperature"]).to_numpy()
+        data = self.df.select([column, "sample_temperature"]).to_numpy()
         peaks = []
 
         # Find local maxima
@@ -208,7 +208,7 @@ class STAAnalyzer:
             for row in significant_changes.iter_rows(named=True):
                 steps.append(
                     {
-                        "temperature": row["temperature"],
+                        "temperature": row["sample_temperature"],
                         "change_percent": row["mass_change_pct"],
                     }
                 )
@@ -218,8 +218,8 @@ class STAAnalyzer:
     def temperature_range(self) -> tuple[float, float]:
         """Get temperature range of the experiment."""
         temp_stats = (
-            self.df.select("temperature").min().item(),
-            self.df.select("temperature").max().item(),
+            self.df.select("sample_temperature").min().item(),
+            self.df.select("sample_temperature").max().item(),
         )
         return temp_stats
 
@@ -257,7 +257,7 @@ class STAAnalyzer:
         fig, axes = plt.subplots(2, 2, figsize=(12, 8))  # type: ignore[attr-defined]
         fig.suptitle("STA Analysis Overview", fontsize=14, fontweight="bold")
 
-        temp = self.df.select("temperature").to_numpy().flatten()
+        temp = self.df.select("sample_temperature").to_numpy().flatten()
 
         # Temperature vs Time
         if "time" in self.df.columns:
@@ -269,8 +269,8 @@ class STAAnalyzer:
             axes[0, 0].grid(True, alpha=0.3)
 
         # DSC Signal
-        if "dsc" in self.df.columns:
-            dsc = self.df.select("dsc").to_numpy().flatten()
+        if "dsc_signal" in self.df.columns:
+            dsc = self.df.select("dsc_signal").to_numpy().flatten()
             axes[0, 1].plot(temp, dsc, "r-", linewidth=1)
             axes[0, 1].set_xlabel("Temperature (°C)")
             axes[0, 1].set_ylabel("DSC (μV)")
@@ -278,8 +278,8 @@ class STAAnalyzer:
             axes[0, 1].grid(True, alpha=0.3)
 
         # Mass Loss
-        if "sample_mass" in self.df.columns:
-            mass = self.df.select("sample_mass").to_numpy().flatten()
+        if "mass" in self.df.columns:
+            mass = self.df.select("mass").to_numpy().flatten()
             axes[1, 0].plot(temp, mass, "g-", linewidth=1)
             axes[1, 0].set_xlabel("Temperature (°C)")
             axes[1, 0].set_ylabel("Mass (mg)")
@@ -287,12 +287,12 @@ class STAAnalyzer:
             axes[1, 0].grid(True, alpha=0.3)
 
         # Combined view
-        if "dsc" in self.df.columns and "sample_mass" in self.df.columns:
+        if "dsc_signal" in self.df.columns and "mass" in self.df.columns:
             ax_dsc = axes[1, 1]
             ax_mass = ax_dsc.twinx()
 
-            dsc = self.df.select("dsc").to_numpy().flatten()
-            mass = self.df.select("sample_mass").to_numpy().flatten()
+            dsc = self.df.select("dsc_signal").to_numpy().flatten()
+            mass = self.df.select("mass").to_numpy().flatten()
 
             line1 = ax_dsc.plot(temp, dsc, "r-", alpha=0.7, label="DSC")
             line2 = ax_mass.plot(temp, mass, "g-", alpha=0.7, label="Mass")
@@ -316,7 +316,7 @@ class STAAnalyzer:
 
 
 def calculate_mass_loss(
-    data: Union[pa.Table, pl.DataFrame], mass_column: str = "sample_mass"
+    data: Union[pa.Table, pl.DataFrame], mass_column: str = "mass"
 ) -> float:
     """Calculate total mass loss percentage.
 
@@ -377,7 +377,7 @@ def onset_temperature(data: Union[pa.Table, pl.DataFrame]) -> float | None:
 
 
 def peak_temperature(
-    data: Union[pa.Table, pl.DataFrame], column: str = "dsc"
+    data: Union[pa.Table, pl.DataFrame], column: str = "dsc_signal"
 ) -> float | None:
     """Find peak temperature from DSC curve.
 
@@ -398,13 +398,13 @@ def peak_temperature(
 
     # Find maximum absolute value
     abs_max_idx = df.select(pl.col(column).abs().arg_max()).item()
-    return df.select("temperature")[abs_max_idx, 0]  # type: ignore[no-any-return]
+    return df.select("sample_temperature")[abs_max_idx, 0]  # type: ignore[no-any-return]
 
 
 def calculate_heat_flow(
     data: Union[pa.Table, pl.DataFrame],
-    dsc_column: str = "dsc",
-    mass_column: str = "sample_mass",
+    dsc_column: str = "dsc_signal",
+    mass_column: str = "mass",
 ) -> pl.DataFrame:
     """Calculate specific heat flow (normalized by mass).
 

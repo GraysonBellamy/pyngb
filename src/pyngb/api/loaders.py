@@ -62,7 +62,7 @@ def load_ngb_data(path: str) -> pa.Table:
     >>> print(f"Shape: {table.num_rows} rows, {table.num_columns} columns")
     >>> print(f"Columns: {table.column_names}")
     Shape: 2500 rows, 8 columns
-    Columns: ['time', 'temperature', 'mass', 'dsc', 'purge_flow', ...]
+    Columns: ['time', 'sample_temperature', 'mass', 'dsc_signal', 'purge_flow', ...]
 
     Accessing metadata:
 
@@ -85,7 +85,7 @@ def load_ngb_data(path: str) -> pa.Table:
     >>> df = pl.from_arrow(table)
     >>>
     >>> # Basic analysis
-    >>> temp_range = df['temperature'].min(), df['temperature'].max()
+    >>> temp_range = df['sample_temperature'].min(), df['sample_temperature'].max()
     >>> mass_loss = (df['mass'].first() - df['mass'].last()) / df['mass'].first() * 100
     >>> print(f"Temperature range: {temp_range[0]:.1f} to {temp_range[1]:.1f} °C")
     >>> print(f"Mass loss: {mass_loss:.1f}%")
@@ -169,7 +169,7 @@ def get_sta_data(path: str) -> tuple[FileMetadata, pa.Table]:
     Operator: John Doe
     Date: 2024-03-15T10:30:00+00:00
     Data points: 2500
-    Measurements: ['time', 'temperature', 'mass', 'dsc']
+    Measurements: ['time', 'sample_temperature', 'mass', 'dsc_signal']
 
     Advanced metadata access:
 

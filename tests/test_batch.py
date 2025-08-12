@@ -21,9 +21,9 @@ def sample_sta_data():
     return pl.DataFrame(
         {
             "time": np.linspace(0, 100, n_points),
-            "temperature": np.linspace(25, 800, n_points),
-            "sample_mass": np.linspace(10, 8, n_points),
-            "dsc": np.random.normal(0, 2, n_points),
+            "sample_temperature": np.linspace(25, 800, n_points),
+            "mass": np.linspace(10, 8, n_points),
+            "dsc_signal": np.random.normal(0, 2, n_points),
         }
     )
 
@@ -42,7 +42,7 @@ class TestValidationModule:
         invalid_data = pl.DataFrame(
             {
                 "time": [1, 2, 1, 4],  # Time goes backwards
-                "temperature": [-300, 25, 50, 75],  # Below absolute zero
+                "sample_temperature": [-300, 25, 50, 75],  # Below absolute zero
             }
         )
         issues = validate_sta_data(invalid_data)
@@ -70,7 +70,7 @@ class TestValidationModule:
 
     def test_empty_data_validation(self):
         """Test validation of empty data."""
-        empty_data = pl.DataFrame({"time": [], "temperature": []})
+        empty_data = pl.DataFrame({"time": [], "sample_temperature": []})
         issues = validate_sta_data(empty_data)
         assert len(issues) > 0
 
@@ -112,7 +112,7 @@ class TestSpecialScenarios:
         constant_temp = pl.DataFrame(
             {
                 "time": [1, 2, 3, 4],
-                "temperature": [25, 25, 25, 25],
+                "sample_temperature": [25, 25, 25, 25],
             }
         )
         issues = validate_sta_data(constant_temp)
@@ -126,7 +126,7 @@ class TestSpecialScenarios:
         data_with_nulls = pl.DataFrame(
             {
                 "time": [1, 2, None, 4],
-                "temperature": [25, 50, 75, None],
+                "sample_temperature": [25, 50, 75, None],
             }
         )
         issues = validate_sta_data(data_with_nulls)

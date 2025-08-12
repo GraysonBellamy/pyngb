@@ -91,9 +91,9 @@ class NGBParser:
             >>> metadata, data = parser.parse("experiment.ngb-ss3")
             >>> print(f"Instrument: {metadata.get('instrument', 'Unknown')}")
             >>> print(f"Columns: {data.column_names}")
-            >>> print(f"Temperature range: {data['temperature'].min()} to {data['temperature'].max()}")
+            >>> print(f"Temperature range: {data['sample_temperature'].min()} to {data['sample_temperature'].max()}")
             Instrument: NETZSCH STA 449 F3 Jupiter
-            Columns: ['time', 'temperature', 'mass', 'dsc', 'purge_flow']
+            Columns: ['time', 'sample_temperature', 'mass', 'dsc_signal', 'purge_flow']
             Temperature range: 25.0 to 800.0
 
         Performance:

@@ -111,9 +111,9 @@ def sample_sta_data():
     return pl.DataFrame(
         {
             "time": np.linspace(0, 100, n_points),
-            "temperature": np.linspace(25, 800, n_points),
-            "sample_mass": np.linspace(10, 8, n_points),
-            "dsc": np.random.normal(0, 5, n_points),
+            "sample_temperature": np.linspace(25, 800, n_points),
+            "mass": np.linspace(10, 8, n_points),
+            "dsc_signal": np.random.normal(0, 5, n_points),
         }
     )
 
@@ -125,7 +125,7 @@ def sample_metadata():
         "instrument": "STA 449 F3",
         "sample_name": "Test Sample",
         "operator": "Test User",
-        "sample_mass": 10.0,
+        "mass": 10.0,
     }
 
 
@@ -144,7 +144,7 @@ class TestValidateSta:
         empty_data = pl.DataFrame(
             {
                 "time": [],
-                "temperature": [],
+                "sample_temperature": [],
             }
         )
         issues = validate_sta_data(empty_data)
@@ -163,7 +163,7 @@ class TestValidateSta:
         data_with_nulls = pl.DataFrame(
             {
                 "time": [1, 2, None, 4],
-                "temperature": [25, 50, 75, None],
+                "sample_temperature": [25, 50, 75, None],
             }
         )
         issues = validate_sta_data(data_with_nulls)
@@ -175,7 +175,7 @@ class TestValidateSta:
         constant_temp_data = pl.DataFrame(
             {
                 "time": [1, 2, 3, 4],
-                "temperature": [25, 25, 25, 25],
+                "sample_temperature": [25, 25, 25, 25],
             }
         )
         issues = validate_sta_data(constant_temp_data)
@@ -190,7 +190,7 @@ class TestValidateSta:
         extreme_temp_data = pl.DataFrame(
             {
                 "time": [1, 2, 3, 4],
-                "temperature": [
+                "sample_temperature": [
                     -300,
                     3000,
                     25,
@@ -237,7 +237,7 @@ class TestQualityChecker:
         empty_data = pl.DataFrame(
             {
                 "time": [],
-                "temperature": [],
+                "sample_temperature": [],
             }
         )
         checker = QualityChecker(empty_data)
@@ -266,8 +266,8 @@ class TestQualityChecker:
         invalid_data = pl.DataFrame(
             {
                 "time": [1, 2, 1, 4],  # Time goes backwards
-                "temperature": [-300, 25, 50, 75],  # Below absolute zero
-                "sample_mass": [-1, 8, 7, 6],  # Negative mass
+                "sample_temperature": [-300, 25, 50, 75],  # Below absolute zero
+                "mass": [-1, 8, 7, 6],  # Negative mass
             }
         )
         checker = QualityChecker(invalid_data)
@@ -409,8 +409,8 @@ class TestSpecificValidationFunctions:
         dsc_data_with_peaks = pl.DataFrame(
             {
                 "time": x,
-                "temperature": x * 80 + 25,
-                "dsc": y,
+                "sample_temperature": x * 80 + 25,
+                "dsc_signal": y,
             }
         )
         analysis = check_dsc_data(dsc_data_with_peaks)
@@ -427,7 +427,7 @@ class TestEdgeCases:
         single_point = pl.DataFrame(
             {
                 "time": [1],
-                "temperature": [25],
+                "sample_temperature": [25],
             }
         )
         checker = QualityChecker(single_point)
@@ -440,8 +440,8 @@ class TestEdgeCases:
         two_points = pl.DataFrame(
             {
                 "time": [1, 2],
-                "temperature": [25, 50],
-                "sample_mass": [10, 9],
+                "sample_temperature": [25, 50],
+                "mass": [10, 9],
             }
         )
         checker = QualityChecker(two_points)
@@ -453,8 +453,8 @@ class TestEdgeCases:
         data_with_inf = pl.DataFrame(
             {
                 "time": [1.0, 2.0, 3.0, 4.0],
-                "temperature": [25.0, 50.0, float("inf"), 100.0],
-                "sample_mass": [10.0, 9.0, 8.0, 7.0],
+                "sample_temperature": [25.0, 50.0, float("inf"), 100.0],
+                "mass": [10.0, 9.0, 8.0, 7.0],
             }
         )
         checker = QualityChecker(data_with_inf)
@@ -467,7 +467,7 @@ class TestEdgeCases:
         data_with_nan = pl.DataFrame(
             {
                 "time": [1, 2, 3, 4],
-                "temperature": [None, None, None, None],
+                "sample_temperature": [None, None, None, None],
             }
         )
         checker = QualityChecker(data_with_nan)
@@ -480,7 +480,7 @@ class TestEdgeCases:
         large_data = pl.DataFrame(
             {
                 "time": np.linspace(0, 1000, 100000),
-                "temperature": np.linspace(25, 800, 100000),
+                "sample_temperature": np.linspace(25, 800, 100000),
             }
         )
         checker = QualityChecker(large_data)

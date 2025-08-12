@@ -46,7 +46,7 @@ def sample_pattern_config():
     }
     config.column_map = {
         "8d": "time",
-        "8e": "temperature",
+        "8e": "sample_temperature",
     }
     return config
 
