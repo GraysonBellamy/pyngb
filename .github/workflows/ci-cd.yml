@@ -210,6 +210,8 @@ jobs:
   publish:
     name: Publish to PyPI
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     needs: [test, build]
     if: github.event_name == 'release' && github.event.action == 'published'
 
