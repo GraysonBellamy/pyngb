@@ -1,6 +1,6 @@
-# PyNetzsch Troubleshooting Guide
+# pyngb Troubleshooting Guide
 
-This guide helps diagnose and resolve common issues when using PyNetzsch.
+This guide helps diagnose and resolve common issues when using pyngb.
 
 ## Common Issues
 
@@ -66,7 +66,7 @@ gc.collect()
 **Solutions**:
 ```python
 import time
-from pynetzsch import load_ngb_data
+from pyngb import load_ngb_data
 
 # Benchmark parsing time
 start_time = time.perf_counter()
@@ -77,7 +77,7 @@ print(f"Parsed {table.num_rows:,} rows in {parse_time:.2f} seconds")
 print(f"Rate: {table.num_rows/parse_time:,.0f} rows/sec")
 
 # If too slow, try custom parser config
-from pynetzsch import NGBParser, PatternConfig
+from pyngb import NGBParser, PatternConfig
 
 config = PatternConfig()
 # Remove unnecessary metadata patterns to speed up parsing
@@ -97,7 +97,7 @@ metadata, data = parser.parse("your_file.ngb-ss3")
 
 **Diagnosis**:
 ```python
-from pynetzsch import load_ngb_data
+from pyngb import load_ngb_data
 
 table = load_ngb_data("your_file.ngb-ss3")
 print("Available columns:", table.column_names)
@@ -131,16 +131,16 @@ for col in df.columns:
 ### 5. Import and Dependencies
 
 #### Import Errors
-**Problem**: Cannot import pynetzsch modules.
+**Problem**: Cannot import pyngb modules.
 
 **Solutions**:
 ```bash
 # Check installation
-pip show pynetzsch
+pip show pyngb
 
 # Reinstall if needed
-pip uninstall pynetzsch
-pip install pynetzsch
+pip uninstall pyngb
+pip install pyngb
 
 # For development installation
 pip install -e .
@@ -154,9 +154,9 @@ pip install -e .
 import polars as pl
 import pyarrow as pa
 import numpy as np
-import pynetzsch
+import pyngb
 
-print(f"PyNetzsch: {pynetzsch.__version__}")
+print(f"pyngb: {pyngb.__version__}")
 print(f"Polars: {pl.__version__}")
 print(f"PyArrow: {pa.__version__}")
 print(f"NumPy: {np.__version__}")
@@ -172,7 +172,7 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 
 # Now run your code - you'll see detailed parsing information
-from pynetzsch import load_ngb_data
+from pyngb import load_ngb_data
 table = load_ngb_data("your_file.ngb-ss3")
 ```
 
@@ -221,7 +221,7 @@ else:
 ### Memory Profiling
 ```python
 import tracemalloc
-from pynetzsch import load_ngb_data
+from pyngb import load_ngb_data
 
 # Start memory tracing
 tracemalloc.start()
@@ -275,7 +275,7 @@ diagnose_ngb_file("your_file.ngb-ss3")
 ### Report Issues
 If you continue to have problems:
 
-1. **Check the GitHub Issues**: https://github.com/GraysonBellamy/pynetzsch/issues
+1. **Check the GitHub Issues**: https://github.com/GraysonBellamy/pyngb/issues
 2. **Create a minimal example** that reproduces the problem
 3. **Include system information**: Python version, OS, dependency versions
 4. **Share file information** (but not the actual file if it contains sensitive data)
@@ -283,7 +283,7 @@ If you continue to have problems:
 ### Example Issue Report
 ```
 **Environment**:
-- PyNetzsch version: 0.1.0
+- pyngb version: 0.1.0
 - Python: 3.11.5
 - OS: Ubuntu 22.04
 - Dependencies: polars 0.20.0, pyarrow 14.0.0
@@ -293,7 +293,7 @@ NGBStreamNotFoundError when parsing specific file
 
 **Code**:
 ```python
-from pynetzsch import load_ngb_data
+from pyngb import load_ngb_data
 table = load_ngb_data("problem_file.ngb-ss3")  # Error here
 ```
 

@@ -1,10 +1,10 @@
-site_name: PyNetzsch
+site_name: pyngb
 site_description: Python library for parsing NETZSCH STA data files
 site_author: Grayson Bellamy
-site_url: https://graysonbellamy.github.io/pynetzsch/
+site_url: https://graysonbellamy.github.io/pyngb/
 
-repo_name: GraysonBellamy/pynetzsch
-repo_url: https://github.com/GraysonBellamy/pynetzsch
+repo_name: GraysonBellamy/pyngb
+repo_url: https://github.com/GraysonBellamy/pyngb
 
 theme:
   name: material
@@ -69,4 +69,4 @@ nav:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/GraysonBellamy/pynetzsch
+  link: https://github.com/GraysonBellamy/pyngb

@@ -1,6 +1,6 @@
-# PyNetzsch Test Suite
+# pyNGB Test Suite
 
-This directory contains comprehensive unit tests for the PyNetzsch library.
+This directory contains comprehensive unit tests for the pyNGB library.
 
 ## Test Structure
 

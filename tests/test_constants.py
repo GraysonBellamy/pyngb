@@ -1,11 +1,11 @@
 """
-Unit tests for pynetzsch constants and configurations.
+Unit tests for pyngb constants and configurations.
 """
 
 from typing import Any, cast
 
 import pytest
-from pynetzsch.constants import BinaryMarkers, DataType, FileMetadata, PatternConfig
+from pyngb.constants import BinaryMarkers, DataType, FileMetadata, PatternConfig
 
 
 class TestDataType:

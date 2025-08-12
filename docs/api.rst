@@ -1,12 +1,12 @@
 API Reference
 =============
 
-This section provides detailed documentation of PyNetzsch's API.
+This section provides detailed documentation of pyngb's API.
 
 Main Functions
 --------------
 
-.. automodule:: pynetzsch
+.. automodule:: pyngb
    :members: load_ngb_data, get_sta_data
 
 Core Modules
@@ -15,44 +15,44 @@ Core Modules
 Binary Parser
 ~~~~~~~~~~~~~
 
-.. automodule:: pynetzsch.binary.parser
+.. automodule:: pyngb.binary.parser
    :members:
 
 Binary Handlers
 ~~~~~~~~~~~~~~~
 
-.. automodule:: pynetzsch.binary.handlers
+.. automodule:: pyngb.binary.handlers
    :members:
 
 Core Parser
 ~~~~~~~~~~~
 
-.. automodule:: pynetzsch.core.parser
+.. automodule:: pyngb.core.parser
    :members:
 
 Extractors
 ~~~~~~~~~~
 
-.. automodule:: pynetzsch.extractors.metadata
+.. automodule:: pyngb.extractors.metadata
    :members:
 
-.. automodule:: pynetzsch.extractors.streams
+.. automodule:: pyngb.extractors.streams
    :members:
 
 Constants
 ~~~~~~~~~
 
-.. automodule:: pynetzsch.constants
+.. automodule:: pyngb.constants
    :members:
 
 Exceptions
 ~~~~~~~~~~
 
-.. automodule:: pynetzsch.exceptions
+.. automodule:: pyngb.exceptions
    :members:
 
 Utilities
 ~~~~~~~~~
 
-.. automodule:: pynetzsch.util
+.. automodule:: pyngb.util
    :members:

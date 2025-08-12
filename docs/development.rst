@@ -1,7 +1,7 @@
 Development
 ===========
 
-This page contains information for developers contributing to PyNetzsch.
+This page contains information for developers contributing to pyngb.
 
 Setting Up Development Environment
 ----------------------------------
@@ -10,8 +10,8 @@ Setting Up Development Environment
 
 .. code-block:: bash
 
-   git clone https://github.com/GraysonBellamy/pynetzsch.git
-   cd pynetzsch
+   git clone https://github.com/GraysonBellamy/pyngb.git
+   cd pyngb
 
 2. Install with development dependencies:
 
@@ -38,7 +38,7 @@ Run tests with coverage:
 
 .. code-block:: bash
 
-   pytest --cov=pynetzsch --cov-report=html
+   pytest --cov=pyngb --cov-report=html
 
 Code Quality
 ------------
@@ -59,7 +59,7 @@ Run quality checks:
    ruff format src/ tests/
 
    # Type checking
-   mypy src/pynetzsch
+   mypy src/pyngb
 
    # Security scanning
    bandit -r src/
@@ -82,8 +82,8 @@ Project Structure
 
 .. code-block:: text
 
-   pynetzsch/
-   ├── src/pynetzsch/          # Main package
+   pyngb/
+   ├── src/pyngb/              # Main package
    │   ├── api/               # High-level API
    │   ├── binary/            # Binary parsing
    │   ├── core/              # Core parsing logic
@@ -115,7 +115,7 @@ Release Process
 
 Releases are managed through GitHub Actions:
 
-1. Update version in ``src/pynetzsch/__about__.py``
+1. Update version in ``src/pyngb/__about__.py``
 2. Create a Git tag: ``git tag v0.2.0``
 3. Push tag: ``git push origin v0.2.0``
 4. GitHub Actions will automatically build and publish to PyPI

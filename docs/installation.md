@@ -5,7 +5,7 @@
 Install the latest stable version:
 
 ```bash
-pip install pynetzsch
+pip install pyngb
 ```
 
 ## From Source
@@ -13,8 +13,8 @@ pip install pynetzsch
 Clone the repository and install in development mode:
 
 ```bash
-git clone https://github.com/GraysonBellamy/pynetzsch.git
-cd pynetzsch
+git clone https://github.com/GraysonBellamy/pyngb.git
+cd pyngb
 pip install -e .
 ```
 
@@ -49,8 +49,8 @@ Development dependencies are automatically installed when using `pip install -e 
 Test your installation:
 
 ```python
-import pynetzsch
-print(pynetzsch.__version__)
+import pyngb
+print(pyngb.__version__)
 ```
 
 Or run the test suite:
@@ -63,16 +63,16 @@ pytest
 
 ### Common Issues
 
-**ImportError: No module named 'pynetzsch'**
-- Make sure you've installed the package: `pip install pynetzsch`
+**ImportError: No module named 'pyngb'**
+- Make sure you've installed the package: `pip install pyngb`
 - If installing from source, use: `pip install -e .`
 
 **ModuleNotFoundError: No module named 'polars'**
 - Install dependencies: `pip install polars pyarrow`
-- Or reinstall pynetzsch: `pip install --upgrade pynetzsch`
+- Or reinstall pyngb: `pip install --upgrade pyngb`
 
 **Permission errors on Windows**
-- Try installing with `--user` flag: `pip install --user pynetzsch`
+- Try installing with `--user` flag: `pip install --user pyngb`
 - Or use a virtual environment
 
 ### Getting Help
@@ -80,5 +80,5 @@ pytest
 If you encounter issues:
 
 1. Check the [troubleshooting guide](troubleshooting.md)
-2. Search existing [GitHub issues](https://github.com/GraysonBellamy/pynetzsch/issues)
+2. Search existing [GitHub issues](https://github.com/GraysonBellamy/pyngb/issues)
 3. Create a new issue with details about your setup and the error

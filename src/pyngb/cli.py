@@ -12,11 +12,7 @@ from typing import Optional
 
 import polars as pl
 
-from pyngb import (
-    __version__,
-    get_sta_data,
-    load_ngb_data,
-)  # transitional import path updated
+from . import __version__, get_sta_data, load_ngb_data
 
 
 def setup_logging(verbose: bool) -> None:

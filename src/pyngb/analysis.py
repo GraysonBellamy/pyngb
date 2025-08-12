@@ -12,15 +12,15 @@ import polars as pl
 import pyarrow as pa
 
 try:
-    import matplotlib.pyplot as plt  # type: ignore[import-untyped]
-    from matplotlib.figure import Figure  # type: ignore[import-untyped]
+    import matplotlib.pyplot as plt  # type: ignore[import-not-found]
+    from matplotlib.figure import Figure  # type: ignore[import-not-found]
 
     HAS_MATPLOTLIB = True
 except ImportError:
     HAS_MATPLOTLIB = False
     # Type stubs for when matplotlib is not available
     if TYPE_CHECKING:
-        from matplotlib.figure import Figure  # type: ignore[import-untyped]
+        from matplotlib.figure import Figure  # type: ignore[import-not-found]
     else:
         Figure = None
 

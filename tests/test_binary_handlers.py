@@ -1,11 +1,11 @@
 """
-Unit tests for pynetzsch binary parsing handlers.
+Unit tests for pyngb binary parsing handlers.
 """
 
 import pytest
-from pynetzsch.binary.handlers import DataTypeRegistry, Float32Handler, Float64Handler
-from pynetzsch.constants import DataType
-from pynetzsch.exceptions import NGBDataTypeError
+from pyngb.binary.handlers import DataTypeRegistry, Float32Handler, Float64Handler
+from pyngb.constants import DataType
+from pyngb.exceptions import NGBDataTypeError
 
 
 class TestFloat64Handler:

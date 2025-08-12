@@ -1,6 +1,6 @@
 # Development
 
-This page contains information for developers contributing to PyNetzsch.
+This page contains information for developers contributing to pyngb.
 
 ## Setting Up Development Environment
 
@@ -14,8 +14,8 @@ This page contains information for developers contributing to PyNetzsch.
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/GraysonBellamy/pynetzsch.git
-   cd pynetzsch
+    git clone https://github.com/GraysonBellamy/pyngb.git
+    cd pyngb
    ```
 
 2. Install the package in development mode:
@@ -30,7 +30,7 @@ This page contains information for developers contributing to PyNetzsch.
 
 ## Code Quality Tools
 
-PyNetzsch uses several automated tools to maintain code quality:
+pyngb uses several automated tools to maintain code quality:
 
 ### Pre-commit Hooks
 
@@ -78,7 +78,7 @@ Tool configurations are in `pyproject.toml`:
 uv run pytest
 
 # Run with coverage
-uv run pytest --cov=pynetzsch --cov-report=html
+uv run pytest --cov=pyngb --cov-report=html
 
 # Run specific test file
 uv run pytest tests/test_api.py
@@ -183,7 +183,7 @@ The documentation will be available at `http://127.0.0.1:8000/` for local develo
 
 Releases are managed through GitHub Actions:
 
-1. Update version in `src/pynetzsch/__about__.py`
+1. Update version in `src/pyngb/__about__.py`
 2. Update `CHANGELOG.md` with new features and fixes
 3. Run full test suite: `uv run pytest`
 4. Run benchmarks to check for regressions: `python benchmarks.py`
@@ -229,8 +229,8 @@ Use conventional commits:
 ## Project Structure
 
 ```text
-pynetzsch/
-├── src/pynetzsch/          # Main package
+pyngb/
+├── src/pyngb/              # Main package
 │   ├── api/               # High-level API
 │   ├── binary/            # Binary parsing
 │   ├── core/              # Core parsing logic
@@ -290,7 +290,7 @@ pytest --cache-clear
 **Type checking errors:**
 ```bash
 # Run mypy on specific files
-mypy src/pynetzsch/specific_file.py
+mypy src/pyngb/specific_file.py
 ```
 
 ### Debugging Test Failures

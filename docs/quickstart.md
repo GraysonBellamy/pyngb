@@ -1,15 +1,15 @@
 # Quick Start Guide
 
-This guide will help you get started with PyNetzsch quickly.
+This guide will help you get started with pyngb quickly.
 
 ## Basic Usage
 
 ### Loading Data
 
-PyNetzsch provides two main functions for loading data:
+pyngb provides two main functions for loading data:
 
 ```python
-from pynetzsch import load_ngb_data, get_sta_data
+from pyngb import load_ngb_data, get_sta_data
 
 # Method 1: Load as PyArrow Table (recommended for large datasets)
 table = load_ngb_data("sample.ngb-ss3")
@@ -44,45 +44,45 @@ df.write_csv("output.csv")
 
 ## Command Line Interface
 
-PyNetzsch includes a powerful CLI for batch processing:
+pyngb includes a powerful CLI for batch processing:
 
 ### Basic Commands
 
 ```bash
 # Convert a single file to Parquet
-python -m pynetzsch sample.ngb-ss3 --format parquet
+python -m pyngb sample.ngb-ss3 --format parquet
 
 # Convert to CSV
-python -m pynetzsch sample.ngb-ss3 --format csv
+python -m pyngb sample.ngb-ss3 --format csv
 
 # Convert to all formats (Parquet, CSV, JSON)
-python -m pynetzsch sample.ngb-ss3 --format all
+python -m pyngb sample.ngb-ss3 --format all
 ```
 
 ### Batch Processing
 
 ```bash
 # Process all files in current directory
-python -m pynetzsch *.ngb-ss3 --format parquet
+python -m pyngb *.ngb-ss3 --format parquet
 
 # Process files with custom output directory
-python -m pynetzsch *.ngb-ss3 --format all --output ./results/
+python -m pyngb *.ngb-ss3 --format all --output ./results/
 
 # Extract metadata only
-python -m pynetzsch *.ngb-ss3 --metadata-only --format json
+python -m pyngb *.ngb-ss3 --metadata-only --format json
 ```
 
 ### Advanced Options
 
 ```bash
 # Verbose output
-python -m pynetzsch sample.ngb-ss3 --format parquet --verbose
+python -m pyngb sample.ngb-ss3 --format parquet --verbose
 
 # Quiet mode (minimal output)
-python -m pynetzsch *.ngb-ss3 --format csv --quiet
+python -m pyngb *.ngb-ss3 --format csv --quiet
 
 # Get help
-python -m pynetzsch --help
+python -m pyngb --help
 ```
 
 ## Common Use Cases
@@ -90,7 +90,7 @@ python -m pynetzsch --help
 ### Data Exploration
 
 ```python
-from pynetzsch import load_ngb_data
+from pyngb import load_ngb_data
 import polars as pl
 
 # Load and explore
@@ -114,7 +114,7 @@ print(df.null_count())
 ```python
 import matplotlib.pyplot as plt
 import polars as pl
-from pynetzsch import load_ngb_data
+from pyngb import load_ngb_data
 
 # Load data
 table = load_ngb_data("sample.ngb-ss3")
@@ -153,7 +153,7 @@ if 'dsc' in df.columns:
 
 ```python
 from pathlib import Path
-from pynetzsch import get_sta_data
+from pyngb import get_sta_data
 import polars as pl
 
 # Process all files in a directory
@@ -194,7 +194,7 @@ if results:
 
 ```python
 import polars as pl
-from pynetzsch import load_ngb_data
+from pyngb import load_ngb_data
 
 # Load multiple files and combine
 files = ["sample1.ngb-ss3", "sample2.ngb-ss3", "sample3.ngb-ss3"]

@@ -1,17 +1,21 @@
-# PyNetzsch
+# pyNGB (Unofficial NETZSCH NGB Parser)
 
-A Python library for parsing NETZSCH STA (Simultaneous Thermal Analysis) NGB (NETZSCH Binary) files.
+An unofficial Python library for parsing NETZSCH STA (Simultaneous Thermal Analysis) NGB (NETZSCH binary) files produced by NETZSCH thermal analysis instruments.
+
+## Disclaimer
+
+**This package and its author are not affiliated with, endorsed by, or approved by NETZSCH-Gerätebau GmbH.** This is an independent, open-source project created to provide Python support for parsing NGB (NETZSCH binary) file formats. NETZSCH is a trademark of NETZSCH-Gerätebau GmbH.
 
 ## Installation
 
 ```bash
-pip install pynetzsch
+pip install pyngb
 ```
 
 ## Quick Start
 
 ```python
-from pynetzsch import load_ngb_data
+from pyngb import load_ngb_data
 
 # Load NGB file
 table = load_ngb_data("sample.ngb-ss3")
@@ -49,7 +53,7 @@ See [MODULAR_STRUCTURE.md](MODULAR_STRUCTURE.md) for detailed architecture docum
 ## Advanced Usage
 
 ```python
-from pynetzsch import get_sta_data, NGBParser, PatternConfig
+from pyngb import get_sta_data, NGBParser, PatternConfig
 
 # Get separate metadata and data objects
 metadata, data = get_sta_data("sample.ngb-ss3")
@@ -64,21 +68,21 @@ parser = NGBParser(config)
 
 ```bash
 # Convert to Parquet (default)
-python -m pynetzsch sample.ngb-ss3
+python -m pyngb sample.ngb-ss3
 
 # Convert to CSV with verbose logging
-python -m pynetzsch sample.ngb-ss3 -f csv -v
+python -m pyngb sample.ngb-ss3 -f csv -v
 
 # Convert to both formats in custom directory
-python -m pynetzsch sample.ngb-ss3 -f all -o /output/dir
+python -m pyngb sample.ngb-ss3 -f all -o /output/dir
 ```
 
 ## Development
 
 ```bash
 # Clone repository
-git clone https://github.com/GraysonBellamy/pynetzsch.git
-cd pynetzsch
+git clone https://github.com/GraysonBellamy/pyngb.git
+cd pyngb
 
 # Install development dependencies
 uv sync

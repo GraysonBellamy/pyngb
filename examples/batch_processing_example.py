@@ -3,7 +3,7 @@
 Example: Batch Processing and Data Validation
 
 This example demonstrates how to use the new batch processing and data validation
-features in PyNetzsch to handle multiple NGB files efficiently.
+features in pyNGB to handle multiple NGB files efficiently.
 """
 
 
@@ -16,7 +16,7 @@ def main():
     # In a real scenario, you would have actual NGB files
     # For this example, we'll demonstrate the API structure
     print("# Quick validation function")
-    print("from pynetzsch import validate_sta_data, load_ngb_data")
+    print("from pyngb import validate_sta_data, load_ngb_data")
     print("table = load_ngb_data('sample.ngb-ss3')")
     print("issues = validate_sta_data(table)")
     print("if issues:")
@@ -30,7 +30,7 @@ def main():
     # Example 2: Comprehensive quality checking
     print("=== Example 2: Comprehensive Quality Checking ===")
     print("# Detailed quality assessment")
-    print("from pynetzsch import QualityChecker")
+    print("from pyngb import QualityChecker")
     print("checker = QualityChecker(table)")
     print("result = checker.full_validation()")
     print("print(result.report())")
@@ -39,7 +39,7 @@ def main():
     # Example 3: Batch processing setup
     print("=== Example 3: Batch Processing ===")
     print("# Process multiple files in parallel")
-    print("from pynetzsch import BatchProcessor")
+    print("from pyngb import BatchProcessor")
     print("processor = BatchProcessor(")
     print("    max_workers=4,")
     print("    output_format='parquet',")
@@ -62,7 +62,7 @@ def main():
     # Example 4: Dataset management
     print("=== Example 4: Dataset Management ===")
     print("# Create and manage datasets")
-    print("from pynetzsch import NGBDataset")
+    print("from pyngb import NGBDataset")
     print("dataset = NGBDataset()")
     print("dataset.add_directory('/path/to/ngb/files')")
     print("print(f'Dataset contains {len(dataset)} files')")

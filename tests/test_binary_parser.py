@@ -1,11 +1,11 @@
 """
-Unit tests for pynetzsch binary parser.
+Unit tests for pyngb binary parser.
 """
 
 from unittest.mock import patch
 
-from pynetzsch.binary.parser import BinaryParser
-from pynetzsch.constants import BinaryMarkers, DataType
+from pyngb.binary.parser import BinaryParser
+from pyngb.constants import BinaryMarkers, DataType
 
 
 class TestBinaryParser:
@@ -198,7 +198,7 @@ class TestBinaryParser:
         # Just verify it's a list and doesn't crash
         assert isinstance(result, list)
 
-    @patch("pynetzsch.binary.parser.logger")
+    @patch("pyngb.binary.parser.logger")
     def test_logging_debug_messages(self, mock_logger):
         """Test that debug messages are logged appropriately."""
         parser = BinaryParser()

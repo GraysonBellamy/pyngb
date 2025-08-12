@@ -1,5 +1,5 @@
 """
-Integration tests for the complete pynetzsch parsing workflow.
+Integration tests for the complete pyngb parsing workflow.
 """
 
 import struct
@@ -10,8 +10,8 @@ from pathlib import Path
 import polars as pl
 import pyarrow as pa
 import pytest
-from pynetzsch import get_sta_data, load_ngb_data
-from pynetzsch.constants import BinaryMarkers
+from pyngb import get_sta_data, load_ngb_data
+from pyngb.constants import BinaryMarkers
 
 
 class TestEndToEndIntegration:
@@ -209,26 +209,27 @@ class TestEndToEndIntegration:
 
     def test_parser_components_integration(self):
         """Test that parser components work together correctly."""
-        from pynetzsch.core.parser import NGBParser
 
-        parser = NGBParser()
+    from pyngb.core.parser import NGBParser
 
-        # Test that all components are properly initialized
-        assert parser.binary_parser is not None
-        assert parser.metadata_extractor is not None
-        assert parser.data_processor is not None
-        assert parser.markers is not None
+    parser = NGBParser()
 
-        # Test that components have expected attributes
-        assert hasattr(parser.binary_parser, "split_tables")
-        assert hasattr(parser.metadata_extractor, "extract_metadata")
-        assert hasattr(parser.data_processor, "process_stream_2")
+    # Test that all components are properly initialized
+    assert parser.binary_parser is not None
+    assert parser.metadata_extractor is not None
+    assert parser.data_processor is not None
+    assert parser.markers is not None
 
-        # Test marker values are proper bytes
-        markers = parser.markers
-        assert isinstance(markers.START_DATA, bytes)
-        assert isinstance(markers.END_DATA, bytes)
-        assert isinstance(markers.TABLE_SEPARATOR, bytes)
+    # Test that components have expected attributes
+    assert hasattr(parser.binary_parser, "split_tables")
+    assert hasattr(parser.metadata_extractor, "extract_metadata")
+    assert hasattr(parser.data_processor, "process_stream_2")
+
+    # Test marker values are proper bytes
+    markers = parser.markers
+    assert isinstance(markers.START_DATA, bytes)
+    assert isinstance(markers.END_DATA, bytes)
+    assert isinstance(markers.TABLE_SEPARATOR, bytes)
 
     def test_error_handling_integration(self):
         """Test error handling in integration scenarios."""
@@ -366,41 +367,44 @@ class TestRegressionScenarios:
     def test_backwards_compatibility(self):
         """Test that the modular structure maintains backwards compatibility."""
         # Test that old import style still works
-        from pynetzsch import NGBParser as ParserClass
-        from pynetzsch import load_ngb_data as load_func
 
-        assert callable(load_func)
-        assert callable(ParserClass)
+    from pyngb import NGBParser as ParserClass
+    from pyngb import load_ngb_data as load_func
 
-        # Test instantiation
-        parser = ParserClass()
-        assert hasattr(parser, "parse")
+    assert callable(load_func)
+    assert callable(ParserClass)
+
+    # Test instantiation
+    parser = ParserClass()
+    assert hasattr(parser, "parse")
 
     def test_module_isolation(self):
         """Test that modules are properly isolated."""
         # Test that we can import and use individual components
-        from pynetzsch.binary import BinaryParser
-        from pynetzsch.constants import PatternConfig
-        from pynetzsch.extractors import MetadataExtractor
 
-        # Should be able to create instances
-        binary_parser = BinaryParser()
-        config = PatternConfig()
-        metadata_extractor = MetadataExtractor(config, binary_parser)
+    from pyngb.binary import BinaryParser
+    from pyngb.constants import PatternConfig
+    from pyngb.extractors import MetadataExtractor
 
-        # Should have expected methods
-        assert hasattr(binary_parser, "split_tables")
-        assert hasattr(metadata_extractor, "extract_metadata")
+    # Should be able to create instances
+    binary_parser = BinaryParser()
+    config = PatternConfig()
+    metadata_extractor = MetadataExtractor(config, binary_parser)
+
+    # Should have expected methods
+    assert hasattr(binary_parser, "split_tables")
+    assert hasattr(metadata_extractor, "extract_metadata")
 
     def test_import_optimization(self):
         """Test that imports are optimized and don't cause circular dependencies."""
         # These should import without issues
-        import pynetzsch
-        import pynetzsch.api
-        import pynetzsch.binary
-        import pynetzsch.core
-        import pynetzsch.extractors
 
-        # Should be able to access main functions
-        assert hasattr(pynetzsch, "load_ngb_data")
-        assert hasattr(pynetzsch, "NGBParser")
+    import pyngb
+    import pyngb.api
+    import pyngb.binary
+    import pyngb.core
+    import pyngb.extractors
+
+    # Should be able to access main functions
+    assert hasattr(pyngb, "load_ngb_data")
+    assert hasattr(pyngb, "NGBParser")

@@ -11,7 +11,7 @@ import numpy as np
 import polars as pl
 import pyarrow as pa
 
-from pyngb.constants import FileMetadata
+from .constants import FileMetadata
 
 __all__ = [
     "QualityChecker",

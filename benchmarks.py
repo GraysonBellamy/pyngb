@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Performance benchmarks for PyNetzsch library.
+Performance benchmarks for pyNGB library.
 
 Usage:
     python benchmarks.py [--ngb-file path/to/file.ngb-ss3]
@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import psutil
-from pynetzsch import load_ngb_data
+from pyngb import load_ngb_data
 
 
 def benchmark_parsing(ngb_file: str, runs: int = 5) -> dict[str, Any]:
@@ -137,7 +137,7 @@ def print_results(parse_results: dict[str, Any], memory_results: dict[str, Any])
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Benchmark PyNetzsch performance")
+    parser = argparse.ArgumentParser(description="Benchmark pyngb performance")
     parser.add_argument(
         "--ngb-file",
         default="tests/test_files/Red_Oak_STA_10K_250731_R7.ngb-ss3",

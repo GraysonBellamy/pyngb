@@ -1,6 +1,6 @@
 # Scripts Directory
 
-This directory contains utility and testing scripts for the PyNetzsch project.
+This directory contains utility and testing scripts for the pyngb project.
 
 ## Scripts Overview
 

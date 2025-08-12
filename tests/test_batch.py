@@ -10,8 +10,8 @@ import numpy as np
 import polars as pl
 import pytest
 
-from pynetzsch.batch import BatchProcessor
-from pynetzsch.validation import QualityChecker, ValidationResult, validate_sta_data
+from pyngb.batch import BatchProcessor
+from pyngb.validation import QualityChecker, ValidationResult, validate_sta_data
 
 
 @pytest.fixture

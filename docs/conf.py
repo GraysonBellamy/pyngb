@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.abspath("../src"))
 
 # -- Project information -----------------------------------------------------
 
-project = "PyNetzsch"
+project = "pyngb"
 copyright = "2025, Grayson Bellamy"
 author = "Grayson Bellamy"
 

@@ -1,5 +1,5 @@
 """
-Test configuration and fixtures for pynetzsch tests.
+Test configuration and fixtures for pyngb tests.
 """
 
 import tempfile
@@ -7,7 +7,7 @@ import zipfile
 from pathlib import Path
 
 import pytest
-from pynetzsch.constants import BinaryMarkers, PatternConfig
+from pyngb.constants import BinaryMarkers, PatternConfig
 
 
 @pytest.fixture()

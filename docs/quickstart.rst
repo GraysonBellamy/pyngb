@@ -1,16 +1,16 @@
 Quick Start Guide
 =================
 
-This guide will help you get started with PyNetzsch quickly.
+This guide will help you get started with pyngb quickly.
 
 Loading Data
 ------------
 
-PyNetzsch provides two main functions for loading data:
+pyngb provides two main functions for loading data:
 
 .. code-block:: python
 
-   from pynetzsch import load_ngb_data, get_sta_data
+   from pyngb import load_ngb_data, get_sta_data
 
    # Method 1: Load as PyArrow Table (recommended for large datasets)
    table = load_ngb_data("sample.ngb-ss3")
@@ -42,18 +42,18 @@ Convert to different formats:
 Command Line Usage
 ------------------
 
-PyNetzsch includes a command-line interface:
+pyngb includes a command-line interface:
 
 .. code-block:: bash
 
    # Convert a single file
-   python -m pynetzsch input.ngb-ss3 --format parquet
+   python -m pyngb input.ngb-ss3 --format parquet
 
    # Process multiple files
-   python -m pynetzsch *.ngb-ss3 --format all --output ./results/
+   python -m pyngb *.ngb-ss3 --format all --output ./results/
 
    # Get help
-   python -m pynetzsch --help
+   python -m pyngb --help
 
 Common Use Cases
 ----------------

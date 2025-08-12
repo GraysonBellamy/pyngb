@@ -1,5 +1,5 @@
 """
-Command-line interface for pynetzsch.
+Command-line interface for pyngb.
 """
 
 import sys

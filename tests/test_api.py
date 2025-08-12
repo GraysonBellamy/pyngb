@@ -1,5 +1,5 @@
 """
-Unit tests for pynetzsch API functions.
+Unit tests for pyngb API functions.
 """
 
 import tempfile
@@ -9,9 +9,9 @@ from unittest.mock import MagicMock, patch
 
 import pyarrow as pa
 import pytest
-from pynetzsch.api.loaders import get_sta_data, load_ngb_data, main
-from pynetzsch.constants import BinaryMarkers
-from pynetzsch.exceptions import NGBStreamNotFoundError
+from pyngb.api.loaders import get_sta_data, load_ngb_data, main
+from pyngb.constants import BinaryMarkers
+from pyngb.exceptions import NGBStreamNotFoundError
 
 
 class TestLoadNGBData:
@@ -50,7 +50,7 @@ class TestLoadNGBData:
         assert "hash" in metadata["file_hash"]
         assert metadata["file_hash"]["method"] == "BLAKE2b"
 
-    @patch("pynetzsch.api.loaders.get_hash")
+    @patch("pyngb.api.loaders.get_hash")
     def test_load_ngb_data_hash_failure(
         self, mock_get_hash, sample_ngb_file, cleanup_temp_files
     ):
@@ -102,19 +102,20 @@ class TestMainCLI:
 
     def test_main_help_argument(self):
         """Test main function with help argument."""
-        import sys
-        from unittest.mock import patch
 
-        # Mock sys.argv to include help
-        with patch.object(sys, "argv", ["pynetzsch", "--help"]):
-            try:
-                main()
-            except SystemExit as e:
-                # argparse exits with 0 for help
-                assert e.code == 0
+    import sys
+    from unittest.mock import patch
 
-    @patch("pynetzsch.api.loaders.load_ngb_data")
-    @patch("pynetzsch.api.loaders.Path")
+    # Mock sys.argv to include help
+    with patch.object(sys, "argv", ["pyngb", "--help"]):
+        try:
+            main()
+        except SystemExit as e:
+            # argparse exits with 0 for help
+            assert e.code == 0
+
+    @patch("pyngb.api.loaders.load_ngb_data")
+    @patch("pyngb.api.loaders.Path")
     @patch("pyarrow.parquet.write_table")
     def test_main_parquet_output(self, mock_write_table, mock_path, mock_load_ngb):
         """Test main function with Parquet output."""
@@ -129,7 +130,7 @@ class TestMainCLI:
         mock_output_path.mkdir = MagicMock()
 
         # Mock sys.argv
-        test_args = ["pynetzsch", "test.ngb-ss3", "-f", "parquet", "-o", "/output"]
+        test_args = ["pyngb", "test.ngb-ss3", "-f", "parquet", "-o", "/output"]
         with patch.object(sys, "argv", test_args):
             result = main()
 
@@ -137,8 +138,8 @@ class TestMainCLI:
         mock_load_ngb.assert_called_once_with("test.ngb-ss3")
         mock_write_table.assert_called_once()
 
-    @patch("pynetzsch.api.loaders.load_ngb_data")
-    @patch("pynetzsch.api.loaders.Path")
+    @patch("pyngb.api.loaders.load_ngb_data")
+    @patch("pyngb.api.loaders.Path")
     @patch("polars.from_arrow")
     def test_main_csv_output(self, mock_from_arrow, mock_path, mock_load_ngb):
         """Test main function with CSV output."""
@@ -158,7 +159,7 @@ class TestMainCLI:
         mock_df.to_pandas.return_value = mock_pandas_df
 
         # Mock sys.argv
-        test_args = ["pynetzsch", "test.ngb-ss3", "-f", "csv"]
+        test_args = ["pyngb", "test.ngb-ss3", "-f", "csv"]
         with patch.object(sys, "argv", test_args):
             result = main()
 
@@ -166,7 +167,7 @@ class TestMainCLI:
         mock_load_ngb.assert_called_once_with("test.ngb-ss3")
         mock_pandas_df.to_csv.assert_called_once()
 
-    @patch("pynetzsch.api.loaders.load_ngb_data")
+    @patch("pyngb.api.loaders.load_ngb_data")
     def test_main_error_handling(self, mock_load_ngb):
         """Test main function error handling."""
         import sys
@@ -176,7 +177,7 @@ class TestMainCLI:
         mock_load_ngb.side_effect = Exception("Test error")
 
         # Mock sys.argv
-        test_args = ["pynetzsch", "test.ngb-ss3"]
+        test_args = ["pyngb", "test.ngb-ss3"]
         with patch.object(sys, "argv", test_args):
             result = main()
 
@@ -188,8 +189,8 @@ class TestMainCLI:
         import sys
         from unittest.mock import patch
 
-        with patch.object(sys, "argv", ["pynetzsch", "test.ngb-ss3", "-v"]):
-            with patch("pynetzsch.api.loaders.load_ngb_data") as mock_load:
+        with patch.object(sys, "argv", ["pyngb", "test.ngb-ss3", "-v"]):
+            with patch("pyngb.api.loaders.load_ngb_data") as mock_load:
                 with patch("logging.basicConfig") as mock_config:
                     mock_load.side_effect = FileNotFoundError("Test")
 

@@ -1,6 +1,6 @@
-# PyNetzsch Examples
+# pyNGB Examples
 
-This directory contains comprehensive examples showing how to use PyNetzsch effectively.
+This directory contains comprehensive examples showing how to use pyNGB effectively.
 
 ## Available Examples
 
@@ -16,7 +16,7 @@ This directory contains comprehensive examples showing how to use PyNetzsch effe
 Process multiple NGB files efficiently with parallel processing:
 
 ```python
-from pynetzsch import BatchProcessor
+from pyngb import BatchProcessor
 
 processor = BatchProcessor(max_workers=4)
 results = processor.process_directory('./data', output_dir='./processed')
@@ -27,7 +27,7 @@ results = processor.process_directory('./data', output_dir='./processed')
 Validate STA data quality and detect common issues:
 
 ```python
-from pynetzsch import validate_sta_data, QualityChecker
+from pyngb import validate_sta_data, QualityChecker
 
 # Quick validation
 issues = validate_sta_data(table)
@@ -43,7 +43,7 @@ print(result.report())
 Manage collections of STA files:
 
 ```python
-from pynetzsch import NGBDataset
+from pyngb import NGBDataset
 
 dataset = NGBDataset()
 dataset.add_directory('./data')
@@ -57,7 +57,7 @@ dataset.to_parquet('consolidated_data.parquet')
 
 ```python
 # examples/01_basic_loading.py
-from pynetzsch import load_ngb_data
+from pyngb import load_ngb_data
 import json
 
 # Load NGB file
@@ -80,7 +80,7 @@ print(f"Mass: {metadata.get('sample_mass', 'Unknown')} mg")
 ```python
 # examples/02_polars_analysis.py
 import polars as pl
-from pynetzsch import load_ngb_data
+from pyngb import load_ngb_data
 
 # Load data
 table = load_ngb_data("sample.ngb-ss3")
@@ -110,7 +110,7 @@ print(f"Peak DSC: {peak_dsc['dsc'][0]:.3f} at {peak_dsc['temperature'][0]:.1f}°
 # examples/03_visualization.py
 import matplotlib.pyplot as plt
 import polars as pl
-from pynetzsch import load_ngb_data
+from pyngb import load_ngb_data
 
 # Load and convert data
 table = load_ngb_data("sample.ngb-ss3")
@@ -158,7 +158,7 @@ plt.show()
 
 ```python
 # examples/04_metadata_extraction.py
-from pynetzsch import get_sta_data
+from pyngb import get_sta_data
 import json
 from datetime import datetime
 
@@ -218,7 +218,7 @@ for param, value in cal_constants.items():
 # examples/05_batch_processing.py
 from pathlib import Path
 import polars as pl
-from pynetzsch import load_ngb_data
+from pyngb import load_ngb_data
 import json
 
 def process_ngb_files(directory: str, output_format='parquet'):
@@ -288,8 +288,8 @@ if __name__ == "__main__":
 
 ```python
 # examples/06_custom_configuration.py
-from pynetzsch import NGBParser, PatternConfig
-from pynetzsch.constants import DataType
+from pyngb import NGBParser, PatternConfig
+from pyngb.constants import DataType
 
 # Create custom configuration
 config = PatternConfig()
@@ -311,7 +311,7 @@ print(f"Available columns: {data.column_names}")
 print(f"Custom metadata: {metadata.get('custom_field', 'Not found')}")
 
 # Example: Extended parser with validation
-from pynetzsch.core.parser import NGBParserExtended
+from pyngb.core.parser import NGBParserExtended
 
 extended_parser = NGBParserExtended(config, cache_patterns=True)
 

@@ -1,9 +1,9 @@
 """
-Unit tests for pynetzsch exceptions.
+Unit tests for pyngb exceptions.
 """
 
 import pytest
-from pynetzsch.exceptions import (
+from pyngb.exceptions import (
     NGBCorruptedFileError,
     NGBDataTypeError,
     NGBParseError,

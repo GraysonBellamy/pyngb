@@ -1,7 +1,7 @@
-PyNetzsch Documentation
+pyngb Documentation
 =======================
 
-PyNetzsch is a Python library for parsing and analyzing NETZSCH STA (Simultaneous Thermal Analysis) data files.
+pyngb is a Python library for parsing and analyzing NETZSCH STA (Simultaneous Thermal Analysis) data files.
 
 .. toctree::
    :maxdepth: 2
@@ -15,17 +15,17 @@ PyNetzsch is a Python library for parsing and analyzing NETZSCH STA (Simultaneou
 Quick Start
 -----------
 
-Install PyNetzsch:
+Install pyngb:
 
 .. code-block:: bash
 
-   pip install pynetzsch
+   pip install pyngb
 
 Basic usage:
 
 .. code-block:: python
 
-   from pynetzsch import load_ngb_data, get_sta_data
+   from pyngb import load_ngb_data, get_sta_data
 
    # Load data as PyArrow Table
    table = load_ngb_data("your_file.ngb-ss3")

@@ -1,4 +1,4 @@
-# Pre-commit hooks for PyNetzsch
+# Pre-commit hooks for pyngb
 # See https://pre-commit.com for more information
 
 repos:
@@ -21,7 +21,7 @@ repos:
         additional_dependencies:
           - types-setuptools
         args: [--ignore-missing-imports]
-        files: ^src/pynetzsch/.*\.py$
+        files: ^src/pyngb/.*\.py$
 
   # General file checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -65,7 +65,7 @@ repos:
   #     - id: pydocstyle
   #       name: "Check docstrings with pydocstyle"
   #       additional_dependencies: [toml]
-  #       files: ^src/pynetzsch/.*\.py$
+  #       files: ^src/pyngb/.*\.py$
   #       args: [--convention=numpy]
 
   # Jupyter notebook cleaning

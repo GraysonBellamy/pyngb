@@ -1,6 +1,6 @@
-# PyNetzsch Roadmap & Future Improvements
+# pyNGB Roadmap & Future Improvements
 
-This document outlines potential future enhancements for the PyNetzsch library.
+This document outlines potential future enhancements for the pyNGB library.
 
 ## 📋 Immediate Next Steps (v0.2.0)
 
@@ -11,7 +11,7 @@ from typing import Protocol, TypeVar, Generic
 import mypy
 
 # Run type checking in CI
-mypy src/pynetzsch --strict
+mypy src/pyngb --strict
 ```
 
 ### Advanced Data Validation
@@ -34,7 +34,7 @@ class NGBDataSchema(BaseModel):
 ```python
 # For batch processing of multiple files
 import asyncio
-from pynetzsch import AsyncNGBParser
+from pyngb import AsyncNGBParser
 
 async def process_many_files(files: list[str]):
     parser = AsyncNGBParser()
@@ -48,7 +48,7 @@ async def process_many_files(files: list[str]):
 ### Plugin Architecture
 ```python
 # Allow custom data processors
-from pynetzsch.plugins import DataProcessorPlugin
+from pyngb.plugins import DataProcessorPlugin
 
 class CustomAnalysisPlugin(DataProcessorPlugin):
     def process_data(self, table: pa.Table) -> pa.Table:
@@ -62,7 +62,7 @@ parser.register_plugin(CustomAnalysisPlugin())
 ### Caching Layer
 ```python
 # Cache parsed results for repeated access
-from pynetzsch.cache import FileCache
+from pyngb.cache import FileCache
 
 cache = FileCache("/path/to/cache")
 table = load_ngb_data("file.ngb-ss3", cache=cache)  # Caches result
@@ -72,7 +72,7 @@ table2 = load_ngb_data("file.ngb-ss3", cache=cache)  # Uses cache
 ### Multi-format Support
 ```python
 # Support other thermal analysis formats
-from pynetzsch import load_thermal_data
+from pyngb import load_thermal_data
 
 # Auto-detect format
 table = load_thermal_data("file.dta")  # TA Instruments
@@ -85,7 +85,7 @@ table = load_thermal_data("file.ngb-ss3")  # NETZSCH
 ### Web Dashboard
 ```python
 # Interactive web interface for data exploration
-from pynetzsch.web import create_dashboard
+from pyngb.web import create_dashboard
 
 app = create_dashboard()
 app.add_file("experiment.ngb-ss3")
@@ -102,7 +102,7 @@ app.run(host="localhost", port=8080)
 ### Machine Learning Integration
 ```python
 # Built-in ML tools for thermal analysis
-from pynetzsch.ml import ThermalAnalyzer
+from pyngb.ml import ThermalAnalyzer
 
 analyzer = ThermalAnalyzer()
 analyzer.fit(training_files)
@@ -120,7 +120,7 @@ material_type = analyzer.classify_material(file)
 ### Cloud Integration
 ```python
 # Process files stored in cloud
-from pynetzsch.cloud import S3Parser, AzureParser
+from pyngb.cloud import S3Parser, AzureParser
 
 # AWS S3
 parser = S3Parser(bucket="my-thermal-data")
@@ -134,7 +134,7 @@ results = parser.process_batch(file_list)
 ### Real-time Data Streaming
 ```python
 # Process data as it's being generated
-from pynetzsch.streaming import NGBStreamer
+from pyngb.streaming import NGBStreamer
 
 streamer = NGBStreamer()
 streamer.connect_instrument("192.168.1.100")
@@ -257,4 +257,4 @@ def process_realtime(data_chunk):
 - Advanced analytics
 - Platform expansion
 
-This roadmap provides a clear path for evolving PyNetzsch from a specialized parsing library into a comprehensive thermal analysis platform.
+This roadmap provides a clear path for evolving pyNGB from a specialized parsing library into a comprehensive thermal analysis platform.

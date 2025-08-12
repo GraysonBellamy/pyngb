@@ -1,5 +1,5 @@
 """
-Comprehensive test runner for pynetzsch tests.
+Comprehensive test runner for pyngb tests.
 Run this file to execute all tests without pytest installation.
 Includes both core functionality and new features testing.
 """
@@ -10,7 +10,7 @@ from pathlib import Path
 
 import polars as pl
 
-# Add src to path so we can import pynetzsch
+# Add src to path so we can import pyngb
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 
@@ -19,7 +19,7 @@ def run_basic_tests():
     passed = 0
     failed = 0
 
-    print("🧪 Running PyNetzsch Comprehensive Tests")
+    print("🧪 Running pyngb Comprehensive Tests")
     print("=" * 50)
 
     core_tests = [
@@ -70,7 +70,7 @@ def run_basic_tests():
 def test_imports():
     """Test that all modules can be imported."""
     # Test main API
-    from pynetzsch import NGBParser, load_ngb_data
+    from pyngb import NGBParser, load_ngb_data
 
     # Test submodules
 
@@ -80,7 +80,7 @@ def test_imports():
 
 def test_exceptions():
     """Test exception classes."""
-    from pynetzsch.exceptions import NGBCorruptedFileError, NGBParseError
+    from pyngb.exceptions import NGBCorruptedFileError, NGBParseError
 
     # Test inheritance
     error = NGBCorruptedFileError("test")
@@ -91,7 +91,7 @@ def test_exceptions():
 
 def test_constants():
     """Test constants and configurations."""
-    from pynetzsch.constants import BinaryMarkers, DataType, PatternConfig
+    from pyngb.constants import BinaryMarkers, DataType, PatternConfig
 
     # Test DataType enum
     assert DataType.FLOAT64.value == b"\x05"
@@ -118,8 +118,8 @@ def test_binary_handlers():
     """Test binary data handlers."""
     import struct
 
-    from pynetzsch.binary.handlers import DataTypeRegistry, Float64Handler
-    from pynetzsch.constants import DataType
+    from pyngb.binary.handlers import DataTypeRegistry, Float64Handler
+    from pyngb.constants import DataType
 
     # Test Float64Handler
     handler = Float64Handler()
@@ -142,8 +142,8 @@ def test_binary_parser_basic():
     """Test basic binary parser functionality."""
     import struct
 
-    from pynetzsch.binary.parser import BinaryParser
-    from pynetzsch.constants import DataType
+    from pyngb.binary.parser import BinaryParser
+    from pyngb.constants import DataType
 
     parser = BinaryParser()
 
@@ -169,7 +169,7 @@ def test_binary_parser_basic():
 def test_validation_features():
     """Test validation features."""
     # Import validation modules
-    from pynetzsch.validation import QualityChecker, ValidationResult, validate_sta_data
+    from pyngb.validation import QualityChecker, ValidationResult, validate_sta_data
 
     # Create sample data with correct column names
     sample_data = pl.DataFrame(
@@ -201,7 +201,7 @@ def test_validation_features():
 
 def test_batch_processing_features():
     """Test batch processing features."""
-    from pynetzsch.batch import BatchProcessor, NGBDataset
+    from pyngb.batch import BatchProcessor, NGBDataset
 
     # Test BatchProcessor initialization
     processor = BatchProcessor(max_workers=2, verbose=False)
@@ -220,8 +220,8 @@ def test_batch_processing_features():
 def test_integration():
     """Test integration between modules."""
     # Test that all imports work
-    from pynetzsch.batch import BatchProcessor
-    from pynetzsch.validation import validate_sta_data
+    from pyngb.batch import BatchProcessor
+    from pyngb.validation import validate_sta_data
 
     # Create test data with correct column names
     test_data = pl.DataFrame(

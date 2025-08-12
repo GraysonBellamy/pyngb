@@ -6,15 +6,15 @@ From PyPI
 
 .. code-block:: bash
 
-   pip install pynetzsch
+   pip install pyngb
 
 From Source
 -----------
 
 .. code-block:: bash
 
-   git clone https://github.com/GraysonBellamy/pynetzsch.git
-   cd pynetzsch
+   git clone https://github.com/GraysonBellamy/pyngb.git
+   cd pyngb
    pip install -e .
 
 Requirements
@@ -31,4 +31,4 @@ For development:
 
 .. code-block:: bash
 
-   pip install pynetzsch[dev]
+   pip install pyngb[dev]

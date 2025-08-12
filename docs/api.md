@@ -1,57 +1,57 @@
 # API Reference
 
-This section provides detailed documentation of PyNetzsch's API.
+This section provides detailed documentation of pyngb's API.
 
 ## Main Functions
 
-::: pynetzsch.load_ngb_data
+::: pyngb.load_ngb_data
 
-::: pynetzsch.get_sta_data
+::: pyngb.get_sta_data
 
 ## Constants
 
-::: pynetzsch.BinaryMarkers
+::: pyngb.BinaryMarkers
 
-::: pynetzsch.PatternConfig
+::: pyngb.PatternConfig
 
 ## Data Types
 
-::: pynetzsch.DataType
+::: pyngb.DataType
 
 ## Exceptions
 
-::: pynetzsch.NGBParseError
+::: pyngb.NGBParseError
 
-::: pynetzsch.NGBCorruptedFileError
+::: pyngb.NGBCorruptedFileError
 
-::: pynetzsch.NGBUnsupportedVersionError
+::: pyngb.NGBUnsupportedVersionError
 
-::: pynetzsch.NGBDataTypeError
+::: pyngb.NGBDataTypeError
 
-::: pynetzsch.NGBStreamNotFoundError
+::: pyngb.NGBStreamNotFoundError
 
 ## Internal Modules
 
 ### Binary Parser
 
-::: pynetzsch.binary.parser
+::: pyngb.binary.parser
 
 ### Binary Handlers
 
-::: pynetzsch.binary.handlers
+::: pyngb.binary.handlers
 
 ### Core Parser
 
-::: pynetzsch.core.parser
+::: pyngb.core.parser
 
 ### Metadata Extraction
 
-::: pynetzsch.extractors.metadata
+::: pyngb.extractors.metadata
 
 ### Stream Extraction
 
-::: pynetzsch.extractors.streams
+::: pyngb.extractors.streams
 
 ### Utilities
 
-::: pynetzsch.util
+::: pyngb.util

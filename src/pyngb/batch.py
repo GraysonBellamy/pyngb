@@ -14,8 +14,8 @@ import polars as pl
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from pyngb.api.loaders import get_sta_data
-from pyngb.constants import FileMetadata
+from .api.loaders import get_sta_data
+from .constants import FileMetadata
 
 __all__ = ["BatchProcessor", "NGBDataset", "process_directory", "process_files"]
 

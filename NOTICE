@@ -1,0 +1,18 @@
+pyNGB - Unofficial NETZSCH NGB Parser
+=====================================
+
+Copyright (c) 2025 Grayson Bellamy
+
+This project includes original code released under the MIT License (see LICENSE.txt).
+
+Trademark Notice
+----------------
+NETZSCH and related marks are trademarks of NETZSCH-Gerätebau GmbH. Their use in this project is purely nominative to describe compatibility with NGB (NETZSCH binary) file formats produced by NETZSCH instruments. This project is unaffiliated with, not endorsed by, and not approved by NETZSCH-Gerätebau GmbH.
+
+No proprietary NETZSCH code, firmware, documentation text, or logos are included in this repository. If you are a representative of NETZSCH and have concerns about the way trademarks are referenced here, please open an issue in the repository or contact the author.
+
+Attribution
+-----------
+Users of this project should not imply endorsement by NETZSCH when publishing derived works or scientific results.
+
+For official NETZSCH software and support, please consult the manufacturer's website.

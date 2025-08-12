@@ -1,13 +1,13 @@
 [project]
-name = "pynetzsch"
+name = "pyngb"
 version = "0.1.0"
-description = "Python package for parsing NETZSCH STA (Simultaneous Thermal Analysis) NGB files with high performance and comprehensive metadata extraction."
+description = "Unofficial parser for NETZSCH STA (Simultaneous Thermal Analysis) NGB instrument binary files. Not affiliated with, endorsed by, or approved by NETZSCH-Gerätebau GmbH."
 readme = "README.md"
 authors = [
     { name = "Grayson Bellamy", email = "gbellamy@umd.edu" }
 ]
 license = { file = "LICENSE.txt" }
-keywords = ["netzsch", "sta", "thermal-analysis", "scientific-data", "binary-parsing"]
+keywords = ["ngb", "netzsch", "sta", "thermal-analysis", "scientific-data", "binary-parsing", "unofficial"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
@@ -62,14 +62,14 @@ performance = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/GraysonBellamy/pynetzsch"
-Documentation = "https://graysonbellamy.github.io/pynetzsch/"
-Repository = "https://github.com/GraysonBellamy/pynetzsch.git"
-Issues = "https://github.com/GraysonBellamy/pynetzsch/issues"
-Changelog = "https://github.com/GraysonBellamy/pynetzsch/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/GraysonBellamy/pyngb"
+Documentation = "https://graysonbellamy.github.io/pyngb/"
+Repository = "https://github.com/GraysonBellamy/pyngb.git"
+Issues = "https://github.com/GraysonBellamy/pyngb/issues"
+Changelog = "https://github.com/GraysonBellamy/pyngb/blob/main/CHANGELOG.md"
 
 [project.scripts]
-pynetzsch = "pynetzsch.cli:main"
+pyngb = "pyngb.cli:main"
 
 [build-system]
 requires = ["hatchling"]
