@@ -191,16 +191,15 @@ jobs:
     - name: Install build dependencies
       run: |
         pip install uv
-        uv sync
-        uv pip install build twine
+        uv sync --extra build
 
     - name: Build package
       run: |
-        python -m build
+        uv run python -m build
 
     - name: Check package
       run: |
-        twine check dist/*
+        uv run twine check dist/*
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4

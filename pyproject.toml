@@ -52,6 +52,10 @@ docs = [
     "mkdocs-material>=9.0.0",
     "mkdocstrings[python]>=0.20.0",
 ]
+build = [
+    "build>=1.0.0",
+    "twine>=4.0.0",
+]
 performance = [
     "psutil>=5.9.0",
     "memory_profiler>=0.60.0",
