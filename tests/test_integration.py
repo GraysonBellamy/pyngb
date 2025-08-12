@@ -148,16 +148,16 @@ class TestEndToEndIntegration:
         # Verify table structure
         assert isinstance(table, pa.Table)
         assert table.num_rows > 0, f"Expected data rows, got {table.num_rows}"
-        assert (
-            len(table.column_names) > 0
-        ), f"Expected columns, got {table.column_names}"
+        assert len(table.column_names) > 0, (
+            f"Expected columns, got {table.column_names}"
+        )
 
         # Verify we have typical STA columns
         expected_columns = {"time", "temperature", "dsc", "sample_mass"}
         actual_columns = set(table.column_names)
-        assert expected_columns.issubset(
-            actual_columns
-        ), f"Missing expected columns: {expected_columns - actual_columns}"
+        assert expected_columns.issubset(actual_columns), (
+            f"Missing expected columns: {expected_columns - actual_columns}"
+        )
 
         # Verify metadata is embedded
         assert table.schema.metadata is not None
@@ -192,17 +192,17 @@ class TestEndToEndIntegration:
         if "time" in table.column_names:
             time_col = table.column("time").to_pylist()
             assert len(time_col) == table.num_rows
-            assert all(
-                isinstance(x, (int, float)) for x in time_col[:10]
-            ), "Time should be numeric"
+            assert all(isinstance(x, (int, float)) for x in time_col[:10]), (
+                "Time should be numeric"
+            )
             print(f"  ✓ Time range: {min(time_col):.1f} to {max(time_col):.1f}")
 
         if "temperature" in table.column_names:
             temp_col = table.column("temperature").to_pylist()
             assert len(temp_col) == table.num_rows
-            assert all(
-                isinstance(x, (int, float)) for x in temp_col[:10]
-            ), "Temperature should be numeric"
+            assert all(isinstance(x, (int, float)) for x in temp_col[:10]), (
+                "Temperature should be numeric"
+            )
             print(
                 f"  ✓ Temperature range: {min(temp_col):.1f} to {max(temp_col):.1f} °C"
             )
