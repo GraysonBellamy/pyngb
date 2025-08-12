@@ -142,15 +142,17 @@ def process_file(file_path: Path, args: argparse.Namespace) -> Optional[dict]:
 
             if args.format in ["csv", "all"]:
                 csv_file = output_dir / f"{base_name}.csv"
-                pl.from_arrow(table).write_csv(csv_file)
+                df: pl.DataFrame = pl.from_arrow(table)  # type: ignore[assignment]
+                df.write_csv(csv_file)
                 if not args.quiet:
                     print(f"  → {csv_file}")
 
             if args.format in ["json", "all"]:
                 json_file = output_dir / f"{base_name}.json"
+                df_for_json: pl.DataFrame = pl.from_arrow(table)  # type: ignore[assignment]
                 with open(json_file, "w") as f:
                     json.dump(
-                        {"metadata": metadata, "data": pl.from_arrow(table).to_dicts()},
+                        {"metadata": metadata, "data": df_for_json.to_dicts()},
                         f,
                         indent=2,
                         default=str,

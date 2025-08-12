@@ -99,7 +99,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        uv sync --dev
+        uv sync --all-extras
 
     - name: Run Bandit Security Scan
       run: |
@@ -108,9 +108,9 @@ jobs:
 
     - name: Run Safety Check
       run: |
-        # Use the legacy check command for CI - it still works but shows deprecation warnings
-        uv run safety check --json --output safety-report.json --ignore-unpinned-requirements || true
-        uv run safety check --ignore-unpinned-requirements || echo "Safety check completed with warnings"
+        # Use the new scan command - cleaner output without deprecation warnings
+        uv run safety scan --output json --save-as json safety-report.json || true
+        uv run safety scan || echo "Safety scan completed with warnings"
 
   docs:
     name: Build Documentation
