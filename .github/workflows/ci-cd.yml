@@ -127,19 +127,53 @@ jobs:
     - name: Install documentation dependencies
       run: |
         pip install uv
-        uv sync
-        uv pip install sphinx sphinx-rtd-theme sphinx-autodoc-typehints
+        uv sync --all-extras
 
     - name: Build documentation
       run: |
-        cd docs
-        make html
+        uv run mkdocs build
+        # Add .nojekyll file for GitHub Pages
+        touch site/.nojekyll
 
     - name: Upload documentation artifacts
       uses: actions/upload-artifact@v4
       with:
         name: documentation
-        path: docs/_build/html
+        path: site
+
+  deploy-docs:
+    name: Deploy Documentation
+    runs-on: ubuntu-latest
+    needs: [docs]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+    - name: Download documentation artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: documentation
+        path: ./site
+
+    - name: Setup Pages
+      uses: actions/configure-pages@v4
+
+    - name: Upload to GitHub Pages
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: ./site
+
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
 
   build:
     name: Build Package

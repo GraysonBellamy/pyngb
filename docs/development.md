@@ -1,8 +1,8 @@
-# Development Guide
+# Development
 
-This guide covers the development workflow and tools for PyNetzsch.
+This page contains information for developers contributing to PyNetzsch.
 
-## Development Environment Setup
+## Setting Up Development Environment
 
 ### Prerequisites
 
@@ -14,7 +14,7 @@ This guide covers the development workflow and tools for PyNetzsch.
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/pynetzsch.git
+   git clone https://github.com/GraysonBellamy/pynetzsch.git
    cd pynetzsch
    ```
 
@@ -36,12 +36,9 @@ PyNetzsch uses several automated tools to maintain code quality:
 
 Pre-commit hooks run automatically before each commit and include:
 
-- **Black**: Code formatting
-- **isort**: Import sorting
-- **Ruff**: Fast Python linter with auto-fixes
+- **Ruff**: Fast Python linter and formatter (replaces Black and isort)
 - **mypy**: Type checking
 - **Bandit**: Security scanning
-- **pydocstyle**: Docstring style checking
 - Various file checks (trailing whitespace, file endings, etc.)
 
 ### Running Tools Manually
@@ -49,18 +46,16 @@ Pre-commit hooks run automatically before each commit and include:
 You can run any of these tools manually:
 
 ```bash
-# Format code
-uv run black src/ tests/
-uv run isort src/ tests/
-
-# Lint code
+# Lint and format code with Ruff
 uv run ruff check src/ tests/ --fix
+uv run ruff format src/ tests/
 
 # Type check
 uv run mypy src/
 
 # Security scan
 uv run bandit -r src/
+uv run safety scan
 
 # Run all pre-commit hooks
 uv run pre-commit run --all-files
@@ -70,12 +65,9 @@ uv run pre-commit run --all-files
 
 Tool configurations are in `pyproject.toml`:
 
-- `[tool.black]`: Code formatting settings
-- `[tool.isort]`: Import sorting configuration
-- `[tool.ruff]`: Linting rules and exclusions
+- `[tool.ruff]`: Linting and formatting rules
 - `[tool.mypy]`: Type checking settings
 - `[tool.bandit]`: Security scanning configuration
-- `[tool.pydocstyle]`: Docstring style rules
 
 ## Testing
 
@@ -93,16 +85,24 @@ uv run pytest tests/test_api.py
 
 # Run with verbose output
 uv run pytest -v
+
+# Run specific test types
+pytest tests/ -k "not integration"  # Skip integration tests
+pytest tests/test_integration.py    # Only integration tests
 ```
 
 ### Test Structure
 
 Tests are organized in the `tests/` directory:
 
-- `test_api.py`: API functionality tests
-- `test_binary_*.py`: Binary parsing tests
+- `test_api.py`: High-level API functionality tests
+- `test_binary_handlers.py`: Binary handler tests
+- `test_binary_parser.py`: Binary parser tests
+- `test_constants.py`: Constants tests
+- `test_exceptions.py`: Exception tests
 - `test_integration.py`: End-to-end integration tests
 - `test_files/`: Sample NGB files for testing
+- `conftest.py`: Pytest configuration and fixtures
 
 ### Adding Tests
 
@@ -112,6 +112,8 @@ When adding new functionality:
 2. Ensure good test coverage (aim for >80%)
 3. Include both positive and negative test cases
 4. Test edge cases and error conditions
+5. Use descriptive test names that explain what is being tested
+6. Follow the Arrange-Act-Assert pattern
 
 ## Performance
 
@@ -123,6 +125,9 @@ Use the built-in benchmarking tools:
 # Run performance benchmarks
 python benchmarks.py
 
+# Run with multiple iterations for better statistics
+python benchmarks.py --runs 5
+
 # Profile memory usage
 python -m memory_profiler benchmarks.py
 ```
@@ -130,60 +135,64 @@ python -m memory_profiler benchmarks.py
 ### Performance Guidelines
 
 - Use numpy arrays for numerical data when possible
+- Consider using PyArrow Tables for memory efficiency with large datasets
 - Minimize memory allocations in hot paths
 - Profile before optimizing
-- Consider using polars for large datasets
+- Consider using Parquet format for intermediate storage (faster than CSV)
+- Process files in chunks for very large datasets
 
 ## Documentation
 
 ### Docstrings
 
-Follow the NumPy docstring convention:
+Follow the Google/NumPy docstring convention:
 
 ```python
 def parse_data(self, data: bytes) -> Dict[str, Any]:
     """Parse binary data into a structured format.
 
-    Parameters
-    ----------
-    data : bytes
-        Raw binary data to parse
+    Args:
+        data: Raw binary data to parse
 
-    Returns
-    -------
-    Dict[str, Any]
+    Returns:
         Parsed data structure
 
-    Raises
-    ------
-    ParseError
-        If data format is invalid
+    Raises:
+        ParseError: If data format is invalid
     """
 ```
 
 ### Building Documentation
 
+The project uses MkDocs with the Material theme:
+
 ```bash
 # Install documentation dependencies
 uv sync --extra docs
 
-# Build documentation (if sphinx setup exists)
-cd docs/
-make html
+# Serve documentation locally with auto-reload
+mkdocs serve
+
+# Build static documentation
+mkdocs build
 ```
 
+The documentation will be available at `http://127.0.0.1:8000/` for local development, or in `site/` for static builds.
+
 ## Release Process
+
+Releases are managed through GitHub Actions:
 
 1. Update version in `src/pynetzsch/__about__.py`
 2. Update `CHANGELOG.md` with new features and fixes
 3. Run full test suite: `uv run pytest`
-4. Run benchmarks to check for regressions
-5. Create release commit and tag
-6. Build and upload to PyPI:
+4. Run benchmarks to check for regressions: `python benchmarks.py`
+5. Create release commit and tag:
    ```bash
-   uv build
-   uv publish
+   git tag v0.2.0
+   git push origin v0.2.0
    ```
+6. GitHub Actions will automatically build and publish to PyPI
 
 ## Contributing
 
@@ -192,8 +201,9 @@ make html
 1. Create a feature branch: `git checkout -b feature/your-feature`
 2. Make changes and add tests
 3. Run pre-commit hooks: `uv run pre-commit run --all-files`
-4. Commit changes: `git commit -m "feat: description"`
-5. Push and create pull request
+4. Ensure all tests pass: `uv run pytest`
+5. Commit changes using conventional commits
+6. Push and create pull request
 
 ### Commit Message Format
 
@@ -205,14 +215,34 @@ Use conventional commits:
 - `test:` adding tests
 - `refactor:` code refactoring
 - `perf:` performance improvements
+- `ci:` CI/CD changes
 
 ### Code Style Guidelines
 
-- Follow PEP 8 (enforced by Black and Ruff)
+- Follow PEP 8 (enforced by Ruff)
 - Use type hints where possible
 - Write clear, descriptive variable names
 - Keep functions small and focused
 - Add docstrings to all public functions/classes
+- Ensure good test coverage for new code
+
+## Project Structure
+
+```text
+pynetzsch/
+├── src/pynetzsch/          # Main package
+│   ├── api/               # High-level API
+│   ├── binary/            # Binary parsing
+│   ├── core/              # Core parsing logic
+│   ├── extractors/        # Data extraction
+│   └── ...
+├── tests/                 # Test suite
+├── docs/                  # MkDocs documentation
+├── .github/workflows/     # CI/CD pipelines
+├── benchmarks.py          # Performance benchmarks
+├── mkdocs.yml            # Documentation configuration
+└── pyproject.toml         # Project configuration
+```
 
 ## IDE Setup
 
@@ -222,7 +252,6 @@ Recommended extensions:
 
 - Python
 - Pylance
-- Black Formatter
 - Ruff
 - Pre-commit
 
@@ -231,31 +260,87 @@ Settings (`.vscode/settings.json`):
 ```json
 {
     "python.defaultInterpreter": "./.venv/bin/python",
-    "python.linting.enabled": true,
-    "python.linting.ruffEnabled": true,
-    "python.formatting.provider": "black",
-    "python.sortImports.path": "isort",
     "[python]": {
         "editor.formatOnSave": true,
         "editor.codeActionsOnSave": {
-            "source.organizeImports": true
-        }
+            "source.fixAll.ruff": true,
+            "source.organizeImports.ruff": true
+        },
+        "editor.defaultFormatter": "charliermarsh.ruff"
     }
 }
+```
+
+## Debugging Tips
+
+### Common Development Issues
+
+**Import errors during development:**
+```bash
+# Make sure you installed in development mode
+uv sync
+```
+
+**Tests failing after changes:**
+```bash
+# Clear pytest cache
+pytest --cache-clear
+```
+
+**Type checking errors:**
+```bash
+# Run mypy on specific files
+mypy src/pynetzsch/specific_file.py
+```
+
+### Debugging Test Failures
+
+Add debug prints or use pytest's built-in debugging:
+
+```bash
+# Run with verbose output
+pytest -v -s
+
+# Drop into debugger on failures
+pytest --pdb
+
+# Run only failed tests from last run
+pytest --lf
 ```
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Pre-commit hooks failing**: Run `uv run pre-commit run --all-files` to see specific issues
-2. **Import errors**: Ensure you've installed the package: `uv sync`
+1. **Pre-commit hooks failing**:
+   ```bash
+   # See specific issues and fix them
+   uv run pre-commit run --all-files
+   ```
+
+2. **Import errors**:
+   ```bash
+   # Ensure package is installed in development mode
+   uv sync --all-extras
+   ```
+
 3. **Type checking errors**: Update type hints or add `# type: ignore` comments
+
 4. **Test failures**: Check if test files are available and environment is set up correctly
+
+5. **Documentation build issues**:
+   ```bash
+   # Install docs dependencies
+   pip install mkdocs mkdocs-material mkdocstrings[python]
+
+   # Test local build
+   mkdocs serve
+   ```
 
 ### Getting Help
 
 - Check existing issues on GitHub
 - Review this documentation
-- Run tests to ensure environment is working
+- Run tests to ensure environment is working: `uv run pytest`
 - Use debugging tools like `pdb` or IDE debuggers
+- Check CI/CD pipeline logs for detailed error information
