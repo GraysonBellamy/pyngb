@@ -41,7 +41,6 @@ dev = [
     "pytest-cov>=4.0.0",
     "pytest-mock>=3.10.0",
     "pytest-benchmark>=4.0.0",
-    "black>=23.0.0",
     "ruff>=0.1.0",
     "mypy>=1.5.0",
     "pre-commit>=3.0.0",
@@ -108,24 +107,6 @@ exclude_lines = [
     "@(abc\\.)?abstractmethod",
 ]
 
-[tool.black]
-line-length = 88
-target-version = ['py39', 'py310', 'py311', 'py312']
-include = '\.pyi?$'
-extend-exclude = '''
-/(
-  # directories
-  \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | build
-  | dist
-)/
-'''
-
 [tool.isort]
 profile = "black"
 line_length = 88
@@ -181,7 +162,7 @@ select = [
     "RUF", # Ruff-specific rules
 ]
 ignore = [
-    "E501",   # Line too long (handled by black)
+    "E501",   # Line too long (handled by ruff formatter)
     "B008",   # Do not perform function calls in argument defaults
     "C901",   # Too complex (let's not worry about complexity for now)
     "B905",   # `zip()` without an explicit `strict=` parameter
