@@ -140,6 +140,10 @@ class QualityChecker:
         >>> print(f"Found {len(issues)} issues")
     """
 
+    df: pl.DataFrame
+    metadata: FileMetadata
+    result: ValidationResult
+
     def __init__(
         self, data: Union[pa.Table, pl.DataFrame], metadata: FileMetadata | None = None
     ):
@@ -150,10 +154,19 @@ class QualityChecker:
             metadata: Optional metadata dictionary
         """
         if isinstance(data, pa.Table):
-            self.df = pl.from_arrow(data)
+            df_temp = pl.from_arrow(data)
+            # Ensure we have a DataFrame, not a Series
+            self.df = (
+                df_temp if isinstance(df_temp, pl.DataFrame) else df_temp.to_frame()
+            )
             # Try to extract metadata from table
-            if metadata is None and data.schema.metadata:
-                metadata = self._extract_metadata_from_table(data)
+            if metadata is None:
+                try:
+                    if data.schema.metadata:  # type: ignore[attr-defined]
+                        metadata = self._extract_metadata_from_table(data)
+                except (AttributeError, KeyError):
+                    # Schema has no metadata or metadata is not accessible
+                    pass
         else:
             self.df = data
 
@@ -562,7 +575,11 @@ def check_temperature_profile(
     Returns:
         Dictionary with temperature profile analysis
     """
-    df = pl.from_arrow(data) if isinstance(data, pa.Table) else data
+    if isinstance(data, pa.Table):
+        df_temp = pl.from_arrow(data)
+        df = df_temp if isinstance(df_temp, pl.DataFrame) else df_temp.to_frame()
+    else:
+        df = data
 
     if "temperature" not in df.columns:
         return {"error": "No temperature column found"}
@@ -595,6 +612,9 @@ def check_mass_data(
         Dictionary with mass data analysis
     """
     df = pl.from_arrow(data) if isinstance(data, pa.Table) else data
+    # Ensure we have a DataFrame, not a Series
+    if isinstance(df, pl.Series):
+        df = pl.DataFrame(df)
 
     if "sample_mass" not in df.columns:
         return {"error": "No sample_mass column found"}
@@ -626,6 +646,9 @@ def check_dsc_data(data: Union[pa.Table, pl.DataFrame]) -> dict[str, str | float
         Dictionary with DSC data analysis
     """
     df = pl.from_arrow(data) if isinstance(data, pa.Table) else data
+    # Ensure we have a DataFrame, not a Series
+    if isinstance(df, pl.Series):
+        df = pl.DataFrame(df)
 
     if "dsc" not in df.columns:
         return {"error": "No dsc column found"}

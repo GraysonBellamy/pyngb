@@ -215,6 +215,9 @@ class BatchProcessor:
             if output_format in ("csv", "both"):
                 csv_path = output_dir / f"{base_name}.csv"
                 df = pl.from_arrow(data)
+                # Ensure we have a DataFrame, not a Series
+                if isinstance(df, pl.Series):
+                    df = pl.DataFrame(df)
                 df.write_csv(csv_path)
 
                 # Also save metadata as JSON
@@ -444,7 +447,7 @@ class NGBDataset:
         if format.lower() == "csv":
             df.write_csv(output_path)
         elif format.lower() == "json":
-            df.write_json(output_path, row_oriented=True)
+            df.write_json(output_path)
         elif format.lower() == "parquet":
             df.write_parquet(output_path)
         else:

@@ -4,7 +4,7 @@ Advanced data analysis and visualization tools for STA data.
 
 from __future__ import annotations
 
-from typing import Union
+from typing import TYPE_CHECKING, Union
 from pathlib import Path
 
 import numpy as np
@@ -12,13 +12,17 @@ import polars as pl
 import pyarrow as pa
 
 try:
-    import matplotlib.pyplot as plt
-    from matplotlib.figure import Figure
+    import matplotlib.pyplot as plt  # type: ignore[import-untyped]
+    from matplotlib.figure import Figure  # type: ignore[import-untyped]
 
     HAS_MATPLOTLIB = True
 except ImportError:
     HAS_MATPLOTLIB = False
-
+    # Type stubs for when matplotlib is not available
+    if TYPE_CHECKING:
+        from matplotlib.figure import Figure  # type: ignore[import-untyped]
+    else:
+        Figure = None
 
 __all__ = [
     "STAAnalyzer",
@@ -57,6 +61,8 @@ class STAAnalyzer:
         >>>     print(f"Event at {event['temperature']:.1f}°C: {event['type']}")
     """
 
+    df: pl.DataFrame  # Type annotation for mypy
+
     def __init__(self, data: Union[pa.Table, pl.DataFrame]):
         """Initialize analyzer with STA data.
 
@@ -64,7 +70,12 @@ class STAAnalyzer:
             data: PyArrow Table or Polars DataFrame with STA measurements
         """
         if isinstance(data, pa.Table):
-            self.df = pl.from_arrow(data)
+            temp_df = pl.from_arrow(data)
+            # Ensure we have a DataFrame, not a Series
+            if isinstance(temp_df, pl.Series):
+                self.df = pl.DataFrame(temp_df)
+            else:
+                self.df = temp_df
         else:
             self.df = data.clone()
 
@@ -241,7 +252,7 @@ class STAAnalyzer:
                 "matplotlib is required for plotting. Install with: pip install matplotlib"
             )
 
-        fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+        fig, axes = plt.subplots(2, 2, figsize=(12, 8))  # type: ignore[attr-defined]
         fig.suptitle("STA Analysis Overview", fontsize=14, fontweight="bold")
 
         temp = self.df.select("temperature").to_numpy().flatten()
@@ -294,10 +305,10 @@ class STAAnalyzer:
             labels = [line.get_label() for line in lines]
             ax_dsc.legend(lines, labels, loc="upper right")
 
-        plt.tight_layout()
+        plt.tight_layout()  # type: ignore[attr-defined]
 
         if save_path:
-            plt.savefig(save_path, dpi=300, bbox_inches="tight")
+            plt.savefig(save_path, dpi=300, bbox_inches="tight")  # type: ignore[attr-defined]
 
         return fig
 
@@ -376,6 +387,9 @@ def peak_temperature(
         Peak temperature or None if not found
     """
     df = pl.from_arrow(data) if isinstance(data, pa.Table) else data
+    # Ensure we have a DataFrame, not a Series
+    if isinstance(df, pl.Series):
+        df = pl.DataFrame(df)
 
     if column not in df.columns:
         return None
@@ -401,6 +415,9 @@ def calculate_heat_flow(
         DataFrame with heat_flow_specific column added
     """
     df = pl.from_arrow(data) if isinstance(data, pa.Table) else data.clone()
+    # Ensure we have a DataFrame, not a Series
+    if isinstance(df, pl.Series):
+        df = pl.DataFrame(df)
 
     if dsc_column not in df.columns or mass_column not in df.columns:
         raise ValueError(f"Required columns not found: {dsc_column}, {mass_column}")
