@@ -3,6 +3,7 @@ Unit tests for pynetzsch constants and configurations.
 """
 
 import pytest
+from typing import Any, cast
 from pynetzsch.constants import (
     DataType,
     BinaryMarkers,
@@ -39,10 +40,10 @@ class TestBinaryMarkers:
     def test_binary_markers_immutable(self):
         """Test that BinaryMarkers is frozen (immutable)."""
         markers = BinaryMarkers()
-
         # Should not be able to modify attributes
         with pytest.raises(AttributeError):
-            markers.START_DATA = b"different_value"
+            setattr(markers, "START_DATA", b"different_value")
+            setattr(cast(Any, markers), "START_DATA", b"different_value")
 
     def test_binary_markers_values(self):
         """Test BinaryMarkers have correct values."""

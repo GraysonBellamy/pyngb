@@ -69,7 +69,7 @@ class TestNGBExceptions:
 
         for exc_class in exceptions:
             assert callable(exc_class)
-            assert issubclass(exc_class, Exception)
+            assert isinstance(exc_class, type) and issubclass(exc_class, Exception)
 
             # Test instantiation
             instance = exc_class("test message")

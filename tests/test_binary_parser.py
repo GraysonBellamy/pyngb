@@ -2,12 +2,10 @@
 Unit tests for pynetzsch binary parser.
 """
 
-import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 from pynetzsch.binary.parser import BinaryParser
 from pynetzsch.constants import BinaryMarkers, DataType
-from pynetzsch.exceptions import NGBDataTypeError
 
 
 class TestBinaryParser:

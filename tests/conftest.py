@@ -6,7 +6,6 @@ import pytest
 import tempfile
 import zipfile
 from pathlib import Path
-from typing import Dict, Any
 
 from pynetzsch.constants import PatternConfig, BinaryMarkers
 

@@ -6,7 +6,6 @@ import tempfile
 import zipfile
 import struct
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 import pyarrow as pa
@@ -133,46 +132,81 @@ class TestEndToEndIntegration:
             return temp_file.name
 
     def test_complete_parsing_workflow(self):
-        """Test the complete parsing workflow with realistic data."""
-        # Skip this test since creating realistic NGB data is complex
-        # This would require understanding the full binary format
-        pytest.skip("Complex NGB format simulation requires real test data")
+        """Test the complete parsing workflow with real NGB data."""
+        from pathlib import Path
 
-        # Original test logic is kept for reference
-        ngb_file = self.create_realistic_ngb_file()
+        # Use the real sample NGB file
+        test_file_path = (
+            Path(__file__).parent / "test_files" / "Red_Oak_STA_10K_250731_R7.ngb-ss3"
+        )
 
-        try:
-            # Test high-level API
-            table = load_ngb_data(ngb_file)
+        if not test_file_path.exists():
+            pytest.skip(f"Test file not found: {test_file_path}")
 
-            # Debug: print table info
-            print(f"Table columns: {table.column_names}")
-            print(f"Table rows: {table.num_rows}")
-            print(f"Table schema: {table.schema}")
+        # Test high-level API with real data
+        table = load_ngb_data(str(test_file_path))
 
-            # Verify table structure (more lenient for debugging)
-            assert isinstance(table, pa.Table)
-            # Temporarily comment out the failing assertions for debugging
-            # assert table.num_rows > 0
-            # assert len(table.column_names) > 0
+        # Verify table structure
+        assert isinstance(table, pa.Table)
+        assert table.num_rows > 0, f"Expected data rows, got {table.num_rows}"
+        assert len(table.column_names) > 0, (
+            f"Expected columns, got {table.column_names}"
+        )
 
-            # Verify metadata is embedded
-            assert b"file_metadata" in table.schema.metadata
-            assert b"type" in table.schema.metadata
+        # Verify we have typical STA columns
+        expected_columns = {"time", "temperature", "dsc", "sample_mass"}
+        actual_columns = set(table.column_names)
+        assert expected_columns.issubset(actual_columns), (
+            f"Missing expected columns: {expected_columns - actual_columns}"
+        )
 
-            # Test separate metadata/data API
-            metadata, data = get_sta_data(ngb_file)
+        # Verify metadata is embedded
+        assert table.schema.metadata is not None
+        assert b"file_metadata" in table.schema.metadata
+        assert b"type" in table.schema.metadata
+        assert table.schema.metadata[b"type"] == b"STA"
 
-            # Verify metadata content
-            assert isinstance(metadata, dict)
-            # Note: exact content depends on parsing success
+        # Test separate metadata/data API
+        metadata, data = get_sta_data(str(test_file_path))
 
-            # Verify data structure
-            assert isinstance(data, pa.Table)
-            assert data.num_rows >= 0
+        # Verify metadata content - rich metadata extracted from the file
+        assert isinstance(metadata, dict)
+        assert len(metadata) > 0, "Should extract metadata from NGB file"
 
-        finally:
-            Path(ngb_file).unlink(missing_ok=True)
+        # Check for typical metadata fields
+        expected_meta_fields = ["instrument", "sample_name", "sample_mass"]
+        for field in expected_meta_fields:
+            if field in metadata:
+                print(f"  ✓ Found {field}: {metadata[field]}")
+
+        # Verify data structure
+        assert isinstance(data, pa.Table)
+        assert data.num_rows > 0
+        assert data.num_rows == table.num_rows, "Both APIs should return same row count"
+
+        print(
+            f"✓ Successfully parsed {table.num_rows} rows with columns: {table.column_names}"
+        )
+        print(f"✓ Metadata keys: {list(metadata.keys())}")
+
+        # Test basic data analysis capabilities
+        if "time" in table.column_names:
+            time_col = table.column("time").to_pylist()
+            assert len(time_col) == table.num_rows
+            assert all(isinstance(x, (int, float)) for x in time_col[:10]), (
+                "Time should be numeric"
+            )
+            print(f"  ✓ Time range: {min(time_col):.1f} to {max(time_col):.1f}")
+
+        if "temperature" in table.column_names:
+            temp_col = table.column("temperature").to_pylist()
+            assert len(temp_col) == table.num_rows
+            assert all(isinstance(x, (int, float)) for x in temp_col[:10]), (
+                "Temperature should be numeric"
+            )
+            print(
+                f"  ✓ Temperature range: {min(temp_col):.1f} to {max(temp_col):.1f} °C"
+            )
 
     def test_parser_components_integration(self):
         """Test that parser components work together correctly."""

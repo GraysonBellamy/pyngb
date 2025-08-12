@@ -108,7 +108,7 @@ class TestMainCLI:
         # Mock sys.argv to include help
         with patch.object(sys, "argv", ["pynetzsch", "--help"]):
             try:
-                result = main()
+                main()
             except SystemExit as e:
                 # argparse exits with 0 for help
                 assert e.code == 0
@@ -193,7 +193,7 @@ class TestMainCLI:
                 with patch("logging.basicConfig") as mock_config:
                     mock_load.side_effect = FileNotFoundError("Test")
 
-                    result = main()
+                    main()
 
                     # Should configure logging with DEBUG level
                     mock_config.assert_called_once_with(level=logging.DEBUG)

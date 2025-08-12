@@ -2,10 +2,8 @@
 Unit tests for pynetzsch binary parsing handlers.
 """
 
-import numpy as np
 import pytest
 from pynetzsch.binary.handlers import (
-    DataTypeHandler,
     Float64Handler,
     Float32Handler,
     DataTypeRegistry,
