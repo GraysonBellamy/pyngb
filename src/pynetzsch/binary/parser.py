@@ -8,7 +8,7 @@ import logging
 import re
 import struct
 from itertools import tee
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from ..constants import BinaryMarkers, DataType
 from .handlers import DataTypeRegistry
@@ -47,7 +47,7 @@ class BinaryParser:
 
     def __init__(self, markers: Optional[BinaryMarkers] = None):
         self.markers = markers or BinaryMarkers()
-        self._compiled_patterns: Dict[str, re.Pattern[bytes]] = {}
+        self._compiled_patterns: dict[str, re.Pattern[bytes]] = {}
         self._data_type_registry = DataTypeRegistry()
         # Hot-path: table separator compiled once
         self._compiled_patterns["table_sep"] = re.compile(
@@ -85,7 +85,7 @@ class BinaryParser:
             logger.debug("Failed to parse value: %s", e)
             return None
 
-    def split_tables(self, data: bytes) -> List[bytes]:
+    def split_tables(self, data: bytes) -> list[bytes]:
         """Split binary data into tables using the known separator.
 
         NGB streams contain multiple tables separated by a specific byte
@@ -117,7 +117,7 @@ class BinaryParser:
 
         return [data[i:j] for i, j in zip_longest(start, end)]
 
-    def extract_data_array(self, table: bytes, data_type: bytes) -> List[float]:
+    def extract_data_array(self, table: bytes, data_type: bytes) -> list[float]:
         """Extract array of numerical data with memory optimization.
 
         Extracts arrays of floating-point data from binary tables using

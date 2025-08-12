@@ -1,0 +1,180 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [ published ]
+
+jobs:
+  test:
+    name: Test Python ${{ matrix.python-version }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        os: [ubuntu-latest, windows-latest, macos-latest]
+      fail-fast: false
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v2
+      with:
+        version: "latest"
+
+    - name: Install dependencies
+      run: |
+        uv sync --all-extras
+
+    - name: Run linting
+      run: |
+        uv run ruff check src/ tests/
+        uv run ruff format --check src/ tests/
+
+    - name: Run type checking
+      run: |
+        uv run mypy src/pynetzsch --ignore-missing-imports
+
+    - name: Run tests with coverage
+      run: |
+        uv run pytest --cov=pynetzsch --cov-report=xml --cov-report=term-missing
+
+    - name: Upload coverage to Codecov
+      if: matrix.python-version == '3.11' && matrix.os == 'ubuntu-latest'
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+
+  performance:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'pull_request'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: |
+        pip install uv
+        uv sync --all-extras
+        uv pip install pytest-benchmark psutil
+
+    - name: Run performance benchmarks
+      run: |
+        uv run python benchmarks.py --runs 3
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Run Bandit Security Scan
+      uses: securecodewarrior/github-action-bandit@v1
+      with:
+        severity: medium
+
+    - name: Run Safety Check
+      run: |
+        pip install safety
+        safety check
+
+  docs:
+    name: Build Documentation
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install documentation dependencies
+      run: |
+        pip install uv
+        uv sync
+        uv pip install sphinx sphinx-rtd-theme sphinx-autodoc-typehints
+
+    - name: Build documentation
+      run: |
+        cd docs
+        make html
+
+    - name: Upload documentation artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: documentation
+        path: docs/_build/html
+
+  build:
+    name: Build Package
+    runs-on: ubuntu-latest
+    needs: [test, security]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install build dependencies
+      run: |
+        pip install uv
+        uv sync
+        uv pip install build twine
+
+    - name: Build package
+      run: |
+        python -m build
+
+    - name: Check package
+      run: |
+        twine check dist/*
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: dist
+        path: dist/
+
+  publish:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    needs: [test, build]
+    if: github.event_name == 'release' && github.event.action == 'published'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: dist
+        path: dist/
+
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@v1.8.10
+      with:
+        password: ${{ secrets.PYPI_API_TOKEN }}

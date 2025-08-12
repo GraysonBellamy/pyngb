@@ -5,14 +5,14 @@ Data type handlers and registry for binary data parsing.
 from __future__ import annotations
 
 import logging
-from typing import List, Protocol
+from typing import Protocol
 
 import numpy as np
 
 from ..constants import DataType
 from ..exceptions import NGBDataTypeError
 
-__all__ = ["DataTypeHandler", "Float64Handler", "Float32Handler", "DataTypeRegistry"]
+__all__ = ["DataTypeHandler", "DataTypeRegistry", "Float32Handler", "Float64Handler"]
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ class DataTypeHandler(Protocol):
         """Check if this handler can process the given data type."""
         ...
 
-    def parse_data(self, data: bytes) -> List[float]:
+    def parse_data(self, data: bytes) -> list[float]:
         """Parse binary data and return list of floats."""
         ...
 
@@ -48,7 +48,7 @@ class Float64Handler:
     def can_handle(self, data_type: bytes) -> bool:
         return data_type == DataType.FLOAT64.value
 
-    def parse_data(self, data: bytes) -> List[float]:
+    def parse_data(self, data: bytes) -> list[float]:
         arr = np.frombuffer(data, dtype="<f8")
         return [float(x) for x in arr]
 
@@ -72,7 +72,7 @@ class Float32Handler:
     def can_handle(self, data_type: bytes) -> bool:
         return data_type == DataType.FLOAT32.value
 
-    def parse_data(self, data: bytes) -> List[float]:
+    def parse_data(self, data: bytes) -> list[float]:
         arr = np.frombuffer(data, dtype="<f4")
         return [float(x) for x in arr]
 
@@ -107,7 +107,7 @@ class DataTypeRegistry:
     """
 
     def __init__(self) -> None:
-        self._handlers: List[DataTypeHandler] = []
+        self._handlers: list[DataTypeHandler] = []
         self._register_default_handlers()
 
     def _register_default_handlers(self) -> None:
@@ -119,7 +119,7 @@ class DataTypeRegistry:
         """Register a new data type handler."""
         self._handlers.append(handler)
 
-    def parse_data(self, data_type: bytes, data: bytes) -> List[float]:
+    def parse_data(self, data_type: bytes, data: bytes) -> list[float]:
         """Parse data using appropriate handler."""
         for handler in self._handlers:
             if handler.can_handle(data_type):

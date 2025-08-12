@@ -150,6 +150,6 @@ Instead of requiring real NGB files, tests create minimal mock data that:
 
 This approach ensures tests are:
 - Self-contained
-- Fast to execute  
+- Fast to execute
 - Easy to understand
 - Robust against data file changes

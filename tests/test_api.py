@@ -5,11 +5,11 @@ Unit tests for pynetzsch API functions.
 import tempfile
 import zipfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-import pytest
 import pyarrow as pa
-from pynetzsch.api.loaders import load_ngb_data, get_sta_data, main
+import pytest
+from pynetzsch.api.loaders import get_sta_data, load_ngb_data, main
 from pynetzsch.constants import BinaryMarkers
 from pynetzsch.exceptions import NGBStreamNotFoundError
 
@@ -184,8 +184,8 @@ class TestMainCLI:
 
     def test_main_verbose_logging(self):
         """Test main function with verbose logging."""
-        import sys
         import logging
+        import sys
         from unittest.mock import patch
 
         with patch.object(sys, "argv", ["pynetzsch", "test.ngb-ss3", "-v"]):

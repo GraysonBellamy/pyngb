@@ -48,13 +48,9 @@ def run_basic_tests():
 def test_imports():
     """Test that all modules can be imported."""
     # Test main API
-    from pynetzsch import load_ngb_data, get_sta_data, NGBParser
+    from pynetzsch import NGBParser, load_ngb_data
 
     # Test submodules
-    from pynetzsch.binary import BinaryParser, DataTypeRegistry
-    from pynetzsch.extractors import MetadataExtractor, DataStreamProcessor
-    from pynetzsch.constants import DataType, PatternConfig
-    from pynetzsch.exceptions import NGBParseError
 
     assert callable(load_ngb_data)
     assert callable(NGBParser)
@@ -62,11 +58,7 @@ def test_imports():
 
 def test_exceptions():
     """Test exception classes."""
-    from pynetzsch.exceptions import (
-        NGBParseError,
-        NGBCorruptedFileError,
-        NGBDataTypeError,
-    )
+    from pynetzsch.exceptions import NGBCorruptedFileError, NGBParseError
 
     # Test inheritance
     error = NGBCorruptedFileError("test")
@@ -77,7 +69,7 @@ def test_exceptions():
 
 def test_constants():
     """Test constants and configurations."""
-    from pynetzsch.constants import DataType, PatternConfig, BinaryMarkers
+    from pynetzsch.constants import BinaryMarkers, DataType, PatternConfig
 
     # Test DataType enum
     assert DataType.FLOAT64.value == b"\x05"
@@ -102,9 +94,10 @@ def test_constants():
 
 def test_binary_handlers():
     """Test binary data handlers."""
-    from pynetzsch.binary.handlers import Float64Handler, DataTypeRegistry
-    from pynetzsch.constants import DataType
     import struct
+
+    from pynetzsch.binary.handlers import DataTypeRegistry, Float64Handler
+    from pynetzsch.constants import DataType
 
     # Test Float64Handler
     handler = Float64Handler()
@@ -125,9 +118,10 @@ def test_binary_handlers():
 
 def test_binary_parser_basic():
     """Test basic binary parser functionality."""
+    import struct
+
     from pynetzsch.binary.parser import BinaryParser
     from pynetzsch.constants import DataType
-    import struct
 
     parser = BinaryParser()
 

@@ -7,10 +7,10 @@ from __future__ import annotations
 import logging
 import re
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any
+from typing import Any, Optional
 
 from ..binary import BinaryParser
-from ..constants import PatternConfig, FileMetadata
+from ..constants import FileMetadata, PatternConfig
 from ..exceptions import NGBParseError
 
 __all__ = ["MetadataExtractor"]
@@ -24,9 +24,9 @@ class MetadataExtractor:
     def __init__(self, config: PatternConfig, parser: BinaryParser) -> None:
         self.config = config
         self.parser = parser
-        self._compiled_meta: Dict[str, re.Pattern[bytes]] = {}
-        self._compiled_temp_prog: Dict[str, re.Pattern[bytes]] = {}
-        self._compiled_cal_consts: Dict[str, re.Pattern[bytes]] = {}
+        self._compiled_meta: dict[str, re.Pattern[bytes]] = {}
+        self._compiled_temp_prog: dict[str, re.Pattern[bytes]] = {}
+        self._compiled_cal_consts: dict[str, re.Pattern[bytes]] = {}
 
         # Precompile patterns used in tight loops for speed (logic unchanged).
         END_FIELD = self.parser.markers.END_FIELD
@@ -83,7 +83,7 @@ class MetadataExtractor:
             return self.parser.parse_value(data_type, value)
         return None
 
-    def extract_metadata(self, tables: List[bytes]) -> FileMetadata:
+    def extract_metadata(self, tables: list[bytes]) -> FileMetadata:
         """Extract all metadata from tables with type safety."""
         metadata: FileMetadata = {}
 

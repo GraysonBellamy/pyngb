@@ -8,14 +8,14 @@ import logging
 import re
 import zipfile
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Optional
 
 import pyarrow as pa
 
 from ..binary import BinaryParser
-from ..constants import BinaryMarkers, PatternConfig, FileMetadata
+from ..constants import BinaryMarkers, FileMetadata, PatternConfig
 from ..exceptions import NGBStreamNotFoundError
-from ..extractors import MetadataExtractor, DataStreamProcessor
+from ..extractors import DataStreamProcessor, MetadataExtractor
 
 __all__ = ["NGBParser", "NGBParserExtended"]
 
@@ -68,7 +68,7 @@ class NGBParser:
         self.metadata_extractor = MetadataExtractor(self.config, self.binary_parser)
         self.data_processor = DataStreamProcessor(self.config, self.binary_parser)
 
-    def parse(self, path: str) -> Tuple[FileMetadata, pa.Table]:
+    def parse(self, path: str) -> tuple[FileMetadata, pa.Table]:
         """Parse NGB file and return metadata and Arrow table.
 
         Opens an NGB file, extracts all metadata and measurement data,
@@ -160,7 +160,7 @@ class NGBParserExtended(NGBParser):
     ):
         super().__init__(config)
         self.cache_patterns = cache_patterns
-        self._pattern_cache: Dict[str, re.Pattern] = {}
+        self._pattern_cache: dict[str, re.Pattern] = {}
 
     def add_custom_column_mapping(self, hex_id: str, column_name: str) -> None:
         """Add custom column mapping at runtime."""
@@ -172,7 +172,7 @@ class NGBParserExtended(NGBParser):
         """Add custom metadata pattern at runtime."""
         self.config.metadata_patterns[field_name] = (category, field)
 
-    def parse_with_validation(self, path: str) -> Tuple[FileMetadata, pa.Table]:
+    def parse_with_validation(self, path: str) -> tuple[FileMetadata, pa.Table]:
         """Parse with additional validation."""
         metadata, data = self.parse(path)
 

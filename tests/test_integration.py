@@ -2,16 +2,15 @@
 Integration tests for the complete pynetzsch parsing workflow.
 """
 
+import struct
 import tempfile
 import zipfile
-import struct
 from pathlib import Path
 
-import pytest
-import pyarrow as pa
 import polars as pl
-
-from pynetzsch import load_ngb_data, get_sta_data
+import pyarrow as pa
+import pytest
+from pynetzsch import get_sta_data, load_ngb_data
 from pynetzsch.constants import BinaryMarkers
 
 
@@ -149,16 +148,16 @@ class TestEndToEndIntegration:
         # Verify table structure
         assert isinstance(table, pa.Table)
         assert table.num_rows > 0, f"Expected data rows, got {table.num_rows}"
-        assert len(table.column_names) > 0, (
-            f"Expected columns, got {table.column_names}"
-        )
+        assert (
+            len(table.column_names) > 0
+        ), f"Expected columns, got {table.column_names}"
 
         # Verify we have typical STA columns
         expected_columns = {"time", "temperature", "dsc", "sample_mass"}
         actual_columns = set(table.column_names)
-        assert expected_columns.issubset(actual_columns), (
-            f"Missing expected columns: {expected_columns - actual_columns}"
-        )
+        assert expected_columns.issubset(
+            actual_columns
+        ), f"Missing expected columns: {expected_columns - actual_columns}"
 
         # Verify metadata is embedded
         assert table.schema.metadata is not None
@@ -193,17 +192,17 @@ class TestEndToEndIntegration:
         if "time" in table.column_names:
             time_col = table.column("time").to_pylist()
             assert len(time_col) == table.num_rows
-            assert all(isinstance(x, (int, float)) for x in time_col[:10]), (
-                "Time should be numeric"
-            )
+            assert all(
+                isinstance(x, (int, float)) for x in time_col[:10]
+            ), "Time should be numeric"
             print(f"  ✓ Time range: {min(time_col):.1f} to {max(time_col):.1f}")
 
         if "temperature" in table.column_names:
             temp_col = table.column("temperature").to_pylist()
             assert len(temp_col) == table.num_rows
-            assert all(isinstance(x, (int, float)) for x in temp_col[:10]), (
-                "Temperature should be numeric"
-            )
+            assert all(
+                isinstance(x, (int, float)) for x in temp_col[:10]
+            ), "Temperature should be numeric"
             print(
                 f"  ✓ Temperature range: {min(temp_col):.1f} to {max(temp_col):.1f} °C"
             )
@@ -321,7 +320,7 @@ class TestPerformanceConsiderations:
 
             return temp_file.name
 
-    @pytest.mark.slow
+    @pytest.mark.slow()
     def test_large_file_parsing(self):
         """Test parsing larger files (marked as slow test)."""
         ngb_file = self.create_large_mock_data(num_points=10000)
@@ -367,8 +366,8 @@ class TestRegressionScenarios:
     def test_backwards_compatibility(self):
         """Test that the modular structure maintains backwards compatibility."""
         # Test that old import style still works
-        from pynetzsch import load_ngb_data as load_func
         from pynetzsch import NGBParser as ParserClass
+        from pynetzsch import load_ngb_data as load_func
 
         assert callable(load_func)
         assert callable(ParserClass)
@@ -381,8 +380,8 @@ class TestRegressionScenarios:
         """Test that modules are properly isolated."""
         # Test that we can import and use individual components
         from pynetzsch.binary import BinaryParser
-        from pynetzsch.extractors import MetadataExtractor
         from pynetzsch.constants import PatternConfig
+        from pynetzsch.extractors import MetadataExtractor
 
         # Should be able to create instances
         binary_parser = BinaryParser()
@@ -397,10 +396,10 @@ class TestRegressionScenarios:
         """Test that imports are optimized and don't cause circular dependencies."""
         # These should import without issues
         import pynetzsch
-        import pynetzsch.binary
-        import pynetzsch.extractors
-        import pynetzsch.core
         import pynetzsch.api
+        import pynetzsch.binary
+        import pynetzsch.core
+        import pynetzsch.extractors
 
         # Should be able to access main functions
         assert hasattr(pynetzsch, "load_ngb_data")

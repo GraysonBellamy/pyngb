@@ -2,15 +2,15 @@
 Test configuration and fixtures for pynetzsch tests.
 """
 
-import pytest
 import tempfile
 import zipfile
 from pathlib import Path
 
-from pynetzsch.constants import PatternConfig, BinaryMarkers
+import pytest
+from pynetzsch.constants import BinaryMarkers, PatternConfig
 
 
-@pytest.fixture
+@pytest.fixture()
 def sample_binary_data():
     """Create sample binary data for testing."""
     # Create a simple binary sequence with markers
@@ -26,7 +26,7 @@ def sample_binary_data():
     return data
 
 
-@pytest.fixture
+@pytest.fixture()
 def sample_metadata_patterns():
     """Create sample metadata patterns for testing."""
     return {
@@ -35,7 +35,7 @@ def sample_metadata_patterns():
     }
 
 
-@pytest.fixture
+@pytest.fixture()
 def sample_pattern_config():
     """Create a sample PatternConfig for testing."""
     config = PatternConfig()
@@ -51,7 +51,7 @@ def sample_pattern_config():
     return config
 
 
-@pytest.fixture
+@pytest.fixture()
 def sample_ngb_file():
     """Create a sample NGB file for integration tests."""
     with tempfile.NamedTemporaryFile(suffix=".ngb-ss3", delete=False) as temp_file:
@@ -90,7 +90,7 @@ def sample_ngb_file():
         return temp_file.name
 
 
-@pytest.fixture
+@pytest.fixture()
 def sample_metadata():
     """Create sample metadata dictionary."""
     return {
@@ -102,7 +102,7 @@ def sample_metadata():
     }
 
 
-@pytest.fixture
+@pytest.fixture()
 def cleanup_temp_files():
     """Fixture to clean up temporary files after tests."""
     temp_files = []

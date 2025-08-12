@@ -2,13 +2,13 @@
 Binary parsing module for NGB files.
 """
 
-from .handlers import DataTypeHandler, Float64Handler, Float32Handler, DataTypeRegistry
+from .handlers import DataTypeHandler, DataTypeRegistry, Float32Handler, Float64Handler
 from .parser import BinaryParser
 
 __all__ = [
-    "DataTypeHandler",
-    "Float64Handler",
-    "Float32Handler",
-    "DataTypeRegistry",
     "BinaryParser",
+    "DataTypeHandler",
+    "DataTypeRegistry",
+    "Float32Handler",
+    "Float64Handler",
 ]

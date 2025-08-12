@@ -5,7 +5,6 @@ High-level API functions for loading NGB data.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Tuple
 
 import pyarrow as pa
 
@@ -13,7 +12,7 @@ from ..constants import FileMetadata
 from ..core import NGBParser
 from ..util import get_hash, set_metadata
 
-__all__ = ["load_ngb_data", "get_sta_data", "main"]
+__all__ = ["get_sta_data", "load_ngb_data", "main"]
 
 
 def load_ngb_data(path: str) -> pa.Table:
@@ -122,7 +121,7 @@ def load_ngb_data(path: str) -> pa.Table:
     return data
 
 
-def get_sta_data(path: str) -> Tuple[FileMetadata, pa.Table]:
+def get_sta_data(path: str) -> tuple[FileMetadata, pa.Table]:
     """
     Get STA data and metadata from an NGB file as separate objects.
 

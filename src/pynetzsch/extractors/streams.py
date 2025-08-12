@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 from itertools import tee, zip_longest
-from typing import List, Optional
+from typing import Optional
 
 import polars as pl
 
@@ -44,7 +44,7 @@ class DataStreamProcessor:
         next(end, None)
         stream_table = [stream_data[i:j] for i, j in zip_longest(start, end)]
 
-        output: List[float] = []
+        output: list[float] = []
         output_polars = pl.DataFrame()
         title: Optional[str] = None
 
@@ -101,7 +101,7 @@ class DataStreamProcessor:
         next(end, None)
         stream_table = [stream_data[i:j] for i, j in zip_longest(start, end)]
 
-        output: List[float] = []
+        output: list[float] = []
         output_polars = existing_df
         title: Optional[str] = None
 

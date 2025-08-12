@@ -4,6 +4,7 @@ General utilities for working with Parquet files and PyArrow tables.
 
 import hashlib
 import json
+from typing import Optional
 
 import pyarrow as pa
 
@@ -72,7 +73,7 @@ def set_metadata(tbl, col_meta={}, tbl_meta={}) -> pa.Table:
     return tbl
 
 
-def get_hash(path: str) -> str | None:
+def get_hash(path: str) -> Optional[str]:
     """Generate file hash for metadata."""
     try:
         with open(path, "rb") as file:

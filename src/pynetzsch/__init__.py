@@ -3,50 +3,46 @@
 # SPDX-License-Identifier: MIT
 
 """
-NETZSCH STA NGB File Parser
-
-A Python library for parsing NETZSCH STA (Simultaneous Thermal Analysis)
-NGB (NETZSCH Binary) files containing thermal analysis data.
-
-Basic Usage:
-    >>> from pynetzsch import load_ngb_data
-    >>> table = load_ngb_data("sample.ngb-ss3")
-    >>> print(f"Columns: {table.column_names}")
-    >>> print(f"Rows: {table.num_rows}")
-
-Advanced Usage:
-    >>> from pynetzsch import get_sta_data, NGBParser
-    >>> metadata, data = get_sta_data("sample.ngb-ss3")
-    >>> parser = NGBParser()
-    >>> # Custom parsing...
+PyNetzsch: A Python library for parsing NETZSCH STA NGB files.
 """
 
-from .api import load_ngb_data, get_sta_data, main
-from .core import NGBParser, NGBParserExtended
+from __future__ import annotations
+
+from .api.loaders import get_sta_data, load_ngb_data
+from .constants import BinaryMarkers, DataType, FileMetadata, PatternConfig
+from .core.parser import NGBParser, NGBParserExtended
 from .exceptions import (
-    NGBParseError,
     NGBCorruptedFileError,
-    NGBUnsupportedVersionError,
     NGBDataTypeError,
+    NGBParseError,
     NGBStreamNotFoundError,
+    NGBUnsupportedVersionError,
 )
-from .constants import PatternConfig, DataType
+
+__version__ = "0.1.0"
+__author__ = "Grayson Bellamy"
+__email__ = "gbellamy@umd.edu"
 
 __all__ = [
-    # Main API functions
+    # Core functions
     "load_ngb_data",
     "get_sta_data",
-    "main",
     # Parser classes
     "NGBParser",
     "NGBParserExtended",
-    # Configuration
+    # Configuration and types
     "PatternConfig",
     "DataType",
+    "BinaryMarkers",
+    "FileMetadata",
     # Exceptions
     "NGBParseError",
     "NGBCorruptedFileError",
     "NGBUnsupportedVersionError",
     "NGBDataTypeError",
     "NGBStreamNotFoundError",
+    # Metadata
+    "__version__",
+    "__author__",
+    "__email__",
 ]

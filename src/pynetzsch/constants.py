@@ -6,9 +6,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Tuple, TypedDict
+from typing import Any, TypedDict
 
-__all__ = ["DataType", "BinaryMarkers", "PatternConfig", "FileMetadata"]
+__all__ = ["BinaryMarkers", "DataType", "FileMetadata", "PatternConfig"]
 
 
 class FileMetadata(TypedDict, total=False):
@@ -28,9 +28,9 @@ class FileMetadata(TypedDict, total=False):
     sample_mass: float
     crucible_mass: float
     material: str
-    temperature_program: Dict[str, Dict[str, Any]]
-    calibration_constants: Dict[str, float]
-    file_hash: Dict[str, str]
+    temperature_program: dict[str, dict[str, Any]]
+    calibration_constants: dict[str, float]
+    file_hash: dict[str, str]
 
 
 class DataType(Enum):
@@ -114,7 +114,7 @@ class PatternConfig:
         NGB file versions. Use caution when customizing.
     """
 
-    metadata_patterns: Dict[str, Tuple[bytes, bytes]] = field(
+    metadata_patterns: dict[str, tuple[bytes, bytes]] = field(
         default_factory=lambda: {
             "instrument": (rb"\x75\x17", rb"\x59\x10"),
             "project": (rb"\x72\x17", rb"\x3c\x08"),
@@ -132,7 +132,7 @@ class PatternConfig:
             "material": (rb"\x30\x75", rb"\x62\x09"),
         }
     )
-    temp_prog_patterns: Dict[str, bytes] = field(
+    temp_prog_patterns: dict[str, bytes] = field(
         default_factory=lambda: {
             "stage_type": rb"\x3f\x08",
             "temperature": rb"\x17\x0e",
@@ -141,12 +141,12 @@ class PatternConfig:
             "time": rb"\x15\x0e",
         }
     )
-    cal_constants_patterns: Dict[str, bytes] = field(
+    cal_constants_patterns: dict[str, bytes] = field(
         default_factory=lambda: {
             f"p{i}": bytes([0x4F + i, 0x04]) if i < 5 else b"\xc3\x04" for i in range(6)
         }
     )
-    column_map: Dict[str, str] = field(
+    column_map: dict[str, str] = field(
         default_factory=lambda: {
             "8d": "time",
             "8e": "temperature",

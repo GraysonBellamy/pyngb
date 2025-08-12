@@ -4,11 +4,11 @@ Unit tests for pynetzsch exceptions.
 
 import pytest
 from pynetzsch.exceptions import (
-    NGBParseError,
     NGBCorruptedFileError,
-    NGBUnsupportedVersionError,
     NGBDataTypeError,
+    NGBParseError,
     NGBStreamNotFoundError,
+    NGBUnsupportedVersionError,
 )
 
 

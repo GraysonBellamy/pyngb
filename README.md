@@ -38,7 +38,7 @@ print(f"Instrument: {metadata.get('instrument', 'Unknown')}")
 This library uses a modular architecture for maintainability and extensibility:
 
 - **binary/**: Low-level binary parsing and data type handlers
-- **extractors/**: Metadata and stream data extraction  
+- **extractors/**: Metadata and stream data extraction
 - **core/**: Main parser orchestration
 - **api/**: High-level public interface
 - **constants.py**: Configuration and data types
@@ -66,7 +66,7 @@ parser = NGBParser(config)
 # Convert to Parquet (default)
 python -m pynetzsch sample.ngb-ss3
 
-# Convert to CSV with verbose logging  
+# Convert to CSV with verbose logging
 python -m pynetzsch sample.ngb-ss3 -f csv -v
 
 # Convert to both formats in custom directory

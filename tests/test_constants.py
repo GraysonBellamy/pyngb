@@ -2,14 +2,10 @@
 Unit tests for pynetzsch constants and configurations.
 """
 
-import pytest
 from typing import Any, cast
-from pynetzsch.constants import (
-    DataType,
-    BinaryMarkers,
-    PatternConfig,
-    FileMetadata,
-)
+
+import pytest
+from pynetzsch.constants import BinaryMarkers, DataType, FileMetadata, PatternConfig
 
 
 class TestDataType:
@@ -42,8 +38,8 @@ class TestBinaryMarkers:
         markers = BinaryMarkers()
         # Should not be able to modify attributes
         with pytest.raises(AttributeError):
-            setattr(markers, "START_DATA", b"different_value")
-            setattr(cast(Any, markers), "START_DATA", b"different_value")
+            markers.START_DATA = b"different_value"
+            cast(Any, markers).START_DATA = b"different_value"
 
     def test_binary_markers_values(self):
         """Test BinaryMarkers have correct values."""
