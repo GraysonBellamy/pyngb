@@ -341,8 +341,8 @@ class QualityChecker:
             )
         else:
             # Mixed heating/cooling
-            heating_points = np.sum(temp_diff > 0)
-            cooling_points = np.sum(temp_diff < 0)
+            heating_points: int = int(np.sum(temp_diff > 0))
+            cooling_points: int = int(np.sum(temp_diff < 0))
             self.result.add_info(
                 f"Mixed temperature profile: {heating_points} heating, {cooling_points} cooling points"
             )
@@ -366,7 +366,7 @@ class QualityChecker:
         if np.all(time_diff >= 0):
             self.result.add_pass("Time progresses monotonically")
         else:
-            backwards_count = np.sum(time_diff < 0)
+            backwards_count: int = int(np.sum(time_diff < 0))
             self.result.add_error(f"Time goes backwards {backwards_count} times")
 
         # Check for reasonable time intervals
@@ -522,7 +522,9 @@ class QualityChecker:
                     lower_bound = q1 - 1.5 * iqr
                     upper_bound = q3 + 1.5 * iqr
 
-                    outliers = np.sum((data < lower_bound) | (data > upper_bound))
+                    outliers: int = int(
+                        np.sum((data < lower_bound) | (data > upper_bound))
+                    )
                     outlier_percentage = (outliers / len(data)) * 100
 
                     if outlier_percentage > 5:

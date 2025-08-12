@@ -183,7 +183,9 @@ class STAAnalyzer:
                 and data[i, 0] > data[i + 1, 0]
                 and abs(data[i, 0]) > min_height
             ):
-                peaks.append({"temperature": data[i, 1], "intensity": data[i, 0]})
+                peaks.append(
+                    {"temperature": float(data[i, 1]), "intensity": float(data[i, 0])}
+                )
 
         return peaks
 

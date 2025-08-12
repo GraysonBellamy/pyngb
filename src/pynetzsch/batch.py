@@ -361,7 +361,9 @@ class NGBDataset:
         """Return number of files in dataset."""
         return len(self.files)
 
-    def summary(self) -> dict[str, int | float | list[str]]:
+    def summary(
+        self,
+    ) -> dict[str, int | float | list[str] | tuple[float, float] | None]:
         """Generate dataset summary statistics.
 
         Returns:
@@ -388,7 +390,9 @@ class NGBDataset:
         materials = [m.get("material", "Unknown") for m in all_metadata]
 
         sample_masses = [
-            m.get("sample_mass") for m in all_metadata if m.get("sample_mass")
+            float(mass)
+            for m in all_metadata
+            if (mass := m.get("sample_mass")) is not None
         ]
 
         return {
@@ -397,7 +401,7 @@ class NGBDataset:
             "unique_instruments": list(set(instruments)),
             "unique_operators": list(set(operators)),
             "unique_materials": list(set(materials)),
-            "sample_mass_range": (min(sample_masses), max(sample_masses))  # type: ignore[dict-item]
+            "sample_mass_range": (min(sample_masses), max(sample_masses))
             if sample_masses
             else None,
             "avg_sample_mass": sum(sample_masses) / len(sample_masses)
