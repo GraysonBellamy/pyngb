@@ -48,8 +48,6 @@ This library uses a modular architecture for maintainability and extensibility:
 - **constants.py**: Configuration and data types
 - **exceptions.py**: Custom exception hierarchy
 
-See [MODULAR_STRUCTURE.md](MODULAR_STRUCTURE.md) for detailed architecture documentation.
-
 ## Advanced Usage
 
 ```python
