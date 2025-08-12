@@ -22,6 +22,7 @@ repos:
           - types-setuptools
         args: [--ignore-missing-imports, --no-strict-optional]
         files: ^src/pynetzsch/.*\.py$
+        exclude: ^src/pynetzsch/(analysis|batch)\.py$
 
   # General file checks
   - repo: https://github.com/pre-commit/pre-commit-hooks

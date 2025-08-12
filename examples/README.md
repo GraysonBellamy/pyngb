@@ -2,6 +2,55 @@
 
 This directory contains comprehensive examples showing how to use PyNetzsch effectively.
 
+## Available Examples
+
+- **batch_processing_example.py** - Demonstrates batch processing and data validation features
+- **01_basic_loading.py** - Basic data loading and exploration
+- **02_data_analysis.py** - Statistical analysis and visualization
+- **03_advanced_features.py** - Advanced parsing and customization
+
+## New Features (v0.1.0+)
+
+### Batch Processing
+
+Process multiple NGB files efficiently with parallel processing:
+
+```python
+from pynetzsch import BatchProcessor
+
+processor = BatchProcessor(max_workers=4)
+results = processor.process_directory('./data', output_dir='./processed')
+```
+
+### Data Validation
+
+Validate STA data quality and detect common issues:
+
+```python
+from pynetzsch import validate_sta_data, QualityChecker
+
+# Quick validation
+issues = validate_sta_data(table)
+
+# Comprehensive quality checking
+checker = QualityChecker(table)
+result = checker.full_validation()
+print(result.report())
+```
+
+### Dataset Management
+
+Manage collections of STA files:
+
+```python
+from pynetzsch import NGBDataset
+
+dataset = NGBDataset()
+dataset.add_directory('./data')
+summary = dataset.get_summary()
+dataset.to_parquet('consolidated_data.parquet')
+```
+
 ## Basic Usage Examples
 
 ### 1. Loading and Exploring Data

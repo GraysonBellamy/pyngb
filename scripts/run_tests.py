@@ -1,25 +1,28 @@
 """
-Simple test runner for pynetzsch tests.
+Comprehensive test runner for pynetzsch tests.
 Run this file to execute all tests without pytest installation.
+Includes both core functionality and new features testing.
 """
 
 import sys
 import traceback
 from pathlib import Path
 
+import polars as pl
+
 # Add src to path so we can import pynetzsch
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 
 def run_basic_tests():
-    """Run basic tests without pytest."""
+    """Run comprehensive tests without pytest."""
     passed = 0
     failed = 0
 
-    print("🧪 Running PyNetzsch Basic Tests")
+    print("🧪 Running PyNetzsch Comprehensive Tests")
     print("=" * 50)
 
-    tests = [
+    core_tests = [
         test_imports,
         test_exceptions,
         test_constants,
@@ -27,9 +30,28 @@ def run_basic_tests():
         test_binary_parser_basic,
     ]
 
-    for test_func in tests:
+    new_feature_tests = [
+        test_validation_features,
+        test_batch_processing_features,
+        test_integration,
+    ]
+
+    print("📋 Core functionality tests:")
+    for test_func in core_tests:
         try:
-            print(f"Running {test_func.__name__}...", end=" ")
+            print(f"  Running {test_func.__name__}...", end=" ")
+            test_func()
+            print("✅ PASSED")
+            passed += 1
+        except Exception as e:
+            print(f"❌ FAILED: {e}")
+            traceback.print_exc()
+            failed += 1
+
+    print("\n🚀 New features tests:")
+    for test_func in new_feature_tests:
+        try:
+            print(f"  Running {test_func.__name__}...", end=" ")
             test_func()
             print("✅ PASSED")
             passed += 1
@@ -142,6 +164,81 @@ def test_binary_parser_basic():
     result = parser.split_tables(data)
     assert len(result) == 1
     assert result[0] == data
+
+
+def test_validation_features():
+    """Test validation features."""
+    # Import validation modules
+    from pynetzsch.validation import QualityChecker, ValidationResult, validate_sta_data
+
+    # Create sample data with correct column names
+    sample_data = pl.DataFrame(
+        {
+            "time": [0.0, 100.0, 200.0, 300.0],
+            "temperature": [25.0, 100.0, 150.0, 200.0],
+            "dta_uv": [10.0, 20.0, 30.0, 40.0],
+            "sample_mass_mg": [10.5, 10.2, 9.8, 9.5],
+        }
+    )
+
+    # Test quick validation function
+    issues = validate_sta_data(sample_data)
+    assert isinstance(issues, list)
+
+    # Test comprehensive quality checker
+    checker = QualityChecker(sample_data)
+    result = checker.full_validation()
+    assert isinstance(result, ValidationResult)
+    assert result.is_valid
+
+    # Test ValidationResult functionality
+    test_result = ValidationResult()
+    test_result.add_error("Test error")
+    test_result.add_warning("Test warning")
+    assert not test_result.is_valid
+    assert test_result.has_warnings
+
+
+def test_batch_processing_features():
+    """Test batch processing features."""
+    from pynetzsch.batch import BatchProcessor, NGBDataset
+
+    # Test BatchProcessor initialization
+    processor = BatchProcessor(max_workers=2, verbose=False)
+    assert processor.max_workers == 2
+    assert not processor.verbose
+
+    # Test empty file list processing
+    results = processor.process_files([])
+    assert len(results) == 0
+
+    # Test NGBDataset functionality
+    dataset = NGBDataset([])
+    assert len(dataset) == 0
+
+
+def test_integration():
+    """Test integration between modules."""
+    # Test that all imports work
+    from pynetzsch.batch import BatchProcessor
+    from pynetzsch.validation import validate_sta_data
+
+    # Create test data with correct column names
+    test_data = pl.DataFrame(
+        {
+            "time": [0.0, 100.0],
+            "temperature": [25.0, 100.0],
+            "dta_uv": [10.0, 20.0],
+        }
+    )
+
+    # Test validation finds no issues with good data
+    issues = validate_sta_data(test_data)
+    assert len(issues) == 0
+
+    # Test BatchProcessor can be created
+    processor = BatchProcessor(max_workers=1)
+    assert processor is not None
 
 
 if __name__ == "__main__":
