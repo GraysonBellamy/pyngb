@@ -8,7 +8,7 @@ import logging
 import re
 import struct
 from itertools import tee
-from typing import Any, Optional
+from typing import Any
 
 from ..constants import BinaryMarkers, DataType
 from .handlers import DataTypeRegistry
@@ -45,7 +45,7 @@ class BinaryParser:
         - Leverages NumPy frombuffer for fast array parsing
     """
 
-    def __init__(self, markers: Optional[BinaryMarkers] = None):
+    def __init__(self, markers: BinaryMarkers | None = None):
         self.markers = markers or BinaryMarkers()
         self._compiled_patterns: dict[str, re.Pattern[bytes]] = {}
         self._data_type_registry = DataTypeRegistry()

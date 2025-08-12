@@ -8,7 +8,6 @@ import logging
 import re
 import zipfile
 from pathlib import Path
-from typing import Optional
 
 import pyarrow as pa
 
@@ -61,7 +60,7 @@ class NGBParser:
         concurrent parsing operations.
     """
 
-    def __init__(self, config: Optional[PatternConfig] = None) -> None:
+    def __init__(self, config: PatternConfig | None = None) -> None:
         self.config = config or PatternConfig()
         self.markers = BinaryMarkers()
         self.binary_parser = BinaryParser(self.markers)
@@ -156,7 +155,7 @@ class NGBParserExtended(NGBParser):
     """Extended parser with additional capabilities."""
 
     def __init__(
-        self, config: Optional[PatternConfig] = None, cache_patterns: bool = True
+        self, config: PatternConfig | None = None, cache_patterns: bool = True
     ):
         super().__init__(config)
         self.cache_patterns = cache_patterns

@@ -24,25 +24,20 @@ __author__ = "Grayson Bellamy"
 __email__ = "gbellamy@umd.edu"
 
 __all__ = [
-    # Core functions
-    "load_ngb_data",
-    "get_sta_data",
-    # Parser classes
+    "BinaryMarkers",
+    "DataType",
+    "FileMetadata",
+    "NGBCorruptedFileError",
+    "NGBDataTypeError",
+    "NGBParseError",
     "NGBParser",
     "NGBParserExtended",
-    # Configuration and types
-    "PatternConfig",
-    "DataType",
-    "BinaryMarkers",
-    "FileMetadata",
-    # Exceptions
-    "NGBParseError",
-    "NGBCorruptedFileError",
-    "NGBUnsupportedVersionError",
-    "NGBDataTypeError",
     "NGBStreamNotFoundError",
-    # Metadata
-    "__version__",
+    "NGBUnsupportedVersionError",
+    "PatternConfig",
     "__author__",
     "__email__",
+    "__version__",
+    "get_sta_data",
+    "load_ngb_data",
 ]

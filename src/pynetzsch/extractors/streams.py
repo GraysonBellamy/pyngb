@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import logging
 from itertools import tee, zip_longest
-from typing import Optional
 
 import polars as pl
 
@@ -46,7 +45,7 @@ class DataStreamProcessor:
 
         output: list[float] = []
         output_polars = pl.DataFrame()
-        title: Optional[str] = None
+        title: str | None = None
 
         col_map = self.config.column_map
         markers = self.parser.markers
@@ -103,7 +102,7 @@ class DataStreamProcessor:
 
         output: list[float] = []
         output_polars = existing_df
-        title: Optional[str] = None
+        title: str | None = None
 
         col_map = self.config.column_map
         markers = self.parser.markers

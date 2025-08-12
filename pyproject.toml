@@ -45,6 +45,8 @@ dev = [
     "ruff>=0.1.0",
     "mypy>=1.5.0",
     "pre-commit>=3.0.0",
+    "bandit[toml]>=1.7.0",
+    "safety>=2.0.0",
 ]
 docs = [
     "sphinx>=5.0.0",
@@ -190,16 +192,19 @@ ignore = [
     "B007",   # Loop control variable not used (common in iteration patterns)
     "B011",   # Assert False (used in tests)
     "B017",   # pytest.raises(Exception) - allow for broad exception testing
+    "PT001",  # Use @pytest.fixture over @pytest.fixture() - allow parentheses for clarity
     "PT011",  # pytest.raises(Exception) is too broad - allow for now
     "PT012",  # pytest.raises() should contain single statement - allow for now
     "PT015",  # Assertion always fails - allow in tests
     "PT017",  # Assert on exception in except block - common test pattern
     "PT018",  # Assertion should be broken down - allow complex assertions
+    "PT023",  # Use @pytest.mark.slow over @pytest.mark.slow() - allow parentheses for clarity
     "RET504", # Unnecessary assignment before return - allow for clarity
     "SIM105", # Use contextlib.suppress - allow try/except patterns
     "SIM117", # Use single with statement - allow nested contexts
     "SIM118", # Use key in dict instead of key in dict.keys() - allow for clarity
     "ARG002", # Unused method argument - common in overrides/interfaces
+    "I001",   # Import block is un-sorted - handled by pre-commit ruff formatting
 ]
 per-file-ignores = {}
 

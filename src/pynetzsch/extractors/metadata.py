@@ -7,7 +7,7 @@ from __future__ import annotations
 import logging
 import re
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
 from ..binary import BinaryParser
 from ..constants import FileMetadata, PatternConfig
@@ -71,7 +71,7 @@ class MetadataExtractor:
             )
             self._compiled_cal_consts[fname] = re.compile(pat, re.DOTALL)
 
-    def extract_field(self, table: bytes, field_name: str) -> Optional[Any]:
+    def extract_field(self, table: bytes, field_name: str) -> Any | None:
         """Extract a single metadata field (value only)."""
         if field_name not in self._compiled_meta:
             raise NGBParseError(f"Unknown metadata field: {field_name}")
