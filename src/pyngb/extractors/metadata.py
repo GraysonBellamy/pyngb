@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import logging
 import re
+import struct
 from datetime import datetime, timezone
 from typing import Any
 
@@ -55,15 +56,21 @@ class MetadataExtractor:
             )
             self._compiled_meta[fname] = re.compile(pat, re.DOTALL)
 
+        # Compile temperature program patterns with correct structure
+        TEMP_PROG_TYPE_PREFIX = (
+            b"\x03\x80\x01"  # Different from regular metadata TYPE_PREFIX
+        )
         for fname, pat_bytes in self.config.temp_prog_patterns.items():
+            # Temperature program structure:
+            # TEMP_PROG_TYPE_PREFIX + field_code + TYPE_SEPARATOR + data_type + field_separator + VALUE_PREFIX + value
             pat = (
-                pat_bytes
-                + rb".+?"
-                + TYPE_PREFIX
-                + rb"(.+?)"
-                + TYPE_SEPARATOR
-                + rb"(.+?)"
-                + END_FIELD
+                re.escape(TEMP_PROG_TYPE_PREFIX)
+                + re.escape(pat_bytes)  # field code (e.g., \x17\x0e for temperature)
+                + re.escape(self.config.temp_prog_type_separator)  # 00 00 01 00 00 00
+                + rb"(.)"  # data type (1 byte, captured)
+                + re.escape(self.config.temp_prog_field_separator)  # 00 17 fc ff ff
+                + re.escape(self.config.temp_prog_value_prefix)  # 04 80 01
+                + rb"(.{4})"  # value (4 bytes, captured)
             )
             self._compiled_temp_prog[fname] = re.compile(pat, re.DOTALL)
 
@@ -95,6 +102,10 @@ class MetadataExtractor:
         """Extract all metadata from tables with type safety."""
         metadata: FileMetadata = {}
         crucible_masses: list[tuple[int, float]] = []
+
+        # Combine all table data for temperature program extraction
+        combined_data = b"".join(tables)
+
         for table in tables:
             for field_name, pattern in self._compiled_meta.items():
                 try:
@@ -133,8 +144,17 @@ class MetadataExtractor:
                 except NGBParseError as e:
                     logger.warning(f"Failed to extract field {field_name}: {e}")
 
-            self._extract_temperature_program(table, metadata)
+            # Extract calibration constants from individual tables (preserves existing behavior)
             self._extract_calibration_constants(table, metadata)
+
+        # Extract temperature program from combined data (FIX: ensures complete extraction)
+        self._extract_temperature_program(combined_data, metadata)
+
+        # Extract MFC metadata with structural disambiguation
+        self._extract_mfc_metadata(tables, metadata)
+
+        # Extract control parameters (furnace and sample PID settings)
+        self._extract_control_parameters(tables, metadata)
 
         # Structural classification for crucible masses (no numeric heuristics)
         if crucible_masses:
@@ -274,6 +294,171 @@ class MetadataExtractor:
 
         return metadata
 
+    def _extract_mfc_metadata(
+        self, tables: list[bytes], metadata: FileMetadata
+    ) -> None:
+        """Extract MFC metadata using sequence-based field assignment."""
+        try:
+            # Step 1: Find field name definitions in order
+            field_definitions = []
+            for field_name in ["Purge 1", "Purge 2", "Protective"]:
+                field_bytes = field_name.encode("utf-16le")
+
+                for i, table_data in enumerate(tables):
+                    if field_bytes in table_data:
+                        field_key = field_name.lower().replace(" ", "_")
+                        field_definitions.append(
+                            {"table": i, "field": field_key, "name": field_name}
+                        )
+                        break  # Take first occurrence
+
+            # Step 2: Find MFC range tables in order using signature-based identification
+            range_tables = []
+            for i, table_data in enumerate(tables):
+                # Look for MFC signature (03 80 01 48 10)
+                has_mfc_signature = False
+                for j in range(len(table_data) - 4):
+                    if table_data[j : j + 3] == b"\x03\x80\x01":
+                        sig_bytes = table_data[j + 3 : j + 5]
+                        if len(sig_bytes) == 2:
+                            sig_val = struct.unpack("<H", sig_bytes)[0]
+                            if sig_val == 0x1048:  # MFC range signature
+                                has_mfc_signature = True
+                                break
+
+                if has_mfc_signature:
+                    # Find range values in this table
+                    for range_val in [250.0, 252.5]:
+                        range_bytes = struct.pack("<f", range_val)
+                        if range_bytes in table_data:
+                            range_tables.append({"table": i, "range": range_val})
+                            break
+
+            # Step 3: Build gas context map for gas assignment
+            gas_context_map = {}
+            for i, table_data in enumerate(tables):
+                if len(table_data) > 20:
+                    try:
+                        # Check for gas context signature
+                        if table_data[1] == 0x1B:
+                            # Look for gas names in UTF-16LE
+                            for gas_name in [
+                                "NITROGEN",
+                                "OXYGEN",
+                                "ARGON",
+                                "HELIUM",
+                                "CARBON_DIOXIDE",
+                            ]:
+                                gas_bytes = gas_name.encode("utf-16le")
+                                if gas_bytes in table_data:
+                                    gas_context_map[i] = gas_name
+                                    break
+                    except (IndexError, UnicodeDecodeError):
+                        continue
+
+            # Step 4: Map fields to ranges using ORDINAL/SEQUENTIAL assignment
+            # 1st field → 1st range, 2nd field → 2nd range, etc.
+            mfc_fields: dict[str, str | float] = {}
+            for field_idx, range_info in enumerate(
+                range_tables[:3]
+            ):  # Take first 3 ranges
+                if field_idx < len(field_definitions):
+                    field_info = field_definitions[field_idx]
+                    field_key = str(field_info["field"])
+                    range_table = int(range_info["table"])
+                    range_value = range_info["range"]
+
+                    # Find gas type for this range table
+                    gas_type = None
+                    for context_table in reversed(range(range_table)):
+                        if context_table in gas_context_map:
+                            gas_type = gas_context_map[context_table]
+                            break
+
+                    # Assign gas and range to the field
+                    if gas_type:
+                        gas_field = f"{field_key}_mfc_gas"
+                        range_field = f"{field_key}_mfc_range"
+                        mfc_fields[gas_field] = str(gas_type)
+                        mfc_fields[range_field] = float(range_value)
+
+            # Update metadata with extracted MFC fields - type: ignore for dynamic keys
+            metadata.update(mfc_fields)  # type: ignore[typeddict-item]
+
+        except Exception as e:
+            logger.warning(f"Failed to extract MFC metadata: {e}")
+
+    def _extract_control_parameters(
+        self, tables: list[bytes], metadata: FileMetadata
+    ) -> None:
+        """Extract control parameters (furnace and sample PID settings) using signature identification."""
+        try:
+            # Control parameter signatures:
+            # 0x0fe7 = XP (proportional gain)
+            # 0x0fe8 = TN (integral time)
+            # 0x0fe9 = TV (derivative time)
+
+            control_signatures = {0x0FE7: "xp", 0x0FE8: "tn", 0x0FE9: "tv"}
+
+            # Track control tables found (first = furnace, second = sample)
+            control_tables = []
+
+            for table_num, table_data in enumerate(tables):
+                if len(table_data) == 0:
+                    continue
+
+                # Look for control parameter signatures in this table
+                control_params_found = {}
+
+                for i in range(len(table_data) - 4):
+                    if table_data[i : i + 3] == b"\x03\x80\x01":
+                        sig_bytes = table_data[i + 3 : i + 5]
+                        if len(sig_bytes) == 2:
+                            sig_val = struct.unpack("<H", sig_bytes)[0]
+
+                            if sig_val in control_signatures:
+                                # Look for float value after this signature
+                                for offset in range(5, min(200, len(table_data) - i)):
+                                    test_pos = i + offset
+                                    if test_pos + 4 <= len(table_data):
+                                        try:
+                                            float_val = struct.unpack(
+                                                "<f",
+                                                table_data[test_pos : test_pos + 4],
+                                            )[0]
+                                            # Check if this looks like a control parameter value (typically 4.00-6.00 range)
+                                            if 3.0 <= float_val <= 7.0:
+                                                param_name = control_signatures[sig_val]
+                                                control_params_found[param_name] = (
+                                                    float_val
+                                                )
+                                                break
+                                        except struct.error:
+                                            continue
+
+                # If we found control parameters in this table, add it to our list
+                if (
+                    len(control_params_found) == 3
+                ):  # Should have all 3 parameters (xp, tn, tv)
+                    control_tables.append((table_num, control_params_found))
+
+            # Assign control parameters based on order (first = furnace, second = sample)
+            if len(control_tables) >= 2:
+                # First control table = furnace parameters
+                furnace_params = control_tables[0][1]
+                for param_name, value in furnace_params.items():
+                    # Type ignore for dynamic key assignment
+                    metadata[f"furnace_{param_name}"] = value  # type: ignore[literal-required]
+
+                # Second control table = sample parameters
+                sample_params = control_tables[1][1]
+                for param_name, value in sample_params.items():
+                    # Type ignore for dynamic key assignment
+                    metadata[f"sample_{param_name}"] = value  # type: ignore[literal-required]
+
+        except Exception as e:
+            logger.warning(f"Failed to extract control parameters: {e}")
+
     def _extract_calibration_constants(
         self, table: bytes, metadata: FileMetadata
     ) -> None:
@@ -320,6 +505,15 @@ class MetadataExtractor:
             for field_name, matches in field_matches.items():
                 if i < len(matches):
                     data_type, value_bytes = matches[i]
-                    value = self.parser.parse_value(data_type, value_bytes)
+
+                    # Temperature program uses data type 0x0c which isn't handled by default parser
+                    # Manually parse as 32-bit float for now
+                    if data_type == b"\x0c" and len(value_bytes) == 4:
+                        import struct
+
+                        value = struct.unpack("<f", value_bytes)[0]
+                    else:
+                        value = self.parser.parse_value(data_type, value_bytes)
+
                     if value is not None:
                         stage[field_name] = value

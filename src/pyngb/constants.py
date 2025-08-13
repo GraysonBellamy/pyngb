@@ -47,6 +47,20 @@ class FileMetadata(TypedDict, total=False):
     temperature_program: dict[str, dict[str, Any]]
     calibration_constants: dict[str, float]
     file_hash: dict[str, str]
+    # MFC (Mass Flow Controller) metadata
+    purge_1_mfc_gas: str
+    purge_2_mfc_gas: str
+    protective_mfc_gas: str
+    purge_1_mfc_range: float
+    purge_2_mfc_range: float
+    protective_mfc_range: float
+    # Control parameters (PID settings)
+    furnace_xp: float
+    furnace_tn: float
+    furnace_tv: float
+    sample_xp: float
+    sample_tn: float
+    sample_tv: float
 
 
 class DataType(Enum):
@@ -150,17 +164,25 @@ class PatternConfig:
             "crucible_mass": (rb"\x7e\x17", rb"\x9e\x0c"),
             # Additional
             "material": (rb"\x30\x75", rb"\x62\x09"),
+            # Note: MFC fields are handled separately in _extract_mfc_metadata
+            # to avoid conflicts with the general pattern matching
         }
     )
     temp_prog_patterns: dict[str, bytes] = field(
         default_factory=lambda: {
-            "stage_type": rb"\x3f\x08",
-            "temperature": rb"\x17\x0e",
-            "heating_rate": rb"\x13\x0e",
-            "acquisition_rate": rb"\x14\x0e",
-            "time": rb"\x15\x0e",
+            "stage_type": b"\x3f\x08",
+            "temperature": b"\x17\x0e",
+            "heating_rate": b"\x13\x0e",
+            "acquisition_rate": b"\x14\x0e",
+            "time": b"\x15\x0e",
         }
     )
+
+    # Temperature program binary structure constants
+    temp_prog_type_separator: bytes = b"\x00\x00\x01\x00\x00\x00"
+    temp_prog_data_type: bytes = b"\x0c"
+    temp_prog_field_separator: bytes = b"\x00\x17\xfc\xff\xff"
+    temp_prog_value_prefix: bytes = b"\x04\x80\x01"
     cal_constants_patterns: dict[str, bytes] = field(
         default_factory=lambda: {
             f"p{i}": bytes([0x4F + i, 0x04]) if i < 5 else b"\xc3\x04" for i in range(6)
