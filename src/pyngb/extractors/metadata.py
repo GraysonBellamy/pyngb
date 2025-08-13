@@ -154,6 +154,12 @@ class MetadataExtractor:
         # Extract MFC metadata with structural disambiguation
         self._extract_mfc_metadata(tables, metadata)
 
+        # Specialized extraction: application_version and licensed_to from container 0003_18fc
+        try:
+            self._extract_app_and_license(combined_data, metadata)
+        except Exception as e:
+            logger.debug("App/license extraction skipped: %s", e)
+
         # Extract control parameters (furnace and sample PID settings)
         self._extract_control_parameters(tables, metadata)
 
@@ -294,6 +300,60 @@ class MetadataExtractor:
                 )[0]["value"]  # type: ignore
 
         return metadata
+
+    def _extract_app_and_license(self, data: bytes, metadata: FileMetadata) -> None:
+        """Extract application_version and licensed_to from 0003_18fc container.
+
+        Uses existing markers and BinaryParser.parse_value to decode STRING values,
+        then selects target strings via simple content rules.
+        """
+        TYPE_PREFIX = self.parser.markers.TYPE_PREFIX
+        TYPE_SEPARATOR = self.parser.markers.TYPE_SEPARATOR
+        END_FIELD = self.parser.markers.END_FIELD
+
+        # category b"\x00\x03", field b"\x18\xfc"
+        category = b"\x00\x03"
+        field = b"\x18\xfc"
+
+        pattern = re.compile(
+            re.escape(category)
+            + rb".{0,120}?"
+            + re.escape(field)
+            + rb".{0,120}?"
+            + re.escape(TYPE_PREFIX)
+            + rb"(.)"
+            + re.escape(TYPE_SEPARATOR)
+            + rb"(.*?)"
+            + re.escape(END_FIELD),
+            re.DOTALL,
+        )
+
+        strings: list[str] = []
+        for m in pattern.finditer(data):
+            dt, val = m.groups()
+            if dt != b"\x1f":
+                continue
+            parsed = self.parser.parse_value(dt, val)
+            if isinstance(parsed, str) and parsed:
+                strings.append(parsed)
+
+        if not strings:
+            return
+
+        # application_version: match leading 'Version x.y.z'
+        app = next(
+            (s for s in strings if re.match(r"^\s*Version\s+\d+\.\d+\.\d+", s)), None
+        )
+        if app and "application_version" not in metadata:
+            metadata["application_version"] = app  # type: ignore
+
+        # licensed_to: pick multi-line non-Version string with letters and country-like tail
+        license_candidates = [
+            s for s in strings if ("\n" in s and not s.lstrip().startswith("Version"))
+        ]
+        if license_candidates and "licensed_to" not in metadata:
+            # choose the longest reasonable candidate
+            metadata["licensed_to"] = max(license_candidates, key=len)  # type: ignore
 
     def _extract_mfc_metadata(
         self, tables: list[bytes], metadata: FileMetadata

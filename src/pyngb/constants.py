@@ -44,6 +44,8 @@ class FileMetadata(TypedDict, total=False):
     reference_crucible_mass: float
     # Other descriptors
     material: str
+    application_version: str
+    licensed_to: str
     temperature_program: dict[str, dict[str, Any]]
     calibration_constants: dict[str, float]
     file_hash: dict[str, str]

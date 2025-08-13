@@ -172,11 +172,26 @@ class TestEndToEndIntegration:
         assert isinstance(metadata, dict)
         assert len(metadata) > 0, "Should extract metadata from NGB file"
 
-        # Check for typical metadata fields
-        expected_meta_fields = ["instrument", "sample_name", "sample_mass"]
+        # Check for typical metadata fields, including specialized ones
+        expected_meta_fields = [
+            "instrument",
+            "sample_name",
+            "sample_mass",
+            "application_version",
+            "licensed_to",
+        ]
         for field in expected_meta_fields:
             if field in metadata:
                 print(f"  ✓ Found {field}: {metadata[field]}")
+        # Ensure specialized fields are present and non-empty
+        assert (
+            isinstance(metadata.get("application_version"), str)
+            and metadata["application_version"].strip()
+        ), "application_version should be a non-empty string"
+        assert (
+            isinstance(metadata.get("licensed_to"), str)
+            and metadata["licensed_to"].strip()
+        ), "licensed_to should be a non-empty string"
 
         # Verify data structure
         assert isinstance(data, pa.Table)
