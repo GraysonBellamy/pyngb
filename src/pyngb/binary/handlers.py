@@ -15,6 +15,7 @@ from ..exceptions import NGBDataTypeError
 __all__ = ["DataTypeHandler", "DataTypeRegistry", "Float32Handler", "Float64Handler"]
 
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 
 class DataTypeHandler(Protocol):

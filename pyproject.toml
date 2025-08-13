@@ -69,7 +69,7 @@ Issues = "https://github.com/GraysonBellamy/pyngb/issues"
 Changelog = "https://github.com/GraysonBellamy/pyngb/blob/main/CHANGELOG.md"
 
 [project.scripts]
-pyngb = "pyngb.cli:main"
+pyngb = "pyngb.api.loaders:main"
 
 [build-system]
 requires = ["hatchling"]

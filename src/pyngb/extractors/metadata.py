@@ -22,6 +22,7 @@ from ..exceptions import NGBParseError
 __all__ = ["MetadataExtractor"]
 
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 SAMPLE_SIG_FRAGMENT = SAMPLE_CRUCIBLE_SIG_FRAGMENT
 REF_SIG_FRAGMENT = REF_CRUCIBLE_SIG_FRAGMENT

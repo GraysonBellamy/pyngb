@@ -22,6 +22,7 @@ from ..exceptions import NGBDataTypeError
 __all__ = ["DataStreamProcessor"]
 
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 
 class DataStreamProcessor:
@@ -76,7 +77,9 @@ class DataStreamProcessor:
                     continue
 
                 data = data[:end_data]
-                data_type = table[start_data - 7 : start_data - 6]
+                # Data type byte immediately precedes START_DATA
+                has_start = table.find(markers.START_DATA)
+                data_type = table[has_start - 1 : has_start]
 
                 try:
                     parsed_data = self.parser._data_type_registry.parse_data(
@@ -126,7 +129,8 @@ class DataStreamProcessor:
                     continue
 
                 data = data[:end_data]
-                data_type = table[start_data - 7 : start_data - 6]
+                has_start = table.find(markers.START_DATA)
+                data_type = table[has_start - 1 : has_start]
 
                 try:
                     parsed_data = self.parser._data_type_registry.parse_data(

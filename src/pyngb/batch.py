@@ -55,12 +55,16 @@ class BatchProcessor:
         self._setup_logging()
 
     def _setup_logging(self) -> None:
-        """Configure logging for batch processing."""
-        if self.verbose:
-            logging.basicConfig(
-                level=logging.INFO,
-                format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        """Configure logging for batch processing without altering global config."""
+        if self.verbose and not logger.handlers:
+            handler = logging.StreamHandler()
+            handler.setFormatter(
+                logging.Formatter(
+                    "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+                )
             )
+            logger.addHandler(handler)
+            logger.setLevel(logging.INFO)
 
     def process_directory(
         self,

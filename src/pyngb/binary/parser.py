@@ -16,6 +16,7 @@ from .handlers import DataTypeRegistry
 __all__ = ["BinaryParser"]
 
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 
 class BinaryParser:
@@ -153,7 +154,10 @@ class BinaryParser:
             logger.debug("START_DATA marker not found in table")
             return []
 
-        start_idx += 6  # preserve original offset logic
+        # Advance to the first byte after the START_DATA header
+        # Empirically, payload begins 6 bytes after the START_DATA marker
+        # to skip marker and header bytes present in the stream format.
+        start_idx += 6
         data_mv = table_mv[start_idx:]
 
         data_bytes = data_mv.tobytes()  # Only convert once for end search

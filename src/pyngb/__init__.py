@@ -8,6 +8,8 @@ pyngb: A Python library for parsing NETZSCH STA NGB files.
 
 from __future__ import annotations
 
+from importlib.metadata import PackageNotFoundError, version
+
 from .api.loaders import get_sta_data, load_ngb_data
 from .batch import BatchProcessor, NGBDataset, process_directory, process_files
 from .constants import BinaryMarkers, DataType, FileMetadata, PatternConfig
@@ -21,7 +23,10 @@ from .exceptions import (
 )
 from .validation import QualityChecker, ValidationResult, validate_sta_data
 
-__version__ = "0.1.0"
+try:
+    __version__ = version("pyngb")
+except PackageNotFoundError:
+    __version__ = "0.0.0"
 __author__ = "Grayson Bellamy"
 __email__ = "gbellamy@umd.edu"
 
