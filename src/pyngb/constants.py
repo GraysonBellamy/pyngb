@@ -8,11 +8,23 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, TypedDict
 
-__all__ = ["BinaryMarkers", "DataType", "FileMetadata", "PatternConfig"]
+__all__ = [  # noqa: RUF022 - order chosen for logical grouping
+    "BinaryMarkers",
+    "DataType",
+    "FileMetadata",
+    "PatternConfig",
+    "REF_CRUCIBLE_SIG_FRAGMENT",
+    "SAMPLE_CRUCIBLE_SIG_FRAGMENT",
+]
 
 
 class FileMetadata(TypedDict, total=False):
-    """Type definition for file metadata dictionary."""
+    """Type definition for file metadata dictionary.
+
+    Mass-related fields grouped together after core identifying fields. Reference masses
+    are structurally derived; crucible_mass pattern also matches reference_crucible_mass and
+    is disambiguated using signature fragments (see SAMPLE_CRUCIBLE_SIG_FRAGMENT / REF_CRUCIBLE_SIG_FRAGMENT).
+    """
 
     instrument: str
     project: str
@@ -25,8 +37,12 @@ class FileMetadata(TypedDict, total=False):
     carrier_type: str
     sample_id: str
     sample_name: str
+    # Mass group
     sample_mass: float
     crucible_mass: float
+    reference_mass: float
+    reference_crucible_mass: float
+    # Other descriptors
     material: str
     temperature_program: dict[str, dict[str, Any]]
     calibration_constants: dict[str, float]
@@ -116,6 +132,7 @@ class PatternConfig:
 
     metadata_patterns: dict[str, tuple[bytes, bytes]] = field(
         default_factory=lambda: {
+            # Core metadata
             "instrument": (rb"\x75\x17", rb"\x59\x10"),
             "project": (rb"\x72\x17", rb"\x3c\x08"),
             "date_performed": (rb"\x72\x17", rb"\x3e\x08"),
@@ -125,10 +142,13 @@ class PatternConfig:
             "comment": (rb"\x72\x17", rb"\x3d\x08"),
             "furnace_type": (rb"\x7a\x17", rb"\x40\x08"),
             "carrier_type": (rb"\x79\x17", rb"\x40\x08"),
+            # Sample descriptors
             "sample_id": (rb"\x30\x75", rb"\x98\x08"),
             "sample_name": (rb"\x30\x75", rb"\x40\x08"),
+            # Mass fields: crucible_mass pattern ALSO matches reference crucible mass (structural disambiguation required)
             "sample_mass": (rb"\x30\x75", rb"\x9e\x0c"),
             "crucible_mass": (rb"\x7e\x17", rb"\x9e\x0c"),
+            # Additional
             "material": (rb"\x30\x75", rb"\x62\x09"),
         }
     )
@@ -165,3 +185,13 @@ class PatternConfig:
             "38": "environmental_acceleration_z",
         }
     )
+
+
+# Structural signature fragments used to differentiate sample vs reference crucible mass
+# occurrences when both share identical (category, field) byte patterns.
+SAMPLE_CRUCIBLE_SIG_FRAGMENT = (
+    b"\x83\x0c\x00\x00\x01\x00\x00\x00\x0c\x00\x17\xfc\xff\xff\x04\x80\x01"
+)
+REF_CRUCIBLE_SIG_FRAGMENT = (
+    b"\xc4\x10\x00\x00\x01\x00\x00\x00\x0c\x00\x17\xfc\xff\xff\x02\x80\x01"
+)

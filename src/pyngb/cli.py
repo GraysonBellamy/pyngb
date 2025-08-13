@@ -134,12 +134,15 @@ def process_file(file_path: Path, args: argparse.Namespace) -> Optional[dict]:
 
             base_name = file_path.stem
 
-            # Convert to DataFrame once for reuse
+            # Convert to DataFrame (data values) but preserve original Arrow table for metadata retention when writing Parquet.
             df: pl.DataFrame = pl.from_arrow(table)  # type: ignore[assignment]
 
             if args.format in ["parquet", "all"]:
                 parquet_file = output_dir / f"{base_name}.parquet"
-                df.write_parquet(parquet_file)
+                # Write Arrow table directly to retain schema metadata (file_metadata)
+                import pyarrow.parquet as pq
+
+                pq.write_table(table, parquet_file)
                 if not args.quiet:
                     print(f"  → {parquet_file}")
 
