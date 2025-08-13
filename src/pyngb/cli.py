@@ -134,25 +134,26 @@ def process_file(file_path: Path, args: argparse.Namespace) -> Optional[dict]:
 
             base_name = file_path.stem
 
+            # Convert to DataFrame once for reuse
+            df: pl.DataFrame = pl.from_arrow(table)  # type: ignore[assignment]
+
             if args.format in ["parquet", "all"]:
                 parquet_file = output_dir / f"{base_name}.parquet"
-                table.to_pandas().to_parquet(parquet_file)
+                df.write_parquet(parquet_file)
                 if not args.quiet:
                     print(f"  → {parquet_file}")
 
             if args.format in ["csv", "all"]:
                 csv_file = output_dir / f"{base_name}.csv"
-                df: pl.DataFrame = pl.from_arrow(table)  # type: ignore[assignment]
                 df.write_csv(csv_file)
                 if not args.quiet:
                     print(f"  → {csv_file}")
 
             if args.format in ["json", "all"]:
                 json_file = output_dir / f"{base_name}.json"
-                df_for_json: pl.DataFrame = pl.from_arrow(table)  # type: ignore[assignment]
                 with open(json_file, "w") as f:
                     json.dump(
-                        {"metadata": metadata, "data": df_for_json.to_dicts()},
+                        {"metadata": metadata, "data": df.to_dicts()},
                         f,
                         indent=2,
                         default=str,
