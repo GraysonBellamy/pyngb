@@ -6,17 +6,17 @@ This guide will help you get started with pyngb quickly.
 
 ### Loading Data
 
-pyngb provides two main functions for loading data:
+pyngb provides a simple, intuitive function for loading data:
 
 ```python
-from pyngb import load_ngb_data, get_sta_data
+from pyngb import read_ngb
 
-# Method 1: Load as PyArrow Table (recommended for large datasets)
-table = load_ngb_data("sample.ngb-ss3")
-print(f"Loaded {table.num_rows} rows with {len(table.column_names)} columns")
+# Default mode: Load as PyArrow Table with embedded metadata
+data = read_ngb("sample.ngb-ss3")
+print(f"Loaded {data.num_rows} rows with {data.num_columns} columns")
 
-# Method 2: Get structured data with metadata
-metadata, data = get_sta_data("sample.ngb-ss3")
+# Advanced mode: Get structured data with separate metadata
+metadata, data = read_ngb("sample.ngb-ss3", return_metadata=True)
 print(f"Sample: {metadata.get('sample_name', 'Unknown')}")
 ```
 
@@ -90,11 +90,11 @@ python -m pyngb --help
 ### Data Exploration
 
 ```python
-from pyngb import load_ngb_data
+from pyngb import read_ngb
 import polars as pl
 
 # Load and explore
-table = load_ngb_data("sample.ngb-ss3")
+table = read_ngb("sample.ngb-ss3")
 df = pl.from_arrow(table)
 
 # Check data structure
@@ -114,10 +114,10 @@ print(df.null_count())
 ```python
 import matplotlib.pyplot as plt
 import polars as pl
-from pyngb import load_ngb_data
+from pyngb import read_ngb
 
 # Load data
-table = load_ngb_data("sample.ngb-ss3")
+table = read_ngb("sample.ngb-ss3")
 df = pl.from_arrow(table)
 
 # Simple temperature vs time plot
@@ -153,7 +153,7 @@ if 'dsc' in df.columns:
 
 ```python
 from pathlib import Path
-from pyngb import get_sta_data
+from pyngb import read_ngb
 import polars as pl
 
 # Process all files in a directory
@@ -162,7 +162,7 @@ results = []
 
 for file in data_dir.glob("*.ngb-ss3"):
     try:
-        metadata, data = get_sta_data(str(file))
+        metadata, data = read_ngb(str(file), return_metadata=True)
 
         # Extract key information
         result = {
@@ -194,14 +194,14 @@ if results:
 
 ```python
 import polars as pl
-from pyngb import load_ngb_data
+from pyngb import read_ngb
 
 # Load multiple files and combine
 files = ["sample1.ngb-ss3", "sample2.ngb-ss3", "sample3.ngb-ss3"]
 all_data = []
 
 for file in files:
-    table = load_ngb_data(file)
+    table = read_ngb(file)
     df = pl.from_arrow(table)
     df = df.with_columns(pl.lit(file).alias("source_file"))
     all_data.append(df)
@@ -226,7 +226,7 @@ print(stats)
 ## Tips and Best Practices
 
 !!! tip "Performance Tips"
-    - Use `load_ngb_data()` for large datasets - it returns PyArrow tables which are more memory efficient
+    - Use `read_ngb()` for large datasets - it returns PyArrow tables which are more memory efficient
     - Convert to Polars DataFrames for analysis - they're faster than Pandas for most operations
     - Use Parquet format for storing processed data - it's much faster to read/write than CSV
 

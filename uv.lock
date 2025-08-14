@@ -1705,7 +1705,9 @@ test = [
 dev = [
     { name = "mypy" },
     { name = "pre-commit" },
+    { name = "psutil" },
     { name = "pytest" },
+    { name = "pytest-cov" },
     { name = "ruff" },
 ]
 
@@ -1740,7 +1742,9 @@ requires-dist = [
 dev = [
     { name = "mypy", specifier = ">=1.17.1" },
     { name = "pre-commit", specifier = ">=4.3.0" },
+    { name = "psutil", specifier = ">=6.1.1" },
     { name = "pytest", specifier = ">=8.4.1" },
+    { name = "pytest-cov", specifier = ">=6.2.1" },
     { name = "ruff", specifier = ">=0.12.8" },
 ]
 

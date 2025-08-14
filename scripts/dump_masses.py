@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from pyngb.core.parser import NGBParser
 
 TEST_DIR = Path("tests/test_files")

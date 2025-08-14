@@ -3,6 +3,7 @@ Unit tests for pyngb exceptions.
 """
 
 import pytest
+
 from pyngb.exceptions import (
     NGBCorruptedFileError,
     NGBDataTypeError,

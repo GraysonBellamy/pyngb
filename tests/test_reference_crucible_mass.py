@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from pyngb.core.parser import NGBParser
 
 

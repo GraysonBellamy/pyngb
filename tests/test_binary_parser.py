@@ -208,4 +208,4 @@ class TestBinaryParser:
         result = parser.extract_data_array(table, DataType.FLOAT64.value)
 
         assert result == []
-        mock_logger.debug.assert_called_with("START_DATA marker not found in table")
+        mock_logger.debug.assert_called_with("Table missing START_DATA marker")

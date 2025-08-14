@@ -84,10 +84,16 @@ addopts = [
     "--verbose",
     "--tb=short",
     "--strict-markers",
+    "--disable-warnings",
 ]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:pyngb.cli",
+    "ignore::RuntimeWarning:numpy",
+    "ignore::UserWarning",
 ]
 
 [tool.coverage.run]
@@ -258,6 +264,8 @@ color = true
 dev = [
     "mypy>=1.17.1",
     "pre-commit>=4.3.0",
+    "psutil>=6.1.1",
     "pytest>=8.4.1",
+    "pytest-cov>=6.2.1",
     "ruff>=0.12.8",
 ]

@@ -13,7 +13,8 @@ from pathlib import Path
 from typing import Any
 
 import psutil
-from pyngb import load_ngb_data
+
+from pyngb import read_ngb
 
 
 def benchmark_parsing(ngb_file: str, runs: int = 5) -> dict[str, Any]:
@@ -36,7 +37,7 @@ def benchmark_parsing(ngb_file: str, runs: int = 5) -> dict[str, Any]:
 
         # Time parsing
         start_time = time.perf_counter()
-        table = load_ngb_data(ngb_file)
+        table = read_ngb(ngb_file)
         end_time = time.perf_counter()
 
         # Measure memory
@@ -72,7 +73,7 @@ def benchmark_memory_efficiency(ngb_file: str) -> dict[str, Any]:
     baseline_memory = process.memory_info().rss
 
     # Load data
-    table = load_ngb_data(ngb_file)
+    table = read_ngb(ngb_file)
 
     # Peak memory
     current, peak = tracemalloc.get_traced_memory()

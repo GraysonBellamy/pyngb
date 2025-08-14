@@ -12,7 +12,13 @@ import numpy as np
 from ..constants import DataType
 from ..exceptions import NGBDataTypeError
 
-__all__ = ["DataTypeHandler", "DataTypeRegistry", "Float32Handler", "Float64Handler"]
+__all__ = [
+    "DataTypeHandler",
+    "DataTypeRegistry",
+    "Float32Handler",
+    "Float64Handler",
+    "Int32Handler",
+]
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -25,7 +31,7 @@ class DataTypeHandler(Protocol):
         """Check if this handler can process the given data type."""
         ...
 
-    def parse_data(self, data: bytes) -> list[float]:
+    def parse_data(self, data: bytes | memoryview) -> list[float]:
         """Parse binary data and return list of floats."""
         ...
 
@@ -49,7 +55,7 @@ class Float64Handler:
     def can_handle(self, data_type: bytes) -> bool:
         return data_type == DataType.FLOAT64.value
 
-    def parse_data(self, data: bytes) -> list[float]:
+    def parse_data(self, data: bytes | memoryview) -> list[float]:
         arr = np.frombuffer(data, dtype="<f8")
         return [float(x) for x in arr]
 
@@ -73,8 +79,32 @@ class Float32Handler:
     def can_handle(self, data_type: bytes) -> bool:
         return data_type == DataType.FLOAT32.value
 
-    def parse_data(self, data: bytes) -> list[float]:
+    def parse_data(self, data: bytes | memoryview) -> list[float]:
         arr = np.frombuffer(data, dtype="<f4")
+        return [float(x) for x in arr]
+
+
+class Int32Handler:
+    """Handler for 32-bit signed integer data.
+
+    This handler processes binary data containing arrays of 32-bit integers
+    stored in little-endian format. Uses NumPy's frombuffer for optimal
+    performance.
+
+    Example:
+        >>> handler = Int32Handler()
+        >>> handler.can_handle(b'\\x03')  # DataType.INT32.value
+        True
+        >>> data = b'\\x2a\\x00\\x00\\x00'  # 42 as little-endian int32
+        >>> handler.parse_data(data)
+        [42.0]
+    """
+
+    def can_handle(self, data_type: bytes) -> bool:
+        return data_type == DataType.INT32.value
+
+    def parse_data(self, data: bytes | memoryview) -> list[float]:
+        arr = np.frombuffer(data, dtype="<i4")
         return [float(x) for x in arr]
 
 
@@ -113,6 +143,7 @@ class DataTypeRegistry:
 
     def _register_default_handlers(self) -> None:
         """Register default data type handlers."""
+        self.register(Int32Handler())
         self.register(Float64Handler())
         self.register(Float32Handler())
 
@@ -120,9 +151,29 @@ class DataTypeRegistry:
         """Register a new data type handler."""
         self._handlers.append(handler)
 
-    def parse_data(self, data_type: bytes, data: bytes) -> list[float]:
-        """Parse data using appropriate handler."""
+    def parse_data(self, data_type: bytes, data: bytes | memoryview) -> list[float]:
+        """Parse data using appropriate handler.
+
+        Args:
+            data_type: Binary data type identifier
+            data: Binary data to parse
+
+        Returns:
+            List of parsed float values
+
+        Raises:
+            NGBDataTypeError: If no handler is found for the data type
+        """
         for handler in self._handlers:
             if handler.can_handle(data_type):
-                return handler.parse_data(data)
+                try:
+                    return handler.parse_data(data)
+                except Exception as e:
+                    logger.warning(
+                        f"Handler {handler.__class__.__name__} failed to parse data: {e}"
+                    )
+                    # Continue to next handler if available
+                    continue
+
+        # If we get here, no handler could process the data
         raise NGBDataTypeError(f"No handler found for data type: {data_type.hex()}")

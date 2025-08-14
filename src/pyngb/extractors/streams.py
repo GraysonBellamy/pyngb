@@ -16,7 +16,7 @@ except ImportError:
     ShapeError = ValueError
 
 from ..binary import BinaryParser
-from ..constants import PatternConfig
+from ..constants import START_DATA_HEADER_OFFSET, PatternConfig
 from ..exceptions import NGBDataTypeError
 
 __all__ = ["DataStreamProcessor"]
@@ -35,14 +35,23 @@ class DataStreamProcessor:
             "table_sep", self.parser.markers.TABLE_SEPARATOR
         )
 
-    # --- Stream 2 ---
-    def process_stream_2(self, stream_data: bytes) -> pl.DataFrame:
-        """Process primary data stream (stream_2)."""
-        # Split into tables - exact original logic
+    def _split_tables(self, stream_data: bytes) -> list[bytes]:
+        """Split a stream into tables using the cached table-separator pattern.
+
+        Mirrors the existing splitting logic used elsewhere in the codebase to
+        avoid behavioral drift while keeping this class self-contained.
+        """
         indices = [m.start() - 2 for m in self._table_sep_re.finditer(stream_data)]
         start, end = tee(indices)
         next(end, None)
-        stream_table = [stream_data[i:j] for i, j in zip_longest(start, end)]
+        tables = [stream_data[i:j] for i, j in zip_longest(start, end)]
+        return [t for t in tables if t]
+
+    # --- Stream 2 ---
+    def process_stream_2(self, stream_data: bytes) -> pl.DataFrame:
+        """Process primary data stream (stream_2)."""
+        # Split into tables - preserve original splitting behavior
+        stream_table = self._split_tables(stream_data)
 
         output: list[float] = []
         output_polars = pl.DataFrame()
@@ -65,12 +74,13 @@ class DataStreamProcessor:
                 output = []
 
             if table[1:2] == b"\x75":  # data
-                start_data = table.find(markers.START_DATA) + 6
-                if start_data == 5:  # find() returned -1
+                start_idx = table.find(markers.START_DATA)
+                if start_idx == -1:
                     logger.debug("START_DATA marker not found in table - skipping")
                     continue
 
-                data = table[start_data:]
+                payload_start = start_idx + START_DATA_HEADER_OFFSET
+                data = table[payload_start:]
                 end_data = data.find(markers.END_DATA)
                 if end_data == -1:
                     logger.debug("END_DATA marker not found in table - skipping")
@@ -78,8 +88,12 @@ class DataStreamProcessor:
 
                 data = data[:end_data]
                 # Data type byte immediately precedes START_DATA
-                has_start = table.find(markers.START_DATA)
-                data_type = table[has_start - 1 : has_start]
+                if start_idx <= 0:
+                    logger.debug(
+                        "No data type byte found before START_DATA - skipping table"
+                    )
+                    continue
+                data_type = table[start_idx - 1 : start_idx]
 
                 try:
                     parsed_data = self.parser._data_type_registry.parse_data(
@@ -97,11 +111,8 @@ class DataStreamProcessor:
         self, stream_data: bytes, existing_df: pl.DataFrame
     ) -> pl.DataFrame:
         """Process secondary data stream (stream_3)."""
-        # Split into tables - exact original logic
-        indices = [m.start() - 2 for m in self._table_sep_re.finditer(stream_data)]
-        start, end = tee(indices)
-        next(end, None)
-        stream_table = [stream_data[i:j] for i, j in zip_longest(start, end)]
+        # Split into tables - preserve original splitting behavior
+        stream_table = self._split_tables(stream_data)
 
         output: list[float] = []
         output_polars = existing_df
@@ -117,20 +128,25 @@ class DataStreamProcessor:
                 output = []
 
             if table[1:2] == b"\x75":  # data
-                start_data = table.find(markers.START_DATA) + 6
-                if start_data == 5:  # find() returned -1
+                start_idx = table.find(markers.START_DATA)
+                if start_idx == -1:
                     logger.debug("START_DATA marker not found in table - skipping")
                     continue
 
-                data = table[start_data:]
+                payload_start = start_idx + START_DATA_HEADER_OFFSET
+                data = table[payload_start:]
                 end_data = data.find(markers.END_DATA)
                 if end_data == -1:
                     logger.debug("END_DATA marker not found in table - skipping")
                     continue
 
                 data = data[:end_data]
-                has_start = table.find(markers.START_DATA)
-                data_type = table[has_start - 1 : has_start]
+                if start_idx <= 0:
+                    logger.debug(
+                        "No data type byte found before START_DATA - skipping table"
+                    )
+                    continue
+                data_type = table[start_idx - 1 : start_idx]
 
                 try:
                     parsed_data = self.parser._data_type_registry.parse_data(

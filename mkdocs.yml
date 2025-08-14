@@ -1,10 +1,11 @@
-site_name: pyngb
-site_description: Python library for parsing NETZSCH STA data files
+site_name: pyngb - NETZSCH STA File Parser
+site_description: Comprehensive Python library for parsing and analyzing NETZSCH STA NGB files
 site_author: Grayson Bellamy
 site_url: https://graysonbellamy.github.io/pyngb/
 
 repo_name: GraysonBellamy/pyngb
 repo_url: https://github.com/GraysonBellamy/pyngb
+edit_uri: edit/main/docs/
 
 theme:
   name: material
@@ -26,12 +27,19 @@ theme:
     - navigation.sections
     - navigation.expand
     - navigation.top
+    - navigation.tracking
     - search.highlight
     - search.share
+    - search.suggest
     - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+  icon:
+    repo: fontawesome/brands/github
 
 plugins:
-  - search
+  - search:
+      lang: en
   - mkdocstrings:
       handlers:
         python:
@@ -42,31 +50,92 @@ plugins:
             show_root_heading: true
             show_root_toc_entry: false
             heading_level: 2
+            members_order: source
+            group_by_category: true
+            show_category_heading: true
+            show_if_no_docstring: false
 
 markdown_extensions:
   - admonition
   - pymdownx.details
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          # Use string reference for format to satisfy YAML linter
+          format: "pymdownx.superfences.fence_code_format"
   - pymdownx.highlight:
       anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
   - pymdownx.inlinehilite
-  - pymdownx.snippets
+  - pymdownx.snippets:
+      check_paths: true
   - pymdownx.tabbed:
       alternate_style: true
   - pymdownx.tasklist:
       custom_checkbox: true
   - attr_list
   - md_in_html
+  - tables
+  - footnotes
+  - pymdownx.critic
+  - pymdownx.caret
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.tilde
+  - pymdownx.emoji:
+      # Use string references so YAML linter doesn't require PyYAML constructors
+      emoji_index: "materialx.emoji.twemoji"
+      emoji_generator: "materialx.emoji.to_svg"
 
 nav:
   - Home: index.md
-  - Installation: installation.md
-  - Quick Start: quickstart.md
-  - API Reference: api.md
-  - Development: development.md
-  - Troubleshooting: troubleshooting.md
+  - Getting Started:
+    - Installation: installation.md
+    - Quick Start: quickstart.md
+    - Troubleshooting: troubleshooting.md
+  - User Guide:
+    - Basic Usage: quickstart.md#basic-usage
+    - Batch Processing: quickstart.md#batch-processing-multiple-files
+    - Data Analysis: quickstart.md#data-analysis-workflow
+    - Command Line: quickstart.md#command-line-interface
+    - Validation: api.md#data-validation
+  - API Reference:
+    - Overview: api.md
+    - Core Functions: api.md#core-functions
+    - Batch Processing: api.md#batch-processing
+    - Data Validation: api.md#data-validation
+    - Configuration: api.md#configuration-classes
+    - Exceptions: api.md#exception-hierarchy
+    - Utilities: api.md#utility-functions
+  - Development:
+    - Contributing: development.md
+    - Testing: development.md#testing
+    - Architecture: development.md#architecture-details
+    - Performance: development.md#performance-testing
 
 extra:
   social:
     - icon: fontawesome/brands/github
-  link: https://github.com/GraysonBellamy/pyngb
+      link: https://github.com/GraysonBellamy/pyngb
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/pyngb/
+  version:
+    provider: mike
+  analytics:
+    provider: google
+    property: ${GOOGLE_ANALYTICS_KEY}
+  generator: false
+
+extra_css:
+  - stylesheets/extra.css
+
+extra_javascript:
+  - javascripts/extra.js
+
+copyright: |
+  Copyright &copy; 2024-2025 Grayson Bellamy -
+  <a href="https://github.com/GraysonBellamy/pyngb/blob/main/LICENSE.txt">MIT License</a>
+  <br>
+  <small>Not affiliated with NETZSCH-Gerätebau GmbH</small>

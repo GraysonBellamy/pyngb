@@ -14,7 +14,7 @@ import polars as pl
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from .api.loaders import get_sta_data
+from .api.loaders import read_ngb
 from .constants import FileMetadata
 
 __all__ = ["BatchProcessor", "NGBDataset", "process_directory", "process_files"]
@@ -204,7 +204,7 @@ class BatchProcessor:
 
         try:
             # Parse the file
-            metadata, data = get_sta_data(str(file_path))
+            metadata, data = read_ngb(str(file_path), return_metadata=True)
 
             # Generate output filename
             base_name = file_path.stem
@@ -453,7 +453,9 @@ class NGBDataset:
 
         output_path = Path(output_path)
         if format.lower() == "csv":
-            df.write_csv(output_path)
+            # Flatten nested data for CSV compatibility
+            df_flattened = self._flatten_dataframe_for_csv(df)
+            df_flattened.write_csv(output_path)
         elif format.lower() == "json":
             df.write_json(output_path)
         elif format.lower() == "parquet":
@@ -462,6 +464,34 @@ class NGBDataset:
             raise ValueError(f"Unsupported format: {format}")
 
         logger.info(f"Exported metadata for {len(all_metadata)} files to {output_path}")
+
+    def _flatten_dataframe_for_csv(self, df: pl.DataFrame) -> pl.DataFrame:
+        """Flatten nested data structures for CSV export compatibility.
+
+        Args:
+            df: DataFrame with potentially nested data
+
+        Returns:
+            DataFrame with flattened data suitable for CSV export
+        """
+        import json
+
+        # Create a new dataframe with flattened columns
+        flattened_data = []
+
+        for row in df.iter_rows(named=True):
+            flattened_row = {}
+            for key, value in row.items():
+                if isinstance(value, (dict, list)):
+                    # Convert nested structures to JSON strings
+                    flattened_row[key] = (
+                        json.dumps(value) if value is not None else None
+                    )
+                else:
+                    flattened_row[key] = value
+            flattened_data.append(flattened_row)
+
+        return pl.DataFrame(flattened_data)
 
     def filter_by_metadata(self, predicate) -> NGBDataset:
         """Filter dataset by metadata criteria.
@@ -496,7 +526,7 @@ class NGBDataset:
         cache_key = str(file_path)
 
         if cache_key not in self._metadata_cache:
-            metadata, _ = get_sta_data(str(file_path))
+            metadata, _ = read_ngb(str(file_path), return_metadata=True)
             self._metadata_cache[cache_key] = metadata
 
         return self._metadata_cache[cache_key]
@@ -551,4 +581,4 @@ def process_files(
         List of processing results
     """
     processor = BatchProcessor(max_workers=max_workers)
-    return processor.process_files(files, output_format)
+    return processor.process_files(files, output_format=output_format)

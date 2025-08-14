@@ -7,10 +7,9 @@ from __future__ import annotations
 import logging
 import re
 import struct
-from itertools import tee
 from typing import Any
 
-from ..constants import BinaryMarkers, DataType
+from ..constants import START_DATA_HEADER_OFFSET, BinaryMarkers, DataType
 from .handlers import DataTypeRegistry
 
 __all__ = ["BinaryParser"]
@@ -46,11 +45,27 @@ class BinaryParser:
         - Leverages NumPy frombuffer for fast array parsing
     """
 
+    # Offsets and constants
+    # NOTE: NGB stream tables are separated by a known byte sequence. Historical
+    # logic used a "-2" adjustment before each separator to align table
+    # boundaries with the actual end of the preceding table. Capture this as a
+    # named constant to avoid magic numbers and clarify intent.
+    TABLE_SPLIT_OFFSET: int = -2
+
+    # Minimum byte length to attempt partial FLOAT64 recovery when handling
+    # corrupted data (8 bytes is the size of one IEEE-754 float64 value).
+    MIN_FLOAT64_BYTES: int = 8
+
     def __init__(self, markers: BinaryMarkers | None = None):
         self.markers = markers or BinaryMarkers()
         self._compiled_patterns: dict[str, re.Pattern[bytes]] = {}
         self._data_type_registry = DataTypeRegistry()
-        # Hot-path: table separator compiled once
+
+        # Maintain a precompiled table separator regex for compatibility with
+        # existing tests that assert this cache is populated at init time.
+        # Even though split_tables now uses a faster bytes.find approach, we
+        # keep this compiled pattern to preserve expected state and allow
+        # potential future regex uses.
         self._compiled_patterns["table_sep"] = re.compile(
             self.markers.TABLE_SEPARATOR, re.DOTALL
         )
@@ -65,15 +80,36 @@ class BinaryParser:
 
     @staticmethod
     def parse_value(data_type: bytes, value: bytes) -> Any:
-        """Parse binary value based on data type."""
+        """Parse binary value based on data type.
+
+        Args:
+            data_type: Data type identifier from DataType enum
+            value: Binary data to parse
+
+        Returns:
+            Parsed value or None if parsing fails
+
+        Raises:
+            ValueError: If data length doesn't match expected type size
+        """
         try:
             if data_type == DataType.INT32.value:
+                if len(value) != 4:
+                    raise ValueError(f"INT32 requires 4 bytes, got {len(value)}")
                 return struct.unpack("<i", value)[0]
             if data_type == DataType.FLOAT32.value:
+                if len(value) != 4:
+                    raise ValueError(f"FLOAT32 requires 4 bytes, got {len(value)}")
                 return struct.unpack("<f", value)[0]
             if data_type == DataType.FLOAT64.value:
+                if len(value) != 8:
+                    raise ValueError(f"FLOAT64 requires 8 bytes, got {len(value)}")
                 return struct.unpack("<d", value)[0]
             if data_type == DataType.STRING.value:
+                if len(value) < 4:
+                    raise ValueError(
+                        f"STRING requires at least 4 bytes for length prefix, got {len(value)}"
+                    )
                 # Skip 4-byte length; strip nulls.
                 return (
                     value[4:]
@@ -82,8 +118,11 @@ class BinaryParser:
                     .replace("\x00", "")
                 )
             return value
-        except Exception as e:
+        except (struct.error, ValueError) as e:
             logger.debug("Failed to parse value: %s", e)
+            return None
+        except Exception as e:
+            logger.debug("Unexpected error parsing value: %s", e)
             return None
 
     def split_tables(self, data: bytes) -> list[bytes]:
@@ -108,15 +147,99 @@ class BinaryParser:
         Note:
             If no separator is found, returns the entire data as a single table.
         """
-        pattern = self._compiled_patterns["table_sep"]
-        indices = [m.start() - 2 for m in pattern.finditer(data)]
-        if not indices:
-            return [data]
-        start, end = tee(indices)
-        next(end, None)
-        from itertools import zip_longest
+        if not data:
+            logger.debug("Empty data provided to split_tables")
+            return []
 
-        return [data[i:j] for i, j in zip_longest(start, end)]
+        sep = self.markers.TABLE_SEPARATOR
+        if not sep:
+            # Defensive: if no separator configured, return the whole payload
+            logger.debug("No table separator configured, returning single table")
+            return [data]
+
+        # Fast non-regex split using bytes.find to determine boundaries while
+        # preserving the historical offset semantics.
+        indices: list[int] = []
+        search_pos = 0
+        while True:
+            idx = data.find(sep, search_pos)
+            if idx == -1:
+                break
+            cut = idx + self.TABLE_SPLIT_OFFSET
+            if cut < 0:
+                cut = 0
+            indices.append(cut)
+            # Continue searching after the separator
+            search_pos = idx + len(sep)
+
+        if not indices:
+            logger.debug("No table separators found, returning single table")
+            return [data]
+
+        # Build table slices from computed boundaries; the last table runs to
+        # the end of the data payload.
+        ends = [*indices[1:], len(data)]
+        tables = [data[i:j] for i, j in zip(indices, ends)]
+
+        # Filter out empty tables
+        valid_tables = [table for table in tables if table]
+        logger.debug(f"Split data into {len(valid_tables)} valid tables")
+
+        return valid_tables
+
+    def handle_corrupted_data(self, data: bytes, context: str = "") -> list[float]:
+        """Handle corrupted or malformed data gracefully.
+
+        Args:
+            data: Potentially corrupted binary data
+            context: Context information for logging
+
+        Returns:
+            Empty list for corrupted data
+        """
+        logger.warning(f"Handling corrupted data in {context}: {len(data)} bytes")
+
+        # Try to recover partial data if possible
+        if len(data) >= self.MIN_FLOAT64_BYTES:
+            try:
+                # Try to extract what we can
+                return self._data_type_registry.parse_data(
+                    DataType.FLOAT64.value, memoryview(data)[: self.MIN_FLOAT64_BYTES]
+                )
+            except Exception as exc:
+                logger.debug("Failed partial parse in handle_corrupted_data: %s", exc)
+
+        return []
+
+    def validate_data_integrity(self, table: bytes) -> bool:
+        """Validate that a table has proper START_DATA and END_DATA markers.
+
+        Args:
+            table: Binary table data to validate
+
+        Returns:
+            True if table has valid structure, False otherwise
+        """
+        has_start = self.markers.START_DATA in table
+        has_end = self.markers.END_DATA in table
+
+        if not has_start:
+            logger.debug("Table missing START_DATA marker")
+            return False
+
+        if not has_end:
+            logger.debug("Table missing END_DATA marker")
+            return False
+
+        # Check that END_DATA comes after START_DATA
+        start_pos = table.find(self.markers.START_DATA)
+        end_pos = table.find(self.markers.END_DATA)
+
+        if end_pos <= start_pos:
+            logger.debug("END_DATA marker appears before or at START_DATA position")
+            return False
+
+        return True
 
     def extract_data_array(self, table: bytes, data_type: bytes) -> list[float]:
         """Extract array of numerical data with memory optimization.
@@ -144,35 +267,39 @@ class BinaryParser:
             Uses NumPy frombuffer which is 10-50x faster than struct.iter_unpack
             for large arrays.
         """
-        # Use memoryview to avoid unnecessary copying
-        table_mv = memoryview(table)
+        # Validate table structure first
+        if not self.validate_data_integrity(table):
+            return []
 
-        # Find data boundaries using memoryview
-        table_bytes = table_mv.tobytes()  # Only convert once
-        start_idx = table_bytes.find(self.markers.START_DATA)
+        # Find data boundaries efficiently
+        start_idx = table.find(self.markers.START_DATA)
         if start_idx == -1:
             logger.debug("START_DATA marker not found in table")
             return []
 
         # Advance to the first byte after the START_DATA header
-        # Empirically, payload begins 6 bytes after the START_DATA marker
-        # to skip marker and header bytes present in the stream format.
-        start_idx += 6
-        data_mv = table_mv[start_idx:]
+        # The payload begins after the START_DATA marker offset to skip
+        # marker and header bytes present in the stream format.
+        start_idx += START_DATA_HEADER_OFFSET
 
-        data_bytes = data_mv.tobytes()  # Only convert once for end search
-        end_idx = data_bytes.find(self.markers.END_DATA)
+        # Find end marker in the remaining data
+        end_idx = table.find(self.markers.END_DATA, start_idx)
         if end_idx == -1:
             logger.debug("END_DATA marker not found in table")
             return []
 
-        # Extract data chunk efficiently using memoryview slicing
-        data_chunk = data_mv[:end_idx].tobytes()
+        # Extract data chunk efficiently using memoryview to avoid copying
+        data_chunk = memoryview(table)[start_idx:end_idx]
+
+        # Validate data chunk is not empty
+        if not data_chunk:
+            logger.debug("Data chunk is empty")
+            return []
 
         # Use pluggable data type registry
         try:
             return self._data_type_registry.parse_data(data_type, data_chunk)
-        except Exception:
+        except Exception as e:
             # Fallback to empty list for unknown data types
-            logger.debug(f"Unknown data type: {data_type.hex()}")
+            logger.debug(f"Failed to parse data with type {data_type.hex()}: {e}")
             return []

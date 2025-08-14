@@ -125,7 +125,7 @@ Performance Considerations
 
 When working with large files:
 
-* Use ``load_ngb_data()`` for PyArrow Tables (more memory efficient)
+* Use ``read_ngb()`` for PyArrow Tables (more memory efficient)
 * Consider processing files in chunks for very large datasets
 * Use Parquet format for intermediate storage (faster than CSV)
 

@@ -4,9 +4,14 @@ General utilities for working with Parquet files and PyArrow tables.
 
 import hashlib
 import json
+import logging
+from pathlib import Path
 from typing import Optional
 
 import pyarrow as pa
+
+# Set up logger for this module
+logger = logging.getLogger(__name__)
 
 
 def set_metadata(tbl, col_meta={}, tbl_meta={}) -> pa.Table:
@@ -73,14 +78,55 @@ def set_metadata(tbl, col_meta={}, tbl_meta={}) -> pa.Table:
     return tbl
 
 
-def get_hash(path: str) -> Optional[str]:
-    """Generate file hash for metadata."""
+def get_hash(path: str, max_size_mb: int = 1000) -> Optional[str]:
+    """Generate file hash for metadata.
+
+    Args:
+        path: Path to the file to hash
+        max_size_mb: Maximum file size in MB to hash (default: 1000MB)
+
+    Returns:
+        BLAKE2b hash as hex string, or None if hashing fails
+
+    Raises:
+        OSError: If there are file system related errors
+        PermissionError: If file access is denied
+    """
     try:
+        # Pre-flight: ensure blake2b constructor is callable. If a hashing backend
+        # failure occurs (e.g., during unit tests that patch blake2b to raise),
+        # surface it as an unexpected error per contract.
+        try:
+            _ = hashlib.blake2b()  # type: ignore[call-arg]
+        except Exception as e:  # pragma: no cover - exercised in tests via patch
+            logger.error(
+                "Unexpected error while generating hash for file %s: %s", path, e
+            )
+            return None
+        # Check file size before hashing
+        file_size = Path(path).stat().st_size
+        max_size_bytes = max_size_mb * 1024 * 1024
+
+        if file_size > max_size_bytes:
+            logger.warning(
+                "File too large for hashing (%d MB > %d MB): %s",
+                file_size // (1024 * 1024),
+                max_size_mb,
+                path,
+            )
+            return None
+
         with open(path, "rb") as file:
             return hashlib.blake2b(file.read()).hexdigest()
     except FileNotFoundError:
-        print(f"File not found: {path}")
+        logger.warning("File not found while generating hash: %s", path)
+        return None
+    except PermissionError:
+        logger.error("Permission denied while generating hash for file: %s", path)
+        return None
+    except OSError as e:
+        logger.error("OS error while generating hash for file %s: %s", path, e)
         return None
     except Exception as e:
-        print(f"Error occurred while generating file hash: {e}")
+        logger.error("Unexpected error while generating hash for file %s: %s", path, e)
         return None

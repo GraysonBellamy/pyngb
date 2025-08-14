@@ -3,6 +3,7 @@ Unit tests for pyngb binary parsing handlers.
 """
 
 import pytest
+
 from pyngb.binary.handlers import DataTypeRegistry, Float32Handler, Float64Handler
 from pyngb.constants import DataType
 from pyngb.exceptions import NGBDataTypeError

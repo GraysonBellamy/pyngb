@@ -125,10 +125,10 @@ class QualityChecker:
     - Metadata consistency
 
     Examples:
-    >>> from pyngb import load_ngb_data
+    >>> from pyngb import read_ngb
     >>> from pyngb.validation import QualityChecker
         >>>
-        >>> table = load_ngb_data("sample.ngb-ss3")
+        >>> table = read_ngb("sample.ngb-ss3")
         >>> checker = QualityChecker(table)
         >>> result = checker.full_validation()
         >>>
@@ -380,15 +380,17 @@ class QualityChecker:
 
         # Check for reasonable time intervals
         if len(time_diff) > 0:
-            avg_interval = np.mean(time_diff[time_diff > 0])
-            if avg_interval < 0.1:  # Less than 0.1 second intervals
-                self.result.add_info(
-                    f"Very high time resolution: {avg_interval:.3f}s average interval"
-                )
-            elif avg_interval > 60:  # More than 1 minute intervals
-                self.result.add_warning(
-                    f"Low time resolution: {avg_interval:.1f}s average interval"
-                )
+            positive_intervals = time_diff[time_diff > 0]
+            if len(positive_intervals) > 0:
+                avg_interval = np.mean(positive_intervals)
+                if avg_interval < 0.1:  # Less than 0.1 second intervals
+                    self.result.add_info(
+                        f"Very high time resolution: {avg_interval:.3f}s average interval"
+                    )
+                elif avg_interval > 60:  # More than 1 minute intervals
+                    self.result.add_warning(
+                        f"Low time resolution: {avg_interval:.1f}s average interval"
+                    )
 
     def _check_mass_data(self) -> None:
         """Validate mass measurements."""
@@ -407,20 +409,57 @@ class QualityChecker:
         mass_min = mass_stats.filter(pl.col("statistic") == "min")["mass"][0]
         mass_max = mass_stats.filter(pl.col("statistic") == "max")["mass"][0]
 
-        # Check for physically reasonable mass values
-        if mass_min <= 0:
-            self.result.add_error(
-                f"Invalid mass values (≤ 0): minimum = {mass_min:.3f}mg"
-            )
-        elif mass_min < 0.1:
-            self.result.add_warning(f"Very low sample mass: {mass_min:.3f}mg")
+        # Check mass against sample mass from metadata if available
+        if (
+            hasattr(self, "metadata")
+            and self.metadata
+            and "sample_mass" in self.metadata
+        ):
+            sample_mass = self.metadata["sample_mass"]
 
+            # Calculate total mass loss (most negative value represents maximum loss)
+            max_mass_loss = abs(mass_min) if mass_min < 0 else 0
+
+            if sample_mass > 0:
+                mass_loss_percentage = (max_mass_loss / sample_mass) * 100
+
+                # Check if mass loss exceeds sample mass (with 10% tolerance for measurement uncertainty)
+                if max_mass_loss > sample_mass * 1.1:
+                    self.result.add_error(
+                        f"Mass loss ({max_mass_loss:.3f}mg) exceeds sample mass ({sample_mass:.3f}mg) by more than tolerance"
+                    )
+                elif mass_loss_percentage > 100:
+                    self.result.add_warning(
+                        f"Mass loss ({mass_loss_percentage:.1f}%) appears to exceed sample mass"
+                    )
+                else:
+                    self.result.add_pass(
+                        f"Mass loss ({mass_loss_percentage:.1f}%) is within expected range"
+                    )
+            else:
+                self.result.add_warning(
+                    "Sample mass in metadata is zero or negative - cannot validate mass loss"
+                )
+        else:
+            self.result.add_info(
+                "No sample mass in metadata - skipping mass loss validation"
+            )
+
+        # Check for extremely high maximum mass values (instrument limits)
         if mass_max > 1000:  # More than 1g
-            self.result.add_warning(f"Very high sample mass: {mass_max:.1f}mg")
+            self.result.add_warning(f"Very high mass reading: {mass_max:.1f}mg")
 
         # Check mass loss/gain
         initial_mass = mass_col[0, 0]
         final_mass = mass_col[-1, 0]
+
+        # Avoid division by zero
+        if initial_mass == 0:
+            self.result.add_error(
+                "Initial mass is zero - cannot calculate mass change percentage"
+            )
+            return
+
         mass_change = ((final_mass - initial_mass) / initial_mass) * 100
 
         if abs(mass_change) < 0.1:
@@ -557,10 +596,10 @@ def validate_sta_data(
         List of validation issues found
 
     Examples:
-    >>> from pyngb import load_ngb_data
+    >>> from pyngb import read_ngb
     >>> from pyngb.validation import validate_sta_data
         >>>
-        >>> table = load_ngb_data("sample.ngb-ss3")
+        >>> table = read_ngb("sample.ngb-ss3")
         >>> issues = validate_sta_data(table)
         >>>
         >>> if issues:
@@ -597,14 +636,20 @@ def check_temperature_profile(
 
     temp_data = df.select("sample_temperature").to_numpy().flatten()
 
+    # Handle NaN and infinite values
+    temp_data_clean = temp_data[~np.isnan(temp_data) & ~np.isinf(temp_data)]
+
+    if len(temp_data_clean) == 0:
+        return {"error": "No valid temperature data (all NaN or infinite)"}
+
     analysis: dict[str, str | float | bool] = {
-        "temperature_range": float(np.ptp(temp_data)),
-        "min_temperature": float(np.min(temp_data)),
-        "max_temperature": float(np.max(temp_data)),
-        "is_monotonic_increasing": bool(np.all(np.diff(temp_data) >= 0)),
-        "is_monotonic_decreasing": bool(np.all(np.diff(temp_data) <= 0)),
-        "average_rate": float(np.mean(np.diff(temp_data)))
-        if len(temp_data) > 1
+        "temperature_range": float(np.ptp(temp_data_clean)),
+        "min_temperature": float(np.min(temp_data_clean)),
+        "max_temperature": float(np.max(temp_data_clean)),
+        "is_monotonic_increasing": bool(np.all(np.diff(temp_data_clean) >= 0)),
+        "is_monotonic_decreasing": bool(np.all(np.diff(temp_data_clean) <= 0)),
+        "average_rate": float(np.mean(np.diff(temp_data_clean)))
+        if len(temp_data_clean) > 1
         else 0.0,
     }
 
@@ -632,16 +677,27 @@ def check_mass_data(
 
     mass_data = df.select("mass").to_numpy().flatten()
 
-    initial_mass = mass_data[0]
-    final_mass = mass_data[-1]
+    # Handle NaN and infinite values
+    mass_data_clean = mass_data[~np.isnan(mass_data) & ~np.isinf(mass_data)]
+
+    if len(mass_data_clean) == 0:
+        return {"error": "No valid mass data (all NaN or infinite)"}
+
+    initial_mass = mass_data_clean[0]
+    final_mass = mass_data_clean[-1]
+
+    # Avoid division by zero
+    if initial_mass == 0:
+        return {"error": "Initial mass is zero - cannot calculate mass loss percentage"}
+
     mass_loss_percent = ((initial_mass - final_mass) / initial_mass) * 100
 
     analysis: dict[str, str | float | bool] = {
         "initial_mass": float(initial_mass),
         "final_mass": float(final_mass),
         "mass_loss_percent": float(mass_loss_percent),
-        "mass_range": float(np.ptp(mass_data)),
-        "has_negative_values": bool(np.any(mass_data <= 0)),
+        "mass_range": float(np.ptp(mass_data_clean)),
+        "has_negative_values": bool(np.any(mass_data_clean <= 0)),
     }
 
     return analysis
@@ -666,29 +722,40 @@ def check_dsc_data(data: Union[pa.Table, pl.DataFrame]) -> dict[str, str | float
 
     dsc_data = df.select("dsc_signal").to_numpy().flatten()
 
+    # Handle NaN and infinite values
+    dsc_data_clean = dsc_data[~np.isnan(dsc_data) & ~np.isinf(dsc_data)]
+
+    if len(dsc_data_clean) == 0:
+        return {"error": "No valid DSC data (all NaN or infinite)"}
+
     # Simple peak detection
     peaks_positive = 0
     peaks_negative = 0
 
-    for i in range(1, len(dsc_data) - 1):
-        if dsc_data[i] > dsc_data[i - 1] and dsc_data[i] > dsc_data[i + 1]:
-            if dsc_data[i] > np.std(dsc_data):  # Significant peak
+    for i in range(1, len(dsc_data_clean) - 1):
+        if (
+            dsc_data_clean[i] > dsc_data_clean[i - 1]
+            and dsc_data_clean[i] > dsc_data_clean[i + 1]
+        ):
+            if dsc_data_clean[i] > np.std(dsc_data_clean):  # Significant peak
                 peaks_positive += 1
         elif (
-            dsc_data[i] < dsc_data[i - 1]
-            and dsc_data[i] < dsc_data[i + 1]
-            and abs(dsc_data[i]) > np.std(dsc_data)
+            dsc_data_clean[i] < dsc_data_clean[i - 1]
+            and dsc_data_clean[i] < dsc_data_clean[i + 1]
+            and abs(dsc_data_clean[i]) > np.std(dsc_data_clean)
         ):  # Significant through
             peaks_negative += 1
 
     analysis: dict[str, str | float | int] = {
-        "signal_range": float(np.ptp(dsc_data)),
-        "signal_std": float(np.std(dsc_data)),
+        "signal_range": float(np.ptp(dsc_data_clean)),
+        "signal_std": float(np.std(dsc_data_clean)),
         "peaks_detected": int(peaks_positive + peaks_negative),
         "positive_peaks": int(peaks_positive),
         "negative_peaks": int(peaks_negative),
-        "signal_to_noise": float(np.max(np.abs(dsc_data)) / np.std(dsc_data))
-        if np.std(dsc_data) > 0
+        "signal_to_noise": float(
+            np.max(np.abs(dsc_data_clean)) / np.std(dsc_data_clean)
+        )
+        if np.std(dsc_data_clean) > 0
         else 0.0,
     }
 

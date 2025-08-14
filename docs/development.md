@@ -1,75 +1,147 @@
-# Development
+# Development Guide
 
-This page contains information for developers contributing to pyngb.
+This guide covers development setup, contribution guidelines, testing procedures, and architectural details for pyngb.
 
-## Setting Up Development Environment
+## Development Setup
 
 ### Prerequisites
 
 - Python 3.9 or higher
-- [uv](https://github.com/astral-sh/uv) package manager
+- [uv](https://github.com/astral-sh/uv) package manager (recommended) or pip
 - Git
 
-### Installation
+### Initial Setup
 
-1. Clone the repository:
-   ```bash
-    git clone https://github.com/GraysonBellamy/pyngb.git
-    cd pyngb
-   ```
+```bash
+# Clone the repository
+git clone https://github.com/GraysonBellamy/pyngb.git
+cd pyngb
 
-2. Install the package in development mode:
-   ```bash
-   uv sync --all-extras
-   ```
+# Install with development dependencies
+uv sync --extra dev
 
-3. Install pre-commit hooks:
-   ```bash
-   uv run pre-commit install
-   ```
+# Install pre-commit hooks (optional but recommended)
+pre-commit install
 
-## Code Quality Tools
+# Verify installation
+uv run pytest --version
+uv run ruff --version
+uv run mypy --version
+```
 
-pyngb uses several automated tools to maintain code quality:
+### Alternative Setup with pip
+
+```bash
+# Clone and navigate
+git clone https://github.com/GraysonBellamy/pyngb.git
+cd pyngb
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install development dependencies
+pip install -e ".[dev]"
+```
+
+## Project Structure
+
+```
+pyngb/
+├── src/pyngb/              # Main package code
+│   ├── api/               # High-level user interface
+│   ├── binary/            # Binary parsing components
+│   ├── core/              # Core parser logic
+│   ├── extractors/        # Data and metadata extractors
+│   ├── batch.py           # Batch processing tools
+│   ├── validation.py      # Data validation
+│   ├── constants.py       # Configuration and constants
+│   ├── exceptions.py      # Custom exceptions
+│   └── util.py           # Utility functions
+├── tests/                 # Comprehensive test suite
+│   ├── test_files/        # Real NGB files for testing
+│   ├── conftest.py        # Test fixtures
+│   └── test_*.py         # Test modules
+├── docs/                  # Documentation
+├── examples/              # Usage examples
+└── scripts/              # Development scripts
+```
+
+## Code Style and Quality
+
+### Code Formatting
+
+We use several tools to maintain code quality:
+
+```bash
+# Format code with ruff
+uv run ruff format .
+
+# Lint with ruff
+uv run ruff check .
+
+# Type checking with mypy
+uv run mypy src/
+
+# Security scanning with bandit
+uv run bandit -r src/
+```
 
 ### Pre-commit Hooks
 
-Pre-commit hooks run automatically before each commit and include:
-
-- **Ruff**: Fast Python linter and formatter (replaces Black and isort)
-- **mypy**: Type checking
-- **Bandit**: Security scanning
-- Various file checks (trailing whitespace, file endings, etc.)
-
-### Running Tools Manually
-
-You can run any of these tools manually:
+Install pre-commit hooks to automatically run checks:
 
 ```bash
-# Lint and format code with Ruff
-uv run ruff check src/ tests/ --fix
-uv run ruff format src/ tests/
+# Install hooks
+pre-commit install
 
-# Type check
-uv run mypy src/
-
-# Security scan
-uv run bandit -r src/
-uv run safety scan
-
-# Run all pre-commit hooks
-uv run pre-commit run --all-files
+# Run hooks manually
+pre-commit run --all-files
 ```
 
-### Configuration
+The pre-commit configuration includes:
+- Code formatting (ruff)
+- Linting (ruff)
+- Type checking (mypy)
+- Security checks (bandit)
+- Documentation checks
 
-Tool configurations are in `pyproject.toml`:
+### Configuration Files
 
-- `[tool.ruff]`: Linting and formatting rules
-- `[tool.mypy]`: Type checking settings
-- `[tool.bandit]`: Security scanning configuration
+- **pyproject.toml**: Main configuration for tools and build
+- **.pre-commit-config.yaml**: Pre-commit hook configuration
+- **.gitignore**: Git ignore patterns
+- **mkdocs.yml**: Documentation configuration
 
 ## Testing
+
+pyngb has a comprehensive test suite with over 300 tests covering unit, integration, and end-to-end scenarios.
+
+### Test Categories
+
+#### Unit Tests
+- **Location**: `tests/test_*.py`
+- **Purpose**: Test individual components in isolation
+- **Coverage**: All major functions and classes
+- **Execution**: Fast (<1 second per test)
+
+#### Integration Tests
+- **Location**: `tests/test_integration_comprehensive.py`
+- **Purpose**: Test component interactions and real-world scenarios
+- **Coverage**: Cross-module functionality, error handling
+- **Execution**: Medium speed (1-10 seconds per test)
+
+#### End-to-End Tests
+- **Location**: `tests/test_end_to_end_workflows.py`
+- **Purpose**: Test complete user workflows
+- **Coverage**: Full data processing pipelines
+- **Execution**: Slower (10+ seconds per test)
+
+#### Stress Tests
+- **Location**: `tests/test_stress_and_edge_cases.py`
+- **Purpose**: Test robustness under extreme conditions
+- **Coverage**: Memory management, concurrent access, edge cases
+- **Execution**: Marked as slow tests
 
 ### Running Tests
 
@@ -77,270 +149,456 @@ Tool configurations are in `pyproject.toml`:
 # Run all tests
 uv run pytest
 
-# Run with coverage
-uv run pytest --cov=pyngb --cov-report=html
+# Run with coverage report
+uv run pytest --cov=src --cov-report=html
+
+# Run only fast tests (skip slow tests)
+uv run pytest -m "not slow"
 
 # Run specific test file
 uv run pytest tests/test_api.py
 
-# Run with verbose output
+# Run specific test function
+uv run pytest tests/test_api.py::TestLoadNGBData::test_basic
+
+# Run tests with verbose output
 uv run pytest -v
 
-# Run specific test types
-pytest tests/ -k "not integration"  # Skip integration tests
-pytest tests/test_integration.py    # Only integration tests
+# Run tests and stop on first failure
+uv run pytest -x
 ```
 
-### Test Structure
+### Test Data
 
-Tests are organized in the `tests/` directory:
+The test suite uses:
+- **Real NGB files**: Located in `tests/test_files/`
+- **Mock data**: Generated programmatically for specific scenarios
+- **Fixtures**: Reusable test components in `conftest.py`
 
-- `test_api.py`: High-level API functionality tests
-- `test_binary_handlers.py`: Binary handler tests
-- `test_binary_parser.py`: Binary parser tests
-- `test_constants.py`: Constants tests
-- `test_exceptions.py`: Exception tests
-- `test_integration.py`: End-to-end integration tests
-- `test_files/`: Sample NGB files for testing
-- `conftest.py`: Pytest configuration and fixtures
+```python
+# Example test using real files
+def test_with_real_file():
+    test_file = Path(__file__).parent / "test_files" / "Red_Oak_STA_10K_250731_R7.ngb-ss3"
+    if not test_file.exists():
+        pytest.skip("Test file not found")
 
-### Adding Tests
+    table = read_ngb(str(test_file))
+    assert table.num_rows > 0
+```
 
-When adding new functionality:
+### Writing Tests
 
-1. Write tests first (TDD approach)
-2. Ensure good test coverage (aim for >80%)
-3. Include both positive and negative test cases
-4. Test edge cases and error conditions
-5. Use descriptive test names that explain what is being tested
-6. Follow the Arrange-Act-Assert pattern
+#### Test Structure
 
-## Performance
+```python
+class TestMyComponent:
+    """Test MyComponent functionality."""
+
+    def test_basic_functionality(self):
+        """Test basic usage scenario."""
+        # Arrange
+        component = MyComponent()
+
+        # Act
+        result = component.do_something()
+
+        # Assert
+        assert result is not None
+
+    def test_error_handling(self):
+        """Test error conditions."""
+        component = MyComponent()
+
+        with pytest.raises(SpecificError):
+            component.do_invalid_thing()
+
+    @pytest.mark.slow
+    def test_performance_scenario(self):
+        """Test performance-critical functionality."""
+        # Mark slow tests appropriately
+        pass
+```
+
+#### Using Fixtures
+
+```python
+def test_with_sample_data(sample_ngb_file):
+    """Test using shared fixture."""
+    table = read_ngb(sample_ngb_file)
+    assert table.num_rows > 0
+```
+
+#### Parameterized Tests
+
+```python
+@pytest.mark.parametrize("file_path,expected_columns", [
+    ("file1.ngb-ss3", ["time", "temperature"]),
+    ("file2.ngb-ss3", ["time", "temperature", "mass"]),
+])
+def test_multiple_files(file_path, expected_columns):
+    """Test with multiple file scenarios."""
+    # Test implementation
+    pass
+```
+
+### Coverage Goals
+
+| Component | Target Coverage | Current Status |
+|-----------|----------------|----------------|
+| API Functions | 95%+ | ✅ Achieved |
+| Core Parser | 90%+ | ✅ Achieved |
+| Binary Handlers | 95%+ | ✅ Achieved |
+| Validation | 90%+ | ✅ Achieved |
+| Batch Processing | 90%+ | ✅ Achieved |
+| Utilities | 95%+ | ✅ Achieved |
+| Overall | 85%+ | ✅ Achieved (90%+) |
+
+## Performance Testing
 
 ### Benchmarking
 
-Use the built-in benchmarking tools:
-
 ```bash
-# Run performance benchmarks
-python benchmarks.py
+# Run performance tests
+uv run pytest tests/test_stress_and_edge_cases.py -m slow
 
-# Run with multiple iterations for better statistics
-python benchmarks.py --runs 5
+# Profile specific functions
+uv run python -m cProfile -o profile.stats scripts/profile_parsing.py
 
-# Profile memory usage
-python -m memory_profiler benchmarks.py
+# Memory profiling
+uv run python -m memory_profiler scripts/memory_test.py
 ```
 
-### Performance Guidelines
+### Performance Targets
 
-- Use numpy arrays for numerical data when possible
-- Consider using PyArrow Tables for memory efficiency with large datasets
-- Minimize memory allocations in hot paths
-- Profile before optimizing
-- Consider using Parquet format for intermediate storage (faster than CSV)
-- Process files in chunks for very large datasets
+| Operation | Target | Measurement |
+|-----------|--------|-------------|
+| Parse 10MB file | <2 seconds | End-to-end parsing |
+| Extract metadata | <0.5 seconds | Metadata only |
+| Batch 100 files | <60 seconds | 4-core parallel |
+| Memory usage | <3x file size | Peak memory |
+
+## Contributing Guidelines
+
+### Contribution Process
+
+1. **Fork the Repository**
+   ```bash
+   # Fork on GitHub, then clone your fork
+   git clone https://github.com/YOUR_USERNAME/pyngb.git
+   cd pyngb
+   ```
+
+2. **Create Feature Branch**
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+3. **Make Changes**
+   - Write code following our style guidelines
+   - Add or update tests for new functionality
+   - Update documentation as needed
+   - Ensure all tests pass
+
+4. **Commit Changes**
+   ```bash
+   git add .
+   git commit -m "feat: add new feature description"
+   ```
+
+5. **Submit Pull Request**
+   - Push to your fork
+   - Create pull request with clear description
+   - Address review feedback
+
+### Commit Message Guidelines
+
+We follow conventional commits:
+
+- `feat:` - New features
+- `fix:` - Bug fixes
+- `docs:` - Documentation changes
+- `test:` - Test additions or modifications
+- `refactor:` - Code refactoring
+- `perf:` - Performance improvements
+- `style:` - Code style changes
+- `chore:` - Maintenance tasks
+
+Examples:
+```
+feat: add batch processing validation
+fix: handle corrupted file headers correctly
+docs: update API reference for new functions
+test: add integration tests for real files
+```
+
+### Code Review Process
+
+All contributions go through code review:
+
+1. **Automated Checks**: CI runs tests, linting, and type checking
+2. **Manual Review**: Maintainers review code quality and design
+3. **Testing**: Verify functionality with real data
+4. **Documentation**: Ensure adequate documentation
+5. **Merge**: Approved changes are merged to main
+
+## Architecture Details
+
+### Design Principles
+
+1. **Modularity**: Clear separation of concerns
+2. **Performance**: Optimize for speed and memory efficiency
+3. **Extensibility**: Easy to add new formats and features
+4. **Reliability**: Comprehensive error handling and validation
+5. **Usability**: Multiple APIs for different use cases
+
+### Core Components
+
+#### API Layer (`api/`)
+- **Purpose**: High-level user interface
+- **Key Files**: `loaders.py`
+- **Responsibilities**: Simple functions for common use cases
+
+#### Core Parser (`core/`)
+- **Purpose**: Orchestrate parsing operations
+- **Key Files**: `parser.py`
+- **Responsibilities**: Coordinate binary parsing, metadata extraction, and data processing
+
+#### Binary Parser (`binary/`)
+- **Purpose**: Low-level binary format handling
+- **Key Files**: `parser.py`, `handlers.py`
+- **Responsibilities**: Binary structure parsing, data type conversion
+
+#### Extractors (`extractors/`)
+- **Purpose**: Specialized data extraction
+- **Key Files**: `metadata.py`, `streams.py`
+- **Responsibilities**: Extract metadata and measurement data
+
+#### Batch Processing (`batch.py`)
+- **Purpose**: Handle multiple files efficiently
+- **Responsibilities**: Parallel processing, progress tracking, error handling
+
+#### Validation (`validation.py`)
+- **Purpose**: Data quality checking
+- **Responsibilities**: Validate data integrity, check for anomalies
+
+### Extension Points
+
+#### Custom Data Type Handlers
+
+```python
+from pyngb.binary.handlers import DataTypeHandler
+
+class CustomHandler(DataTypeHandler):
+    def can_handle(self, data_type: bytes) -> bool:
+        return data_type == b'\x99'
+
+    def parse(self, data: bytes) -> list:
+        # Custom parsing logic
+        return parsed_data
+```
+
+#### Custom Validation Rules
+
+```python
+from pyngb.validation import QualityChecker
+
+class CustomQualityChecker(QualityChecker):
+    def custom_validation(self):
+        # Add domain-specific validation
+        pass
+```
+
+#### Custom Configuration
+
+```python
+from pyngb.constants import PatternConfig
+
+config = PatternConfig()
+config.metadata_patterns["new_field"] = (b"\x99\x99", b"\x88\x88")
+config.column_map["99"] = "new_column"
+```
 
 ## Documentation
 
-### Docstrings
-
-Follow the Google/NumPy docstring convention:
-
-```python
-def parse_data(self, data: bytes) -> Dict[str, Any]:
-    """Parse binary data into a structured format.
-
-    Args:
-        data: Raw binary data to parse
-
-    Returns:
-        Parsed data structure
-
-    Raises:
-        ParseError: If data format is invalid
-    """
-```
-
 ### Building Documentation
-
-The project uses MkDocs with the Material theme:
 
 ```bash
 # Install documentation dependencies
 uv sync --extra docs
 
-# Serve documentation locally with auto-reload
-mkdocs serve
-
-# Build static documentation
+# Build documentation
+cd docs
 mkdocs build
+
+# Serve documentation locally
+mkdocs serve
 ```
 
-The documentation will be available at `http://127.0.0.1:8000/` for local development, or in `site/` for static builds.
+### Documentation Structure
+
+- **index.md**: Main documentation landing page
+- **installation.md**: Installation instructions
+- **quickstart.md**: Getting started guide
+- **api.md**: Complete API reference
+- **development.md**: This development guide
+- **troubleshooting.md**: Common issues and solutions
+
+### Writing Documentation
+
+#### API Documentation
+
+Use Google-style docstrings:
+
+```python
+def my_function(param1: str, param2: int = 10) -> bool:
+    """Brief description of function.
+
+    Longer description if needed.
+
+    Args:
+        param1: Description of first parameter.
+        param2: Description of second parameter with default.
+
+    Returns:
+        Description of return value.
+
+    Raises:
+        ValueError: When parameter is invalid.
+
+    Examples:
+        >>> result = my_function("test", 5)
+        >>> print(result)
+        True
+    """
+    return True
+```
+
+#### User Guide Documentation
+
+- Use clear, practical examples
+- Include complete code snippets
+- Show expected output when helpful
+- Use admonitions for tips and warnings
+
+```markdown
+!!! tip "Performance Tip"
+    Use PyArrow tables for better memory efficiency.
+
+!!! warning "Important"
+    Always validate data when processing unknown files.
+```
 
 ## Release Process
 
-Releases are managed through GitHub Actions:
+### Version Management
 
-1. Update version in `src/pyngb/__about__.py`
-2. Update `CHANGELOG.md` with new features and fixes
-3. Run full test suite: `uv run pytest`
-4. Run benchmarks to check for regressions: `python benchmarks.py`
-5. Create release commit and tag:
+We use semantic versioning (SemVer):
+- **Major** (1.0.0): Breaking changes
+- **Minor** (0.1.0): New features, backwards compatible
+- **Patch** (0.0.1): Bug fixes, backwards compatible
+
+### Release Checklist
+
+1. **Update Version**
    ```bash
-   git tag v0.2.0
-   git push origin v0.2.0
+   # Update version in pyproject.toml
+   # Update CHANGELOG.md
    ```
-6. GitHub Actions will automatically build and publish to PyPI
 
-## Contributing
+2. **Run Full Test Suite**
+   ```bash
+   uv run pytest --cov=src
+   # Ensure >90% coverage
+   # All tests pass
+   ```
 
-### Pull Request Process
+3. **Update Documentation**
+   ```bash
+   # Update API docs
+   # Update examples
+   # Build documentation
+   ```
 
-1. Create a feature branch: `git checkout -b feature/your-feature`
-2. Make changes and add tests
-3. Run pre-commit hooks: `uv run pre-commit run --all-files`
-4. Ensure all tests pass: `uv run pytest`
-5. Commit changes using conventional commits
-6. Push and create pull request
+4. **Build and Test Package**
+   ```bash
+   uv build
+   # Test installation in clean environment
+   ```
 
-### Commit Message Format
+5. **Create Release**
+   ```bash
+   git tag v0.1.0
+   git push origin v0.1.0
+   # Create GitHub release
+   # Upload to PyPI
+   ```
 
-Use conventional commits:
+## Debugging and Troubleshooting
 
-- `feat:` new features
-- `fix:` bug fixes
-- `docs:` documentation changes
-- `test:` adding tests
-- `refactor:` code refactoring
-- `perf:` performance improvements
-- `ci:` CI/CD changes
+### Development Debugging
 
-### Code Style Guidelines
+```python
+# Enable debug logging
+import logging
+logging.basicConfig(level=logging.DEBUG)
 
-- Follow PEP 8 (enforced by Ruff)
-- Use type hints where possible
-- Write clear, descriptive variable names
-- Keep functions small and focused
-- Add docstrings to all public functions/classes
-- Ensure good test coverage for new code
+# Use debugger
+import pdb; pdb.set_trace()
 
-## Project Structure
-
-```text
-pyngb/
-├── src/pyngb/              # Main package
-│   ├── api/               # High-level API
-│   ├── binary/            # Binary parsing
-│   ├── core/              # Core parsing logic
-│   ├── extractors/        # Data extraction
-│   └── ...
-├── tests/                 # Test suite
-├── docs/                  # MkDocs documentation
-├── .github/workflows/     # CI/CD pipelines
-├── benchmarks.py          # Performance benchmarks
-├── mkdocs.yml            # Documentation configuration
-└── pyproject.toml         # Project configuration
+# Profile performance
+import cProfile
+cProfile.run('my_function()')
 ```
-
-## IDE Setup
-
-### VS Code
-
-Recommended extensions:
-
-- Python
-- Pylance
-- Ruff
-- Pre-commit
-
-Settings (`.vscode/settings.json`):
-
-```json
-{
-    "python.defaultInterpreter": "./.venv/bin/python",
-    "[python]": {
-        "editor.formatOnSave": true,
-        "editor.codeActionsOnSave": {
-            "source.fixAll.ruff": true,
-            "source.organizeImports.ruff": true
-        },
-        "editor.defaultFormatter": "charliermarsh.ruff"
-    }
-}
-```
-
-## Debugging Tips
-
-### Common Development Issues
-
-**Import errors during development:**
-```bash
-# Make sure you installed in development mode
-uv sync
-```
-
-**Tests failing after changes:**
-```bash
-# Clear pytest cache
-pytest --cache-clear
-```
-
-**Type checking errors:**
-```bash
-# Run mypy on specific files
-mypy src/pyngb/specific_file.py
-```
-
-### Debugging Test Failures
-
-Add debug prints or use pytest's built-in debugging:
-
-```bash
-# Run with verbose output
-pytest -v -s
-
-# Drop into debugger on failures
-pytest --pdb
-
-# Run only failed tests from last run
-pytest --lf
-```
-
-## Troubleshooting
 
 ### Common Issues
 
-1. **Pre-commit hooks failing**:
-   ```bash
-   # See specific issues and fix them
-   uv run pre-commit run --all-files
-   ```
+#### Import Errors
+```bash
+# Ensure package is installed in development mode
+pip install -e .
+# or with uv
+uv sync
+```
 
-2. **Import errors**:
-   ```bash
-   # Ensure package is installed in development mode
-   uv sync --all-extras
-   ```
+#### Test Failures
+```bash
+# Run specific failing test with verbose output
+uv run pytest tests/test_specific.py::test_function -v -s
 
-3. **Type checking errors**: Update type hints or add `# type: ignore` comments
+# Check test data files exist
+ls tests/test_files/
+```
 
-4. **Test failures**: Check if test files are available and environment is set up correctly
+#### Memory Issues
+```bash
+# Monitor memory usage
+uv run python -m memory_profiler script.py
 
-5. **Documentation build issues**:
-   ```bash
-   # Install docs dependencies
-   pip install mkdocs mkdocs-material mkdocstrings[python]
+# Use smaller test data
+# Process in chunks
+```
 
-   # Test local build
-   mkdocs serve
-   ```
+## Getting Help
 
-### Getting Help
+### Internal Resources
+- Check existing tests for usage examples
+- Review docstrings in source code
+- Use IDE debugging tools
 
-- Check existing issues on GitHub
-- Review this documentation
-- Run tests to ensure environment is working: `uv run pytest`
-- Use debugging tools like `pdb` or IDE debuggers
-- Check CI/CD pipeline logs for detailed error information
+### External Resources
+- [GitHub Issues](https://github.com/GraysonBellamy/pyngb/issues)
+- [GitHub Discussions](https://github.com/GraysonBellamy/pyngb/discussions)
+- [Documentation](https://graysonbellamy.github.io/pyngb/)
+
+### Contributing Back
+
+Found a bug? Have an improvement idea?
+
+1. Search existing issues first
+2. Create detailed issue with reproduction steps
+3. Consider submitting a pull request
+4. Help improve documentation
+
+---
+
+Thank you for contributing to pyngb! Your efforts help make thermal analysis data more accessible to the scientific community.

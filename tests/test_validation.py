@@ -108,12 +108,14 @@ class TestValidationResult:
 def sample_sta_data():
     """Create sample STA data for testing."""
     n_points = 1000
+    # Seed randomness for determinism in tests
+    rng = np.random.default_rng(0)
     return pl.DataFrame(
         {
             "time": np.linspace(0, 100, n_points),
             "sample_temperature": np.linspace(25, 800, n_points),
             "mass": np.linspace(10, 8, n_points),
-            "dsc_signal": np.random.normal(0, 5, n_points),
+            "dsc_signal": rng.normal(0, 5, n_points),
         }
     )
 
@@ -475,6 +477,7 @@ class TestEdgeCases:
         assert len(issues) > 0
         assert any("null" in issue.lower() for issue in issues)
 
+    @pytest.mark.slow
     def test_very_large_dataset(self):
         """Test validation with large dataset."""
         large_data = pl.DataFrame(

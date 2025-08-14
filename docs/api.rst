@@ -7,7 +7,7 @@ Main Functions
 --------------
 
 .. automodule:: pyngb
-   :members: load_ngb_data, get_sta_data
+   :members: read_ngb, read_ngb
 
 Core Modules
 ------------

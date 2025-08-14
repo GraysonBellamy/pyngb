@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from pyngb.core.parser import NGBParser
 
 # This test ensures that if signature fragments were absent, logic would still assign a crucible_mass.

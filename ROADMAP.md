@@ -65,8 +65,8 @@ parser.register_plugin(CustomAnalysisPlugin())
 from pyngb.cache import FileCache
 
 cache = FileCache("/path/to/cache")
-table = load_ngb_data("file.ngb-ss3", cache=cache)  # Caches result
-table2 = load_ngb_data("file.ngb-ss3", cache=cache)  # Uses cache
+table = read_ngb("file.ngb-ss3", cache=cache)  # Caches result
+table2 = read_ngb("file.ngb-ss3", cache=cache)  # Uses cache
 ```
 
 ### Multi-format Support

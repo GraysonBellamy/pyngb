@@ -70,11 +70,11 @@ def run_basic_tests():
 def test_imports():
     """Test that all modules can be imported."""
     # Test main API
-    from pyngb import NGBParser, load_ngb_data
+    from pyngb import NGBParser, read_ngb
 
     # Test submodules
 
-    assert callable(load_ngb_data)
+    assert callable(read_ngb)
     assert callable(NGBParser)
 
 

@@ -5,6 +5,7 @@ Unit tests for pyngb constants and configurations.
 from typing import Any, cast
 
 import pytest
+
 from pyngb.constants import BinaryMarkers, DataType, FileMetadata, PatternConfig
 
 

@@ -6,17 +6,18 @@ extracts complete heating program stages from NGB files. This addresses
 a recurring issue where only partial temperature programs were extracted.
 """
 
-import pytest
+import json
 import zipfile
 from pathlib import Path
 
-from pyngb.extractors.metadata import MetadataExtractor
-from pyngb.constants import PatternConfig
-from pyngb.binary.parser import BinaryParser
-from pyngb.core.parser import NGBParser
-from pyngb.batch import BatchProcessor
 import pyarrow.parquet as pq
-import json
+import pytest
+
+from pyngb.batch import BatchProcessor
+from pyngb.binary.parser import BinaryParser
+from pyngb.constants import PatternConfig
+from pyngb.core.parser import NGBParser
+from pyngb.extractors.metadata import MetadataExtractor
 
 
 class TestTemperatureProgramExtraction:

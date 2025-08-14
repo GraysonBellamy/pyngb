@@ -35,8 +35,8 @@ import itertools
 import re
 import struct
 import zipfile
-from dataclasses import dataclass
 from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
 
 from pyngb.constants import BinaryMarkers
 

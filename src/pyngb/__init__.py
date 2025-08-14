@@ -10,10 +10,10 @@ from __future__ import annotations
 
 from importlib.metadata import PackageNotFoundError, version
 
-from .api.loaders import get_sta_data, load_ngb_data
+from .api.loaders import read_ngb
 from .batch import BatchProcessor, NGBDataset, process_directory, process_files
 from .constants import BinaryMarkers, DataType, FileMetadata, PatternConfig
-from .core.parser import NGBParser, NGBParserExtended
+from .core.parser import NGBParser
 from .exceptions import (
     NGBCorruptedFileError,
     NGBDataTypeError,
@@ -40,7 +40,6 @@ __all__ = [
     "NGBDataset",
     "NGBParseError",
     "NGBParser",
-    "NGBParserExtended",
     "NGBStreamNotFoundError",
     "NGBUnsupportedVersionError",
     "PatternConfig",
@@ -49,9 +48,8 @@ __all__ = [
     "__author__",
     "__email__",
     "__version__",
-    "get_sta_data",
-    "load_ngb_data",
     "process_directory",
     "process_files",
+    "read_ngb",
     "validate_sta_data",
 ]

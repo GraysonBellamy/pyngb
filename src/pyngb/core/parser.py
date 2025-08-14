@@ -5,10 +5,10 @@ Main NGB parser classes.
 from __future__ import annotations
 
 import logging
-import re
 import zipfile
 from pathlib import Path
 
+import polars as pl
 import pyarrow as pa
 
 from ..binary import BinaryParser
@@ -16,7 +16,7 @@ from ..constants import BinaryMarkers, FileMetadata, PatternConfig
 from ..exceptions import NGBStreamNotFoundError
 from ..extractors import DataStreamProcessor, MetadataExtractor
 
-__all__ = ["NGBParser", "NGBParserExtended"]
+__all__ = ["NGBParser"]
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -67,6 +67,33 @@ class NGBParser:
         self.metadata_extractor = MetadataExtractor(self.config, self.binary_parser)
         self.data_processor = DataStreamProcessor(self.config, self.binary_parser)
 
+    def validate_ngb_structure(self, zip_file: zipfile.ZipFile) -> list[str]:
+        """Validate that the ZIP file has the expected NGB structure.
+
+        Args:
+            zip_file: Open ZIP file to validate
+
+        Returns:
+            List of available streams
+
+        Raises:
+            NGBStreamNotFoundError: If required streams are missing
+        """
+        available_streams = zip_file.namelist()
+        logger.debug(f"Available streams: {available_streams}")
+
+        # Check for required streams
+        # stream_1 and stream_2 are required for basic operation; stream_3 is optional
+        required_streams = ["Streams/stream_1.table", "Streams/stream_2.table"]
+        missing_streams = [
+            stream for stream in required_streams if stream not in available_streams
+        ]
+
+        if missing_streams:
+            raise NGBStreamNotFoundError(f"Missing required streams: {missing_streams}")
+
+        return available_streams
+
     def parse(self, path: str) -> tuple[FileMetadata, pa.Table]:
         """Parse NGB file and return metadata and Arrow table.
 
@@ -95,40 +122,24 @@ class NGBParser:
             Instrument: NETZSCH STA 449 F3 Jupiter
             Columns: ['time', 'sample_temperature', 'mass', 'dsc_signal', 'purge_flow']
             Temperature range: 25.0 to 800.0
-
-        Performance:
-            Typical parsing times:
-            - Small files (<1MB): <0.1 seconds
-            - Medium files (1-10MB): 0.1-1 seconds
-            - Large files (10-100MB): 1-10 seconds
         """
         path_obj = Path(path)
         if not path_obj.exists():
             raise FileNotFoundError(f"File not found: {path}")
 
         metadata: FileMetadata = {}
-
-        # Import polars here to avoid top-level import
-        import polars as pl
-
         data_df = pl.DataFrame()
 
         try:
             with zipfile.ZipFile(path, "r") as z:
                 # Validate NGB file structure
-                available_streams = z.namelist()
-                logger.debug(f"Available streams: {available_streams}")
+                available_streams = self.validate_ngb_structure(z)
 
                 # stream_1: metadata
-                if "Streams/stream_1.table" in available_streams:
-                    with z.open("Streams/stream_1.table") as stream:
-                        stream_data = stream.read()
-                        tables = self.binary_parser.split_tables(stream_data)
-                        metadata = self.metadata_extractor.extract_metadata(tables)
-                else:
-                    raise NGBStreamNotFoundError(
-                        "stream_1.table not found - metadata unavailable"
-                    )
+                with z.open("Streams/stream_1.table") as stream:
+                    stream_data = stream.read()
+                    tables = self.binary_parser.split_tables(stream_data)
+                    metadata = self.metadata_extractor.extract_metadata(tables)
 
                 # stream_2: primary data
                 if "Streams/stream_2.table" in available_streams:
@@ -137,55 +148,21 @@ class NGBParser:
                         data_df = self.data_processor.process_stream_2(stream_data)
 
                 # stream_3: additional data merged into existing df
-                if "Streams/stream_3.table" in z.namelist():
+                if "Streams/stream_3.table" in available_streams:
                     with z.open("Streams/stream_3.table") as stream:
                         stream_data = stream.read()
                         data_df = self.data_processor.process_stream_3(
                             stream_data, data_df
                         )
 
+        except zipfile.BadZipFile as e:
+            logger.error("Invalid ZIP archive: %s", e)
+            raise
+        except NGBStreamNotFoundError:
+            # Re-raise our custom exceptions as-is
+            raise
         except Exception as e:
             logger.error("Failed to parse NGB file: %s", e)
             raise
 
         return metadata, data_df.to_arrow()
-
-
-class NGBParserExtended(NGBParser):
-    """Extended parser with additional capabilities."""
-
-    def __init__(
-        self, config: PatternConfig | None = None, cache_patterns: bool = True
-    ):
-        super().__init__(config)
-        self.cache_patterns = cache_patterns
-        self._pattern_cache: dict[str, re.Pattern] = {}
-
-    def add_custom_column_mapping(self, hex_id: str, column_name: str) -> None:
-        """Add custom column mapping at runtime."""
-        self.config.column_map[hex_id] = column_name
-
-    def add_metadata_pattern(
-        self, field_name: str, category: bytes, field: bytes
-    ) -> None:
-        """Add custom metadata pattern at runtime."""
-        self.config.metadata_patterns[field_name] = (category, field)
-
-    def parse_with_validation(self, path: str) -> tuple[FileMetadata, pa.Table]:
-        """Parse with additional validation."""
-        metadata, data = self.parse(path)
-
-        # Validate required columns
-        required_columns = ["time", "temperature"]
-        schema = data.schema
-        missing = [col for col in required_columns if col not in schema.names]
-        if missing:
-            logger.warning("Missing required columns: %s", missing)
-
-        # Validate data ranges
-        if "temperature" in schema.names:
-            temp_col = data.column("temperature").to_pylist()
-            if temp_col and (min(temp_col) < -273.15 or max(temp_col) > 3000):
-                logger.warning("Temperature values outside expected range")
-
-        return metadata, data

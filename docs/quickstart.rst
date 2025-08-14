@@ -10,14 +10,14 @@ pyngb provides two main functions for loading data:
 
 .. code-block:: python
 
-   from pyngb import load_ngb_data, get_sta_data
+   from pyngb import read_ngb, read_ngb
 
    # Method 1: Load as PyArrow Table (recommended for large datasets)
-   table = load_ngb_data("sample.ngb-ss3")
+   table = read_ngb("sample.ngb-ss3")
    print(f"Loaded {table.num_rows} rows with {len(table.column_names)} columns")
 
    # Method 2: Get structured data with metadata
-   metadata, data = get_sta_data("sample.ngb-ss3")
+   metadata, data = read_ngb("sample.ngb-ss3")
    print(f"Sample: {metadata.get('sample_name', 'Unknown')}")
 
 Working with Data
@@ -63,7 +63,7 @@ Common Use Cases
 .. code-block:: python
 
    # Load and explore
-   table = load_ngb_data("sample.ngb-ss3")
+   table = read_ngb("sample.ngb-ss3")
    df = pl.from_arrow(table)
 
    # Check available columns
@@ -89,7 +89,7 @@ Common Use Cases
 
    for file in data_dir.glob("*.ngb-ss3"):
        try:
-           metadata, data = get_sta_data(str(file))
+           metadata, data = read_ngb(str(file))
            results.append({
                'filename': file.name,
                'sample_name': metadata.get('sample_name'),

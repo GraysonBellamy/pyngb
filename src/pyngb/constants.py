@@ -98,13 +98,8 @@ class BinaryMarkers:
         TYPE_SEPARATOR: Separates type from value data
         END_TABLE: Marks the end of a table
         TABLE_SEPARATOR: Separates individual tables in a stream
-        START_DATA: Marks beginning of binary data payload
-        END_DATA: Marks end of binary data payload
-
-    Example:
-        >>> markers = BinaryMarkers()
-        >>> data.find(markers.START_DATA)
-        1024  # Found at byte position 1024
+        START_DATA: Marks the beginning of data payload
+        END_DATA: Marks the end of data payload
     """
 
     END_FIELD: bytes = b"\x01\x00\x00\x00\x02\x00\x01\x00\x00"
@@ -116,6 +111,10 @@ class BinaryMarkers:
     END_DATA: bytes = (
         b"\x01\x00\x00\x00\x02\x00\x01\x00\x00\x00\x03\x00\x18\xfc\xff\xff\x03\x80\x01"
     )
+
+
+# Constants for binary parsing
+START_DATA_HEADER_OFFSET = 6  # Bytes to skip after START_DATA marker to reach payload
 
 
 @dataclass
@@ -219,3 +218,32 @@ SAMPLE_CRUCIBLE_SIG_FRAGMENT = (
 REF_CRUCIBLE_SIG_FRAGMENT = (
     b"\xc4\x10\x00\x00\x01\x00\x00\x00\x0c\x00\x17\xfc\xff\xff\x02\x80\x01"
 )
+
+# Binary structure constants for metadata extraction
+TEMP_PROG_TYPE_PREFIX = b"\x03\x80\x01"
+MFC_SIGNATURE = 0x1048  # MFC range signature
+GAS_CONTEXT_SIGNATURE = 0x1B
+
+# Control parameter signatures
+CONTROL_SIGNATURES = {
+    0x0FE7: "xp",  # proportional gain
+    0x0FE8: "tn",  # integral time
+    0x0FE9: "tv",  # derivative time
+}
+
+# Gas types for MFC metadata
+GAS_TYPES = ["NITROGEN", "OXYGEN", "ARGON", "HELIUM", "CARBON_DIOXIDE"]
+
+# MFC field names
+MFC_FIELD_NAMES = ["Purge 1", "Purge 2", "Protective"]
+
+# Search window sizes for structural extraction
+CRUCIBLE_MASS_SEARCH_WINDOW = 256
+CRUCIBLE_MASS_PREVIEW_SIZE = 64
+CONTROL_PARAM_SEARCH_OFFSET = 200
+
+# Application and license extraction constants
+APP_LICENSE_CATEGORY = b"\x00\x03"
+APP_LICENSE_FIELD = b"\x18\xfc"
+APP_LICENSE_SEARCH_RANGE = 120
+STRING_DATA_TYPE = b"\x1f"

@@ -16,8 +16,8 @@ def main():
     # In a real scenario, you would have actual NGB files
     # For this example, we'll demonstrate the API structure
     print("# Quick validation function")
-    print("from pyngb import validate_sta_data, load_ngb_data")
-    print("table = load_ngb_data('sample.ngb-ss3')")
+    print("from pyngb import validate_sta_data, read_ngb")
+    print("table = read_ngb('sample.ngb-ss3')")
     print("issues = validate_sta_data(table)")
     print("if issues:")
     print("    print('Validation issues found:')")

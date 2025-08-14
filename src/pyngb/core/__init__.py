@@ -2,6 +2,6 @@
 Main parser classes for NGB files.
 """
 
-from .parser import NGBParser, NGBParserExtended
+from .parser import NGBParser
 
-__all__ = ["NGBParser", "NGBParserExtended"]
+__all__ = ["NGBParser"]
