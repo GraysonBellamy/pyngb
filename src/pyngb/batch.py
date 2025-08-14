@@ -9,6 +9,7 @@ import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import Union
+from collections.abc import Callable
 
 import polars as pl
 import pyarrow as pa
@@ -493,7 +494,9 @@ class NGBDataset:
 
         return pl.DataFrame(flattened_data)
 
-    def filter_by_metadata(self, predicate) -> NGBDataset:
+    def filter_by_metadata(
+        self, predicate: Callable[[FileMetadata], bool]
+    ) -> NGBDataset:
         """Filter dataset by metadata criteria.
 
         Args:

@@ -1,0 +1,7 @@
+/* Custom site styles (placeholder) */
+:root {
+  --pyngb-accent: #1565c0;
+}
+
+/***** Minor tweaks *****/
+.md-typeset a { color: var(--pyngb-accent); }

@@ -6,7 +6,7 @@ import hashlib
 import json
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Any
 
 import pyarrow as pa
 
@@ -14,7 +14,9 @@ import pyarrow as pa
 logger = logging.getLogger(__name__)
 
 
-def set_metadata(tbl, col_meta={}, tbl_meta={}) -> pa.Table:
+def set_metadata(
+    tbl, col_meta: dict[str, Any] = {}, tbl_meta: dict[str, Any] = {}
+) -> pa.Table:
     """Store table- and column-level metadata as json-encoded byte strings.
 
     Provided by: https://stackoverflow.com/a/69553667/25195764
