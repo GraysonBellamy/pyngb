@@ -15,7 +15,6 @@ from pyngb import (
     BatchProcessor,
     NGBDataset,
     NGBParser,
-    process_directory,
     read_ngb,
     validate_sta_data,
 )
@@ -260,16 +259,28 @@ class TestBatchProcessingIntegration:
         test_dir = real_test_files[0].parent
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            _output_dir = Path(temp_dir)
+            output_dir = Path(temp_dir)
 
-            # Test convenience function
-            results = process_directory(
-                str(test_dir), pattern="*.ngb-ss3", output_format="both", max_workers=1
+            # Use BatchProcessor directly to specify output directory
+            from pyngb.batch import BatchProcessor
+
+            processor = BatchProcessor(max_workers=1)
+            results = processor.process_directory(
+                str(test_dir),
+                pattern="*.ngb-ss3",
+                output_format="both",
+                output_dir=str(output_dir),
             )
 
             assert len(results) >= 1
             successful = [r for r in results if r["status"] == "success"]
             assert len(successful) > 0
+
+            # Verify files were created in the temporary directory, not the source
+            generated_files = list(output_dir.glob("*"))
+            assert len(generated_files) > 0, (
+                "No files were generated in the output directory"
+            )
 
 
 @pytest.mark.integration
@@ -706,7 +717,6 @@ class TestRegressionProtection:
         assert "new_id" in config.column_map
 
         # Pattern 3: Batch processing
-        from pyngb.batch import process_directory, process_files
+        from pyngb.batch import process_files
 
         assert callable(process_files)
-        assert callable(process_directory)

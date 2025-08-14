@@ -194,21 +194,25 @@ class TestNGBDataset:
 class TestProcessFunctions:
     """Test high-level process functions."""
 
-    def test_process_files(self, sample_ngb_file):
+    def test_process_files(self, sample_ngb_file, tmp_path):
         """Test processing multiple files."""
         files = [sample_ngb_file] * 3
 
-        results = process_files(files)
+        # Use BatchProcessor with explicit output directory
+        processor = BatchProcessor()
+        results = processor.process_files(files, output_dir=str(tmp_path))
 
         assert len(results) == 3
         for result in results:
             assert result is not None
 
-    def test_process_files_with_errors(self, sample_ngb_file):
+    def test_process_files_with_errors(self, sample_ngb_file, tmp_path):
         """Test processing files with some errors."""
         files = [sample_ngb_file, "non_existent.ngb", sample_ngb_file]
 
-        results = process_files(files)
+        # Use BatchProcessor with explicit output directory
+        processor = BatchProcessor()
+        results = processor.process_files(files, output_dir=str(tmp_path))
 
         assert len(results) == 3
         # Check that we have both success and error results
@@ -223,6 +227,10 @@ class TestProcessFunctions:
         test_dir = tmp_path / "test_batch"
         test_dir.mkdir()
 
+        # Create output directory
+        output_dir = tmp_path / "output"
+        output_dir.mkdir()
+
         # Copy sample file multiple times with correct extension
         for i in range(3):
             shutil.copy2(sample_ngb_file, test_dir / f"file_{i}.ngb-ss3")
@@ -230,7 +238,9 @@ class TestProcessFunctions:
         # Add a non-ngb file
         (test_dir / "readme.txt").write_text("This is a readme")
 
-        results = process_directory(str(test_dir))
+        # Use BatchProcessor with explicit output directory
+        processor = BatchProcessor()
+        results = processor.process_directory(str(test_dir), output_dir=str(output_dir))
 
         # Should process 3 .ngb-ss3 files, ignore .txt file
         assert len(results) == 3
@@ -497,9 +507,11 @@ class TestBatchProcessingIntegration:
 class TestBatchProcessingEdgeCases:
     """Test edge cases in batch processing."""
 
-    def test_batch_processing_single_file(self, sample_ngb_file):
+    def test_batch_processing_single_file(self, sample_ngb_file, tmp_path):
         """Test batch processing with single file."""
-        results = process_files([sample_ngb_file])
+        # Use BatchProcessor with explicit output directory
+        processor = BatchProcessor()
+        results = processor.process_files([sample_ngb_file], output_dir=str(tmp_path))
 
         assert len(results) == 1
         assert results[0] is not None

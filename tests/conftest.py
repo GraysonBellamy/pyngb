@@ -120,3 +120,28 @@ def cleanup_temp_files():
             Path(temp_file).unlink(missing_ok=True)
         except Exception:
             pass
+
+
+@pytest.fixture(autouse=True)
+def cleanup_generated_files():
+    """Automatically clean up generated tmp*.parquet files after each test."""
+    yield
+
+    # Clean up any tmp*.parquet files generated during the test
+    root_dir = Path(__file__).parent.parent  # Project root
+    for tmp_file in root_dir.glob("tmp*.parquet"):
+        try:
+            tmp_file.unlink()
+        except Exception:
+            pass
+
+
+@pytest.fixture()
+def real_test_files():
+    """Provide real test files if available, otherwise skip."""
+    test_files_dir = Path(__file__).parent / "test_files"
+    if not test_files_dir.exists():
+        return []
+
+    real_files = list(test_files_dir.glob("*.ngb-ss3"))
+    return real_files
