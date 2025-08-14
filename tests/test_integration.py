@@ -334,13 +334,14 @@ class TestAdvancedUseCases:
                 # Minimal but valid content
                 z.writestr("Streams/stream_1.table", b"mock data 1")
                 z.writestr("Streams/stream_2.table", b"mock data 2")
+            temp_file_path = temp_file.name
 
         try:
             # Parse multiple times to test memory cleanup
             tables = []
             for _ in range(5):
                 try:
-                    table = read_ngb(temp_file.name)
+                    table = read_ngb(temp_file_path)
                     tables.append(table)
                 except Exception:
                     # Expected for mock data, just testing memory handling
@@ -354,7 +355,7 @@ class TestAdvancedUseCases:
             assert True
 
         finally:
-            Path(temp_file.name).unlink(missing_ok=True)
+            Path(temp_file_path).unlink(missing_ok=True)
 
     def test_concurrent_processing_safety(self):
         """Test thread safety and concurrent processing."""
@@ -485,13 +486,14 @@ class TestErrorRecoveryIntegration:
             ) as temp_file:
                 temp_file.write(content)
                 temp_file.flush()
+                temp_file_path = temp_file.name
 
-                try:
-                    # Should handle corruption gracefully
-                    with pytest.raises(Exception):  # Should raise some kind of error
-                        read_ngb(temp_file.name)
-                finally:
-                    Path(temp_file.name).unlink(missing_ok=True)
+            try:
+                # Should handle corruption gracefully
+                with pytest.raises(Exception):  # Should raise some kind of error
+                    read_ngb(temp_file_path)
+            finally:
+                Path(temp_file_path).unlink(missing_ok=True)
 
 
 @pytest.mark.integration
@@ -526,14 +528,15 @@ class TestDataIntegrityValidation:
                 # Create basic data stream in wrong location
                 data_content = b"minimal data stream"
                 z.writestr("wrong_path/stream_2.table", data_content)
+            temp_file_path = temp_file.name
 
         try:
             # This will likely fail due to incomplete mock data, but tests the workflow
             with pytest.raises(Exception):
-                metadata, data = read_ngb(temp_file.name, return_metadata=True)
+                metadata, data = read_ngb(temp_file_path, return_metadata=True)
 
         finally:
-            Path(temp_file.name).unlink(missing_ok=True)
+            Path(temp_file_path).unlink(missing_ok=True)
 
     def test_cross_api_consistency(self):
         """Test consistency between different API endpoints."""

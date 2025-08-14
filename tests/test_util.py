@@ -231,31 +231,33 @@ class TestGetHash:
             content = b"test content for hashing"
             temp_file.write(content)
             temp_file.flush()
+            temp_file_path = temp_file.name
 
-            # Calculate expected hash
-            expected_hash = hashlib.blake2b(content).hexdigest()
+        # Calculate expected hash
+        expected_hash = hashlib.blake2b(content).hexdigest()
 
-            # Test the function
-            result = get_hash(temp_file.name)
+        # Test the function
+        result = get_hash(temp_file_path)
 
-            assert result == expected_hash
+        assert result == expected_hash
 
-            # Cleanup
-            Path(temp_file.name).unlink()
+        # Cleanup
+        Path(temp_file_path).unlink()
 
     def test_get_hash_empty_file(self):
         """Test get_hash with an empty file."""
         with tempfile.NamedTemporaryFile(delete=False) as temp_file:
             # Empty file
             temp_file.flush()
+            temp_file_path = temp_file.name
 
-            expected_hash = hashlib.blake2b(b"").hexdigest()
-            result = get_hash(temp_file.name)
+        expected_hash = hashlib.blake2b(b"").hexdigest()
+        result = get_hash(temp_file_path)
 
-            assert result == expected_hash
+        assert result == expected_hash
 
-            # Cleanup
-            Path(temp_file.name).unlink()
+        # Cleanup
+        Path(temp_file_path).unlink()
 
     def test_get_hash_large_file(self):
         """Test get_hash with a larger file."""
@@ -264,14 +266,15 @@ class TestGetHash:
             content = b"A" * 10000  # 10KB of 'A's
             temp_file.write(content)
             temp_file.flush()
+            temp_file_path = temp_file.name
 
-            expected_hash = hashlib.blake2b(content).hexdigest()
-            result = get_hash(temp_file.name)
+        expected_hash = hashlib.blake2b(content).hexdigest()
+        result = get_hash(temp_file_path)
 
-            assert result == expected_hash
+        assert result == expected_hash
 
-            # Cleanup
-            Path(temp_file.name).unlink()
+        # Cleanup
+        Path(temp_file_path).unlink()
 
     def test_get_hash_binary_file(self):
         """Test get_hash with binary content."""
@@ -280,14 +283,15 @@ class TestGetHash:
             content = bytes(range(256))
             temp_file.write(content)
             temp_file.flush()
+            temp_file_path = temp_file.name
 
-            expected_hash = hashlib.blake2b(content).hexdigest()
-            result = get_hash(temp_file.name)
+        expected_hash = hashlib.blake2b(content).hexdigest()
+        result = get_hash(temp_file_path)
 
-            assert result == expected_hash
+        assert result == expected_hash
 
-            # Cleanup
-            Path(temp_file.name).unlink()
+        # Cleanup
+        Path(temp_file_path).unlink()
 
     def test_get_hash_unicode_content(self):
         """Test get_hash with Unicode content."""
@@ -296,14 +300,15 @@ class TestGetHash:
             content = "Hello 世界 🌍".encode()
             temp_file.write(content)
             temp_file.flush()
+            temp_file_path = temp_file.name
 
-            expected_hash = hashlib.blake2b(content).hexdigest()
-            result = get_hash(temp_file.name)
+        expected_hash = hashlib.blake2b(content).hexdigest()
+        result = get_hash(temp_file_path)
 
-            assert result == expected_hash
+        assert result == expected_hash
 
-            # Cleanup
-            Path(temp_file.name).unlink()
+        # Cleanup
+        Path(temp_file_path).unlink()
 
     @patch("pyngb.util.logger")
     def test_get_hash_file_not_found(self, mock_logger):
@@ -382,39 +387,42 @@ class TestGetHash:
             content = b"deterministic test content"
             temp_file.write(content)
             temp_file.flush()
+            temp_file_path = temp_file.name
 
-            # Get hash multiple times
-            hash1 = get_hash(temp_file.name)
-            hash2 = get_hash(temp_file.name)
-            hash3 = get_hash(temp_file.name)
+        # Get hash multiple times
+        hash1 = get_hash(temp_file_path)
+        hash2 = get_hash(temp_file_path)
+        hash3 = get_hash(temp_file_path)
 
-            # Should all be the same
-            assert hash1 == hash2 == hash3
-            assert hash1 is not None
+        # Should all be the same
+        assert hash1 == hash2 == hash3
+        assert hash1 is not None
 
-            # Cleanup
-            Path(temp_file.name).unlink()
+        # Cleanup
+        Path(temp_file_path).unlink()
 
     def test_get_hash_different_files_different_hashes(self):
         """Test that different files produce different hashes."""
         with tempfile.NamedTemporaryFile(delete=False) as temp_file1:
             temp_file1.write(b"content 1")
             temp_file1.flush()
+            temp_file1_path = temp_file1.name
 
-            with tempfile.NamedTemporaryFile(delete=False) as temp_file2:
-                temp_file2.write(b"content 2")
-                temp_file2.flush()
+        with tempfile.NamedTemporaryFile(delete=False) as temp_file2:
+            temp_file2.write(b"content 2")
+            temp_file2.flush()
+            temp_file2_path = temp_file2.name
 
-                hash1 = get_hash(temp_file1.name)
-                hash2 = get_hash(temp_file2.name)
+        hash1 = get_hash(temp_file1_path)
+        hash2 = get_hash(temp_file2_path)
 
-                assert hash1 != hash2
-                assert hash1 is not None
-                assert hash2 is not None
+        assert hash1 != hash2
+        assert hash1 is not None
+        assert hash2 is not None
 
-                # Cleanup
-                Path(temp_file1.name).unlink()
-                Path(temp_file2.name).unlink()
+        # Cleanup
+        Path(temp_file1_path).unlink()
+        Path(temp_file2_path).unlink()
 
     def test_get_hash_blake2b_algorithm(self):
         """Test that get_hash uses BLAKE2b algorithm specifically."""
@@ -422,14 +430,15 @@ class TestGetHash:
             content = b"test blake2b"
             temp_file.write(content)
             temp_file.flush()
+            temp_file_path = temp_file.name
 
-            result = get_hash(temp_file.name)
-            expected = hashlib.blake2b(content).hexdigest()
+        result = get_hash(temp_file_path)
+        expected = hashlib.blake2b(content).hexdigest()
 
-            assert result == expected
+        assert result == expected
 
-            # Cleanup
-            Path(temp_file.name).unlink()
+        # Cleanup
+        Path(temp_file_path).unlink()
 
     def test_get_hash_file_size_limit(self):
         """Test that get_hash respects the file size limit."""
@@ -438,17 +447,18 @@ class TestGetHash:
             content = b"x" * (1024 * 1024 + 1)  # 1MB + 1 byte
             temp_file.write(content)
             temp_file.flush()
+            temp_file_path = temp_file.name
 
-            # Test with default limit (1000MB) - should work
-            result = get_hash(temp_file.name)
-            assert result is not None
+        # Test with default limit (1000MB) - should work
+        result = get_hash(temp_file_path)
+        assert result is not None
 
-            # Test with 1MB limit - should fail
-            result = get_hash(temp_file.name, max_size_mb=1)
-            assert result is None
+        # Test with 1MB limit - should fail
+        result = get_hash(temp_file_path, max_size_mb=1)
+        assert result is None
 
-            # Cleanup
-            Path(temp_file.name).unlink()
+        # Cleanup
+        Path(temp_file_path).unlink()
 
 
 class TestUtilIntegration:
@@ -461,35 +471,36 @@ class TestUtilIntegration:
             content = b"sample file content"
             temp_file.write(content)
             temp_file.flush()
+            temp_file_path = temp_file.name
 
-            # Get hash
-            file_hash = get_hash(temp_file.name)
+        # Get hash
+        file_hash = get_hash(temp_file_path)
 
-            # Create table and add metadata including hash
-            table = pa.table({"data": [1, 2, 3]})
-            tbl_meta = {
-                "file_hash": {
-                    "method": "BLAKE2b",
-                    "hash": file_hash,
-                    "file": Path(temp_file.name).name,
-                },
-                "data_type": "test",
-            }
+        # Create table and add metadata including hash
+        table = pa.table({"data": [1, 2, 3]})
+        tbl_meta = {
+            "file_hash": {
+                "method": "BLAKE2b",
+                "hash": file_hash,
+                "file": Path(temp_file_path).name,
+            },
+            "data_type": "test",
+        }
 
-            result = set_metadata(table, tbl_meta=tbl_meta)
+        result = set_metadata(table, tbl_meta=tbl_meta)
 
-            # Verify metadata is properly stored
-            assert b"file_hash" in result.schema.metadata
-            assert b"data_type" in result.schema.metadata
+        # Verify metadata is properly stored
+        assert b"file_hash" in result.schema.metadata
+        assert b"data_type" in result.schema.metadata
 
-            # Verify hash metadata structure
-            hash_meta = json.loads(result.schema.metadata[b"file_hash"].decode())
-            assert hash_meta["method"] == "BLAKE2b"
-            assert hash_meta["hash"] == file_hash
-            assert hash_meta["file"] == Path(temp_file.name).name
+        # Verify hash metadata structure
+        hash_meta = json.loads(result.schema.metadata[b"file_hash"].decode())
+        assert hash_meta["method"] == "BLAKE2b"
+        assert hash_meta["hash"] == file_hash
+        assert hash_meta["file"] == Path(temp_file_path).name
 
-            # Cleanup
-            Path(temp_file.name).unlink()
+        # Cleanup
+        Path(temp_file_path).unlink()
 
     def test_round_trip_metadata(self):
         """Test round-trip serialization/deserialization of metadata."""
