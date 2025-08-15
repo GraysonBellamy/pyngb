@@ -453,21 +453,14 @@ class QualityChecker:
         initial_mass = mass_col[0, 0]
         final_mass = mass_col[-1, 0]
 
-        # Avoid division by zero
-        if initial_mass == 0:
-            self.result.add_error(
-                "Initial mass is zero - cannot calculate mass change percentage"
-            )
-            return
+        # For thermal analysis, initial mass is typically zeroed, so calculate relative to that zero point
+        # Check for reasonable mass change patterns
+        mass_change = final_mass - initial_mass
 
-        mass_change = ((final_mass - initial_mass) / initial_mass) * 100
-
-        if abs(mass_change) < 0.1:
-            self.result.add_info(f"Very small mass change: {mass_change:.2f}%")
-        elif mass_change > 10:  # Mass gain > 10%
-            self.result.add_warning(f"Significant mass gain: {mass_change:.1f}%")
-        elif mass_change < -90:  # Mass loss > 90%
-            self.result.add_warning(f"Extreme mass loss: {abs(mass_change):.1f}%")
+        if abs(mass_change) < 0.001:  # Less than 1 μg change
+            self.result.add_info(f"Very small mass change: {mass_change:.3f}mg")
+        elif mass_change > 5:  # Mass gain > 5mg (unusual)
+            self.result.add_warning(f"Significant mass gain: {mass_change:.3f}mg")
         else:
             self.result.add_pass("Mass change is within reasonable range")
 
@@ -537,17 +530,6 @@ class QualityChecker:
             self.result.add_warning(f"Missing metadata fields: {missing_metadata}")
         else:
             self.result.add_pass("Essential metadata fields present")
-
-        # Check sample mass consistency
-        if "sample_mass" in self.metadata and "mass" in self.df.columns:
-            metadata_mass = self.metadata.get("sample_mass")
-            data_initial_mass = self.df.select("mass")[0, 0]
-
-            if metadata_mass and abs(metadata_mass - data_initial_mass) > 0.1:
-                self.result.add_warning(
-                    f"Sample mass mismatch: metadata={metadata_mass:.2f}mg, "
-                    f"data initial={data_initial_mass:.2f}mg"
-                )
 
     def _check_statistical_properties(self) -> None:
         """Check statistical properties for anomalies."""
@@ -686,18 +668,15 @@ def check_mass_data(
     initial_mass = mass_data_clean[0]
     final_mass = mass_data_clean[-1]
 
-    # Avoid division by zero
-    if initial_mass == 0:
-        return {"error": "Initial mass is zero - cannot calculate mass loss percentage"}
-
-    mass_loss_percent = ((initial_mass - final_mass) / initial_mass) * 100
+    # For thermal analysis, mass change is measured from the zeroed starting point
+    mass_change = final_mass - initial_mass
 
     analysis: dict[str, str | float | bool] = {
         "initial_mass": float(initial_mass),
         "final_mass": float(final_mass),
-        "mass_loss_percent": float(mass_loss_percent),
+        "mass_change": float(mass_change),
         "mass_range": float(np.ptp(mass_data_clean)),
-        "has_negative_values": bool(np.any(mass_data_clean <= 0)),
+        "has_negative_values": bool(np.any(mass_data_clean < 0)),
     }
 
     return analysis

@@ -362,14 +362,14 @@ class TestSpecificValidationFunctions:
         assert isinstance(analysis, dict)
         assert "initial_mass" in analysis
         assert "final_mass" in analysis
-        assert "mass_loss_percent" in analysis
+        assert "mass_change" in analysis
         assert "mass_range" in analysis
         assert "has_negative_values" in analysis
 
         # Check values are reasonable
         assert analysis["initial_mass"] == 10.0
         assert analysis["final_mass"] == 8.0
-        assert analysis["mass_loss_percent"] == 20.0
+        assert analysis["mass_change"] == -2.0  # Change from mass_loss_percent
         assert analysis["has_negative_values"] is False
 
     def test_check_mass_data_missing_column(self):

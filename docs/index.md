@@ -1,6 +1,6 @@
 # pyngb - NETZSCH STA File Parser
 
-Welcome to pyngb, a comprehensive Python library for parsing and analyzing NETZSCH STA (Simultaneous Thermal Analysis) NGB files.
+Welcome to pyngb, a comprehensive Python library for parsing and analyzing NETZSCH TA (Thermal Analysis) NGB files.
 
 ## What is pyngb?
 
