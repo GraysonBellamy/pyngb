@@ -18,7 +18,7 @@ pyngb is a high-performance, production-ready library that enables scientists an
 - Optimized binary parsing with NumPy and PyArrow
 - Memory-efficient processing of large files
 - Parallel batch processing capabilities
-- Typical parsing speed: 0.1-2 seconds per file
+- Typical parsing speed: 0.1-1 seconds per file
 
 ### 📊 **Rich Data Extraction**
 - Complete metadata extraction (instrument settings, sample info, conditions)
@@ -127,7 +127,7 @@ graph TB
 ## Supported Data
 
 ### File Formats
-- **Primary**: `.ngb-ss3` files from NETZSCH STA instruments
+- **Primary**: `.ngb-ss3` and `.ngb-bs3` files from NETZSCH STA instruments
 - **Output**: Parquet, CSV, JSON metadata
 
 ### Measurement Types
@@ -157,7 +157,7 @@ Ready to start using pyngb? Here are your next steps:
 
 | Metric | Typical Value |
 |--------|---------------|
-| **Parse Speed** | 0.1-2 seconds per file |
+| **Parse Speed** | 0.1-1 seconds per file |
 | **Memory Usage** | ~2x file size |
 | **Batch Processing** | 100 files in ~30 seconds (4 cores) |
 | **File Size Support** | KB to GB range |

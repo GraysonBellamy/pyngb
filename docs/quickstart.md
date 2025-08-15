@@ -135,7 +135,7 @@ if 'dsc_signal' in df.columns:
     # DSC plot
     ax2.plot(df['time'], df['dsc_signal'])
     ax2.set_xlabel('Time (s)')
-    ax2.set_ylabel('DSC Signal (mW/mg)')
+    ax2.set_ylabel('DSC Signal (µV)')
     ax2.grid(True)
 
     plt.tight_layout()

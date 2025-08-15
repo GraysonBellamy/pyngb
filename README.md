@@ -262,7 +262,7 @@ Common data columns extracted from NGB files:
 | `sample_temperature` | Sample temperature | °C |
 | `furnace_temperature` | Furnace temperature | °C |
 | `mass` | Sample mass | mg |
-| `dsc_signal` | DSC heat flow | mW/mg |
+| `dsc_signal` | DSC heat flow | µV/mg |
 | `purge_flow_1` | Primary purge gas flow | mL/min |
 | `purge_flow_2` | Secondary purge gas flow | mL/min |
 | `protective_flow` | Protective gas flow | mL/min |

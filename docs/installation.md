@@ -217,8 +217,8 @@ finally:
 ### For Data Analysis
 
 ```bash
-# Install pandas for DataFrame interoperability
-pip install pandas
+# Install polars for DataFrame interoperability
+pip install polars
 
 # Install matplotlib for plotting
 pip install matplotlib
