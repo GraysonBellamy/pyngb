@@ -431,7 +431,7 @@ python -c "import pyngb; print(pyngb.__version__)"
 pip install --pre pyngb
 
 # Install specific version
-pip install pyngb==0.1.0
+pip install pyngb==0.0.1
 ```
 
 ### Rollback if Needed
