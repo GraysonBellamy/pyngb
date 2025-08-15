@@ -243,7 +243,7 @@ table = read_ngb("sample.ngb-ss3")
 print("Available columns:", table.column_names)
 
 # Check for common variations
-common_names = ["time", "temperature", "sample_temperature", "mass", "dsc", "dsc_signal"]
+common_names = ["time", "sample_temperature", "mass", "dsc_signal"]
 available = set(table.column_names)
 
 for name in common_names:
@@ -410,11 +410,11 @@ python -c "from pyngb import read_ngb; print(read_ngb('sample.ngb-ss3').num_rows
 # Check CLI help
 python -m pyngb --help
 
-# Use full argument names
-python -m pyngb sample.ngb-ss3 --format parquet --output ./output/
+# Use supported flags
+python -m pyngb sample.ngb-ss3 -f parquet -o ./output/
 
 # Quote paths with spaces
-python -m pyngb "file with spaces.ngb-ss3" --format csv
+python -m pyngb "file with spaces.ngb-ss3" -f csv
 ```
 
 ## Integration Issues

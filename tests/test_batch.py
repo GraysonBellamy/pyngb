@@ -65,6 +65,31 @@ class TestBatchProcessor:
         # Second should have error status
         assert results[1]["status"] == "error"
 
+    def test_process_files_multi_worker(self, sample_ngb_file, tmp_path):
+        """Process multiple files concurrently with >1 worker."""
+        # Create unique copies to avoid output filename collisions
+        work_dir = tmp_path / "multi_worker"
+        work_dir.mkdir()
+        local_files = []
+        for i in range(3):
+            dst = work_dir / f"copy_{i}.ngb-ss3"
+            import shutil as _shutil
+
+            _shutil.copy2(sample_ngb_file, dst)
+            local_files.append(str(dst))
+
+        processor = BatchProcessor(max_workers=2, verbose=True)
+        results = processor.process_files(
+            local_files, output_dir=str(work_dir), output_format="csv"
+        )
+
+        assert len(results) == 3
+        assert all(r["status"] == "success" for r in results)
+        # Ensure outputs exist
+        for f in local_files:
+            stem = Path(f).stem
+            assert (work_dir / f"{stem}.csv").exists()
+
     @pytest.mark.slow
     def test_large_batch_processing(self, sample_ngb_file):
         """Test processing a large batch of files."""
@@ -288,6 +313,25 @@ class TestProcessFunctions:
         assert len(results) == 3
         for result in results:
             assert result["status"] == "success"
+
+    def test_process_directory_multi_worker(self, sample_ngb_file, tmp_path):
+        """Ensure directory processing works with multiple workers."""
+        test_dir = tmp_path / "multi_worker_dir"
+        out_dir = tmp_path / "multi_worker_out"
+        test_dir.mkdir()
+        out_dir.mkdir()
+
+        # Add several unique files
+        import shutil as _shutil
+
+        for i in range(4):
+            _shutil.copy2(sample_ngb_file, test_dir / f"mw_{i}.ngb-ss3")
+
+        processor = BatchProcessor(max_workers=3)
+        results = processor.process_directory(str(test_dir), output_dir=str(out_dir))
+
+        assert len(results) == 4
+        assert all(r["status"] == "success" for r in results)
 
     def test_process_directory_empty(self, tmp_path):
         """Test processing empty directory."""

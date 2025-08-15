@@ -12,8 +12,8 @@ pyngb provides a simple, intuitive function for loading data:
 from pyngb import read_ngb
 
 # Default mode: Load as PyArrow Table with embedded metadata
-data = read_ngb("sample.ngb-ss3")
-print(f"Loaded {data.num_rows} rows with {data.num_columns} columns")
+table = read_ngb("sample.ngb-ss3")
+print(f"Loaded {table.num_rows} rows with {table.num_columns} columns")
 
 # Advanced mode: Get structured data with separate metadata
 metadata, data = read_ngb("sample.ngb-ss3", return_metadata=True)
@@ -35,7 +35,7 @@ print(df.describe())
 print(f"Columns: {df.columns}")
 
 # Filter data
-temperature_data = df.filter(pl.col("temperature") > 100)
+temperature_data = df.filter(pl.col("sample_temperature") > 100)
 
 # Save to files
 df.write_parquet("output.parquet")
@@ -46,40 +46,33 @@ df.write_csv("output.csv")
 
 pyngb includes a powerful CLI for batch processing:
 
-### Basic Commands
+### Basic Commands (single file)
 
 ```bash
-# Convert a single file to Parquet
-python -m pyngb sample.ngb-ss3 --format parquet
+python -m pyngb sample.ngb-ss3 -f parquet
 
 # Convert to CSV
-python -m pyngb sample.ngb-ss3 --format csv
+python -m pyngb sample.ngb-ss3 -f csv
 
-# Convert to all formats (Parquet, CSV, JSON)
-python -m pyngb sample.ngb-ss3 --format all
+# Convert to both formats (Parquet and CSV)
+python -m pyngb sample.ngb-ss3 -f all
 ```
 
-### Batch Processing
+### Multiple files
 
 ```bash
-# Process all files in current directory
-python -m pyngb *.ngb-ss3 --format parquet
-
-# Process files with custom output directory
-python -m pyngb *.ngb-ss3 --format all --output ./results/
-
-# Extract metadata only
-python -m pyngb *.ngb-ss3 --metadata-only --format json
+# The CLI processes one input file at a time.
+# Use a simple shell loop for multiple files, or see the Batch Processor.
+for f in *.ngb-ss3; do
+    python -m pyngb "$f" -f parquet -o ./results
+done
 ```
 
 ### Advanced Options
 
 ```bash
 # Verbose output
-python -m pyngb sample.ngb-ss3 --format parquet --verbose
-
-# Quiet mode (minimal output)
-python -m pyngb *.ngb-ss3 --format csv --quiet
+python -m pyngb sample.ngb-ss3 -f parquet -v
 
 # Get help
 python -m pyngb --help
@@ -103,7 +96,7 @@ print("Data types:", df.dtypes)
 print("Shape:", df.shape)
 
 # Basic statistics
-print(df.select(pl.col("temperature", "time", "dsc")).describe())
+print(df.select(pl.col("sample_temperature", "time", "dsc_signal")).describe())
 
 # Check for missing values
 print(df.null_count())
@@ -121,28 +114,28 @@ table = read_ngb("sample.ngb-ss3")
 df = pl.from_arrow(table)
 
 # Simple temperature vs time plot
-if 'time' in df.columns and 'temperature' in df.columns:
+if 'time' in df.columns and 'sample_temperature' in df.columns:
     plt.figure(figsize=(10, 6))
-    plt.plot(df['time'], df['temperature'])
+    plt.plot(df['time'], df['sample_temperature'])
     plt.xlabel('Time (s)')
-    plt.ylabel('Temperature (°C)')
-    plt.title('Temperature Program')
+    plt.ylabel('Sample Temperature (°C)')
+    plt.title('Sample Temperature Program')
     plt.grid(True)
     plt.show()
 
 # Multiple plots
-if 'dsc' in df.columns:
+if 'dsc_signal' in df.columns:
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
 
     # Temperature plot
-    ax1.plot(df['time'], df['temperature'])
-    ax1.set_ylabel('Temperature (°C)')
+    ax1.plot(df['time'], df['sample_temperature'])
+    ax1.set_ylabel('Sample Temperature (°C)')
     ax1.grid(True)
 
     # DSC plot
-    ax2.plot(df['time'], df['dsc'])
+    ax2.plot(df['time'], df['dsc_signal'])
     ax2.set_xlabel('Time (s)')
-    ax2.set_ylabel('DSC (mW/mg)')
+    ax2.set_ylabel('DSC Signal (mW/mg)')
     ax2.grid(True)
 
     plt.tight_layout()
@@ -214,8 +207,8 @@ print("Combined dataset shape:", combined_df.shape)
 
 # Group by source file and get statistics
 stats = combined_df.group_by("source_file").agg([
-    pl.col("temperature").mean().alias("avg_temp"),
-    pl.col("temperature").max().alias("max_temp"),
+    pl.col("sample_temperature").mean().alias("avg_temp"),
+    pl.col("sample_temperature").max().alias("max_temp"),
     pl.col("time").max().alias("duration")
 ])
 

@@ -6,18 +6,18 @@ This guide will help you get started with pyngb quickly.
 Loading Data
 ------------
 
-pyngb provides two main functions for loading data:
+pyngb provides a simple function for loading data:
 
 .. code-block:: python
 
-   from pyngb import read_ngb, read_ngb
+   from pyngb import read_ngb
 
    # Method 1: Load as PyArrow Table (recommended for large datasets)
    table = read_ngb("sample.ngb-ss3")
    print(f"Loaded {table.num_rows} rows with {len(table.column_names)} columns")
 
    # Method 2: Get structured data with metadata
-   metadata, data = read_ngb("sample.ngb-ss3")
+   metadata, data = read_ngb("sample.ngb-ss3", return_metadata=True)
    print(f"Sample: {metadata.get('sample_name', 'Unknown')}")
 
 Working with Data
@@ -47,10 +47,10 @@ pyngb includes a command-line interface:
 .. code-block:: bash
 
    # Convert a single file
-   python -m pyngb input.ngb-ss3 --format parquet
+   python -m pyngb input.ngb-ss3 -f parquet
 
    # Process multiple files
-   python -m pyngb *.ngb-ss3 --format all --output ./results/
+   for f in *.ngb-ss3; do python -m pyngb "$f" -f all -o ./results/; done
 
    # Get help
    python -m pyngb --help
@@ -70,11 +70,11 @@ Common Use Cases
    print(df.columns)
 
    # Plot temperature vs time
-   if 'time' in df.columns and 'temperature' in df.columns:
+   if 'time' in df.columns and 'sample_temperature' in df.columns:
        import matplotlib.pyplot as plt
-       plt.plot(df['time'], df['temperature'])
+      plt.plot(df['time'], df['sample_temperature'])
        plt.xlabel('Time (s)')
-       plt.ylabel('Temperature (°C)')
+      plt.ylabel('Sample Temperature (°C)')
        plt.show()
 
 **Batch Processing:**
@@ -88,8 +88,8 @@ Common Use Cases
    results = []
 
    for file in data_dir.glob("*.ngb-ss3"):
-       try:
-           metadata, data = read_ngb(str(file))
+      try:
+         metadata, data = read_ngb(str(file), return_metadata=True)
            results.append({
                'filename': file.name,
                'sample_name': metadata.get('sample_name'),

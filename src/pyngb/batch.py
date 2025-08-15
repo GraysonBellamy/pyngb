@@ -6,13 +6,13 @@ from __future__ import annotations
 
 import logging
 import time
+import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import Union
 from collections.abc import Callable
 
 import polars as pl
-import pyarrow as pa
 import pyarrow.parquet as pq
 
 from .api.loaders import read_ngb
@@ -21,6 +21,75 @@ from .constants import FileMetadata
 __all__ = ["BatchProcessor", "NGBDataset", "process_directory", "process_files"]
 
 logger = logging.getLogger(__name__)
+
+
+def _process_single_file_worker(
+    file_path: str,
+    output_format: str,
+    output_dir: str,
+    skip_errors: bool,
+) -> dict[str, str | float | None]:
+    """Top-level worker function to process a single file (multiprocessing-safe).
+
+    Using a module-level function avoids pickling bound methods and reduces
+    fork-related issues with libraries like PyArrow/Polars when using processes.
+    """
+    import json
+
+    start_time = time.perf_counter()
+    file_p = Path(file_path)
+
+    try:
+        metadata, data = read_ngb(str(file_p), return_metadata=True)
+        base_name = file_p.stem
+        out_dir = Path(output_dir)
+
+        if output_format in ("parquet", "both"):
+            # Attach metadata to Arrow table and write parquet
+            metadata_json = json.dumps(metadata, default=str)
+            existing_meta = data.schema.metadata or {}
+            new_meta = {**existing_meta, b"file_metadata": metadata_json.encode()}
+            table_with_meta = data.replace_schema_metadata(new_meta)
+            pq.write_table(
+                table_with_meta, out_dir / f"{base_name}.parquet", compression="snappy"
+            )
+
+        if output_format in ("csv", "both"):
+            df = pl.from_arrow(data)
+            if isinstance(df, pl.Series):
+                df = pl.DataFrame(df)
+            df.write_csv(out_dir / f"{base_name}.csv")
+
+            # Also save metadata JSON alongside
+            metadata_path = out_dir / f"{base_name}_metadata.json"
+            with open(metadata_path, "w") as f:
+                json.dump(metadata, f, indent=2, default=str)
+
+        processing_time = time.perf_counter() - start_time
+        return {
+            "file": str(file_p),
+            "status": "success",
+            "rows": data.num_rows,
+            "columns": data.num_columns,
+            "sample_name": metadata.get("sample_name"),
+            "processing_time": processing_time,
+            "error": None,
+        }
+
+    except Exception as e:
+        processing_time = time.perf_counter() - start_time
+        if not skip_errors:
+            # Re-raise in strict mode so caller can surface the error
+            raise
+        return {
+            "file": str(file_p),
+            "status": "error",
+            "rows": None,
+            "columns": None,
+            "sample_name": None,
+            "processing_time": processing_time,
+            "error": f"{type(e).__name__}: {e!s}",
+        }
 
 
 class BatchProcessor:
@@ -150,30 +219,48 @@ class BatchProcessor:
         if self.max_workers == 1:
             # Sequential processing for debugging
             for file_path in files:
-                result = self._process_single_file(
-                    file_path, output_format, output_dir, skip_errors
+                result = _process_single_file_worker(
+                    str(file_path), output_format, str(output_dir), skip_errors
                 )
                 results.append(result)
                 if self.verbose:
                     self._log_progress(len(results), len(files), start_time)
         else:
             # Parallel processing
-            with ProcessPoolExecutor(max_workers=self.max_workers) as executor:
+            # Use 'spawn' to avoid fork-safety issues with PyArrow/Polars
+            with ProcessPoolExecutor(
+                max_workers=self.max_workers,
+                mp_context=mp.get_context("spawn"),
+            ) as executor:
                 # Submit all tasks
                 future_to_file = {
                     executor.submit(
-                        self._process_single_file,
-                        file_path,
+                        _process_single_file_worker,
+                        str(file_path),
                         output_format,
-                        output_dir,
+                        str(output_dir),
                         skip_errors,
-                    ): file_path
+                    ): str(file_path)
                     for file_path in files
                 }
 
                 # Collect results as they complete
                 for future in as_completed(future_to_file):
-                    result = future.result()
+                    src = future_to_file[future]
+                    try:
+                        result = future.result()
+                    except Exception as e:
+                        # Convert worker exception into an error record
+                        result = {
+                            "file": str(src),
+                            "status": "error",
+                            "rows": None,
+                            "columns": None,
+                            "sample_name": None,
+                            "processing_time": 0.0,
+                            "error": f"{type(e).__name__}: {e!s}",
+                        }
+                        logger.error(f"Failed to process {src}: {e!s}")
                     results.append(result)
 
                     if self.verbose:
@@ -182,101 +269,7 @@ class BatchProcessor:
         self._log_summary(results, start_time)
         return results
 
-    def _process_single_file(
-        self,
-        file_path: Union[str, Path],
-        output_format: str,
-        output_dir: Path,
-        skip_errors: bool,
-    ) -> dict[str, str | float | None]:
-        """Process a single NGB file.
-
-        Args:
-            file_path: Path to the NGB file
-            output_format: Output format
-            output_dir: Output directory
-            skip_errors: Whether to skip on error
-
-        Returns:
-            Processing result dictionary
-        """
-        file_path = Path(file_path)
-        start_time = time.perf_counter()
-
-        try:
-            # Parse the file
-            metadata, data = read_ngb(str(file_path), return_metadata=True)
-
-            # Generate output filename
-            base_name = file_path.stem
-
-            # Save in requested format(s)
-            if output_format in ("parquet", "both"):
-                parquet_path = output_dir / f"{base_name}.parquet"
-                # Add metadata to table for preservation
-                table_with_meta = self._add_metadata_to_table(data, metadata)
-                pq.write_table(table_with_meta, parquet_path, compression="snappy")
-
-            if output_format in ("csv", "both"):
-                csv_path = output_dir / f"{base_name}.csv"
-                df = pl.from_arrow(data)
-                # Ensure we have a DataFrame, not a Series
-                if isinstance(df, pl.Series):
-                    df = pl.DataFrame(df)
-                df.write_csv(csv_path)
-
-                # Also save metadata as JSON
-                import json
-
-                metadata_path = output_dir / f"{base_name}_metadata.json"
-                with open(metadata_path, "w") as f:
-                    json.dump(metadata, f, indent=2, default=str)
-
-            processing_time = time.perf_counter() - start_time
-
-            return {
-                "file": str(file_path),
-                "status": "success",
-                "rows": data.num_rows,
-                "columns": data.num_columns,
-                "sample_name": metadata.get("sample_name"),
-                "processing_time": processing_time,
-                "error": None,
-            }
-
-        except Exception as e:
-            processing_time = time.perf_counter() - start_time
-            error_msg = f"{type(e).__name__}: {e!s}"
-
-            if not skip_errors:
-                raise
-
-            logger.error(f"Failed to process {file_path}: {error_msg}")
-
-            return {
-                "file": str(file_path),
-                "status": "error",
-                "rows": None,
-                "columns": None,
-                "sample_name": None,
-                "processing_time": processing_time,
-                "error": error_msg,
-            }
-
-    def _add_metadata_to_table(
-        self, table: pa.Table, metadata: FileMetadata
-    ) -> pa.Table:
-        """Add metadata to PyArrow table."""
-        import json
-
-        # Convert metadata to JSON string for storage
-        metadata_json = json.dumps(metadata, default=str)
-
-        # Add to table metadata
-        existing_meta = table.schema.metadata or {}
-        new_meta = {**existing_meta, b"file_metadata": metadata_json.encode()}
-
-        return table.replace_schema_metadata(new_meta)
+    # Note: per-file processing moved to module-level worker to be multiprocessing-safe
 
     def _log_progress(self, completed: int, total: int, start_time: float) -> None:
         """Log processing progress."""

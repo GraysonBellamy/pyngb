@@ -16,6 +16,9 @@ Usage:
 
 import argparse
 import sys
+import tempfile
+from collections.abc import Sequence
+from typing import Union
 from pathlib import Path
 
 import polars as pl
@@ -23,7 +26,7 @@ import polars as pl
 from pyngb import BatchProcessor, NGBDataset, process_directory
 
 
-def demonstrate_batch_processor(files: list[str], output_dir: str):
+def demonstrate_batch_processor(files: Sequence[Union[str, Path]], output_dir: str):
     """Demonstrate BatchProcessor class usage."""
 
     print("\n🔧 Method 1: BatchProcessor Class")
@@ -37,7 +40,7 @@ def demonstrate_batch_processor(files: list[str], output_dir: str):
 
     # Process files
     results = processor.process_files(
-        files,
+        list(files),
         output_format="both",  # Create both Parquet and CSV files
         output_dir=output_dir,
         skip_errors=True,  # Continue processing if individual files fail
@@ -52,15 +55,23 @@ def demonstrate_batch_processor(files: list[str], output_dir: str):
     print(f"  ❌ Failed: {len(failed)}")
 
     if successful:
-        total_rows = sum(r["rows"] for r in successful)
-        avg_time = sum(r["processing_time"] for r in successful) / len(successful)
+        total_rows = int(sum(float(r.get("rows") or 0) for r in successful))
+        avg_time = (
+            sum(float(r.get("processing_time") or 0.0) for r in successful)
+            / len(successful)
+            if successful
+            else 0.0
+        )
 
         print(f"  📈 Total data points: {total_rows:,}")
         print(f"  ⏱️  Average processing time: {avg_time:.2f} seconds")
 
         print("\n📁 Output Files Created:")
         for result in successful:
-            input_path = Path(result["file"])
+            file_val = result.get("file")
+            if not isinstance(file_val, str):
+                continue
+            input_path = Path(file_val)
             base_name = input_path.stem
 
             parquet_file = Path(output_dir) / f"{base_name}.parquet"
@@ -101,7 +112,9 @@ def demonstrate_convenience_function(input_dir: str, _output_dir: str):
 
         # Show sample information
         for result in successful[:3]:  # Show first 3
-            print(f"    {Path(result['file']).name}: {result['rows']} rows")
+            file_val = result.get("file")
+            name = Path(file_val).name if isinstance(file_val, str) else "<unknown>"
+            print(f"    {name}: {result.get('rows', 0)} rows")
 
         if len(successful) > 3:
             print(f"    ... and {len(successful) - 3} more files")
@@ -109,7 +122,7 @@ def demonstrate_convenience_function(input_dir: str, _output_dir: str):
     return results
 
 
-def demonstrate_dataset_management(files: list[str]):
+def demonstrate_dataset_management(files: Sequence[Union[str, Path]], out_dir: Path):
     """Demonstrate NGBDataset for dataset management."""
 
     print("\n📚 Method 3: Dataset Management")
@@ -135,9 +148,13 @@ def demonstrate_dataset_management(files: list[str]):
             operators = summary["unique_operators"]
             print(f"  Operators: {operators}")
 
-        if summary.get("sample_mass_range"):
-            mass_range = summary["sample_mass_range"]
-            print(f"  Sample mass range: {mass_range[0]:.1f} to {mass_range[1]:.1f} mg")
+        rng = summary.get("sample_mass_range")
+        if (
+            isinstance(rng, tuple)
+            and len(rng) == 2
+            and all(isinstance(x, (int, float)) for x in rng)
+        ):
+            print(f"  Sample mass range: {rng[0]:.1f} to {rng[1]:.1f} mg")
 
         if summary.get("avg_sample_mass"):
             avg_mass = summary["avg_sample_mass"]
@@ -148,10 +165,10 @@ def demonstrate_dataset_management(files: list[str]):
 
     # Export metadata
     try:
-        metadata_file = "dataset_metadata.csv"
-        dataset.export_metadata(metadata_file, format="csv")
+        metadata_file = out_dir / "dataset_metadata.csv"
+        dataset.export_metadata(str(metadata_file), format="csv")
 
-        if Path(metadata_file).exists():
+        if metadata_file.exists():
             print(f"  📁 Metadata exported to: {metadata_file}")
 
             # Show metadata preview
@@ -227,8 +244,8 @@ def main():
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="./batch_output/",
-        help="Output directory for processed files",
+        default=None,
+        help="Output directory for processed files (defaults to a temporary directory)",
     )
     parser.add_argument("--files", nargs="+", help="Specific files to process")
 
@@ -291,10 +308,18 @@ def main():
     files_to_process = valid_files
     print(f"✅ Will process {len(files_to_process)} files")
 
-    # Create output directory
-    output_dir = Path(args.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    print(f"📁 Output directory: {output_dir}")
+    # Create output directory (temporary if not provided)
+    if args.output_dir:
+        output_dir = Path(args.output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        print(f"📁 Output directory: {output_dir}")
+        # Run example normally, leave artifacts when user chose path
+        cleanup = False
+    else:
+        tmp = tempfile.TemporaryDirectory(prefix="pyngb_batch_out_")
+        output_dir = Path(tmp.name)
+        print(f"📁 Output directory (temporary): {output_dir}")
+        cleanup = True
 
     # Demonstrate different batch processing methods
     all_results = []
@@ -308,7 +333,7 @@ def main():
         _ = demonstrate_convenience_function(args.input_dir, str(output_dir))
 
     # Method 3: Dataset management
-    demonstrate_dataset_management(files_to_process)
+    demonstrate_dataset_management(files_to_process, output_dir)
 
     # Create processing summary
     create_processing_summary(all_results, str(output_dir))
@@ -323,6 +348,11 @@ def main():
 
     print("\n📁 Check the output directory for processed files:")
     print(f"  {output_dir.absolute()}")
+
+    # Cleanup temporary directory if we created one
+    if cleanup:
+        print("\n🧹 Cleaning up temporary output directory...")
+        # TemporaryDirectory will clean up automatically when going out of scope
 
     return 0
 

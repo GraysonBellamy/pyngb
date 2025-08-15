@@ -189,8 +189,7 @@ def main():
         print("\n✅ Basic parsing demonstration completed successfully!")
         print("\n💡 Next Steps:")
         print("  - Try the batch_processing.py example for multiple files")
-        print("  - Check plotting_examples.py for data visualization")
-        print("  - See data_exploration.py for advanced analysis")
+        print("  - Explore validation with QualityChecker in docs")
     else:
         print("\n❌ Demonstration encountered errors.")
         print("💡 Troubleshooting:")

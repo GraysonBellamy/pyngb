@@ -136,8 +136,8 @@ import pyngb
 print(f"pyngb version: {pyngb.__version__}")
 
 # Test basic functionality
-from pyngb import read_ngb, read_ngb
-print("✓ Core functions imported successfully")
+from pyngb import read_ngb
+print("✓ Core function imported successfully")
 
 # Test command-line interface
 import subprocess

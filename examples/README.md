@@ -6,34 +6,27 @@ This directory contains practical examples demonstrating how to use pyngb for va
 
 ### Basic Usage
 - **[basic_parsing.py](basic_parsing.py)**: Simple file parsing and data extraction
-- **[data_exploration.py](data_exploration.py)**: Data exploration and basic analysis
-- **[plotting_examples.py](plotting_examples.py)**: Creating plots and visualizations
 
 ### Advanced Features
 - **[batch_processing.py](batch_processing.py)**: Processing multiple files efficiently
-- **[custom_validation.py](custom_validation.py)**: Custom data validation rules
-- **[dataset_management.py](dataset_management.py)**: Managing collections of NGB files
+- **[batch_processing_example.py](batch_processing_example.py)**: Validation + batch + dataset
 
 ### Integration Examples
-- **[pandas_integration.py](pandas_integration.py)**: Working with Pandas DataFrames
-- **[jupyter_notebook.ipynb](jupyter_notebook.ipynb)**: Interactive Jupyter notebook
-- **[automation_script.py](automation_script.py)**: Automated processing pipeline
+- (Bring your own) Jupyter notebook to try code snippets from docs
 
 ### Specialized Use Cases
-- **[temperature_analysis.py](temperature_analysis.py)**: Temperature program analysis
-- **[mass_loss_analysis.py](mass_loss_analysis.py)**: TGA mass loss calculations
-- **[comparative_analysis.py](comparative_analysis.py)**: Comparing multiple samples
+- See docs User Guide sections for analysis patterns
 
 ## Running Examples
 
 ### Prerequisites
 
 ```bash
-# Install pyngb with optional dependencies
-pip install pyngb[examples]
+# Install pyngb
+pip install pyngb
 
-# Or install dependencies manually
-pip install pyngb matplotlib pandas jupyter seaborn
+# Optional tools for plotting/notebooks
+pip install matplotlib pandas jupyter seaborn
 ```
 
 ### Using Example Data

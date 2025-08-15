@@ -232,8 +232,8 @@ def test_with_sample_data(sample_ngb_file):
 
 ```python
 @pytest.mark.parametrize("file_path,expected_columns", [
-    ("file1.ngb-ss3", ["time", "temperature"]),
-    ("file2.ngb-ss3", ["time", "temperature", "mass"]),
+    ("file1.ngb-ss3", ["time", "sample_temperature"]),
+    ("file2.ngb-ss3", ["time", "sample_temperature", "mass"]),
 ])
 def test_multiple_files(file_path, expected_columns):
     """Test with multiple file scenarios."""

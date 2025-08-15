@@ -282,28 +282,43 @@ except FileNotFoundError:
 
 ### Binary Parser Module
 
-::: pyngb.binary.BinaryParser
+::: pyngb.binary.parser.BinaryParser
     options:
       heading_level: 3
       show_source: false
 
 ### Binary Handlers Module
 
-::: pyngb.binary.handlers
+::: pyngb.binary.handlers.DataTypeRegistry
     options:
       heading_level: 3
       show_source: false
 
+::: pyngb.binary.handlers.Float64Handler
+        options:
+            heading_level: 3
+            show_source: false
+
+::: pyngb.binary.handlers.Float32Handler
+        options:
+            heading_level: 3
+            show_source: false
+
+::: pyngb.binary.handlers.Int32Handler
+        options:
+            heading_level: 3
+            show_source: false
+
 ### Metadata Extraction Module
 
-::: pyngb.extractors.MetadataExtractor
+::: pyngb.extractors.metadata.MetadataExtractor
     options:
       heading_level: 3
       show_source: false
 
 ### Stream Processing Module
 
-::: pyngb.extractors.DataStreamProcessor
+::: pyngb.extractors.streams.DataStreamProcessor
     options:
       heading_level: 3
       show_source: false

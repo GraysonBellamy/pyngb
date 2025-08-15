@@ -25,13 +25,13 @@ Basic usage:
 
 .. code-block:: python
 
-   from pyngb import read_ngb, read_ngb
+   from pyngb import read_ngb
 
    # Load data as PyArrow Table
    table = read_ngb("your_file.ngb-ss3")
 
    # Get structured data with metadata
-   metadata, data = read_ngb("your_file.ngb-ss3")
+   metadata, data = read_ngb("your_file.ngb-ss3", return_metadata=True)
 
 Features
 --------
