@@ -82,7 +82,7 @@ jobs:
 
     - name: Run performance benchmarks
       run: |
-        uv run python benchmarks.py --runs 3
+        uv run python scripts/benchmarks.py --runs 3
 
   security:
     name: Security Scan
