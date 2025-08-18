@@ -10,10 +10,10 @@ from itertools import tee, zip_longest
 import polars as pl
 
 try:
-    from polars.exceptions import ShapeError  # type: ignore[import]
+    from polars.exceptions import ShapeError  # type: ignore[import-untyped]
 except ImportError:
     # Fallback for older versions of polars
-    ShapeError = ValueError
+    ShapeError = ValueError  # type: ignore[misc,assignment]
 
 from ..binary import BinaryParser
 from ..constants import START_DATA_HEADER_OFFSET, PatternConfig
