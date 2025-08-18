@@ -77,8 +77,7 @@ jobs:
     - name: Install dependencies
       run: |
         pip install uv
-        uv sync --all-extras
-        uv pip install pytest-benchmark psutil
+        uv sync --extra performance
 
     - name: Run performance benchmarks
       run: |
