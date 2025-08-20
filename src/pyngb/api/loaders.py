@@ -241,6 +241,7 @@ def main() -> int:
                 data, output_path / f"{base_name}.parquet", compression="snappy"
             )
         if args.format in ("csv", "all"):
+            # Optimize: Only convert to Polars when needed for CSV output
             df = pl.from_arrow(data)
             # Ensure we have a DataFrame for CSV writing
             if isinstance(df, pl.DataFrame):

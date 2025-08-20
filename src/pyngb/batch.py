@@ -55,6 +55,7 @@ def _process_single_file_worker(
             )
 
         if output_format in ("csv", "both"):
+            # Optimize: Only convert to Polars when needed for CSV output
             df = pl.from_arrow(data)
             if isinstance(df, pl.Series):
                 df = pl.DataFrame(df)

@@ -165,4 +165,7 @@ class NGBParser:
             logger.error("Failed to parse NGB file: %s", e)
             raise
 
+        # Convert to PyArrow at API boundary for cross-language compatibility
+        # and metadata embedding. This is the single conversion point from
+        # internal Polars processing to external PyArrow interface.
         return metadata, data_df.to_arrow()
