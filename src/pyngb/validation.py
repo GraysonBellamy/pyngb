@@ -26,6 +26,27 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
+def _ensure_polars_dataframe(data: Union[pa.Table, pl.DataFrame]) -> pl.DataFrame:
+    """Helper function to efficiently convert data to Polars DataFrame.
+
+    Avoids unnecessary conversions when data is already a Polars DataFrame.
+
+    Args:
+        data: Input data as PyArrow Table or Polars DataFrame
+
+    Returns:
+        Polars DataFrame
+    """
+    if isinstance(data, pl.DataFrame):
+        return data
+    if isinstance(data, pa.Table):
+        df_temp = pl.from_arrow(data)
+        return df_temp if isinstance(df_temp, pl.DataFrame) else df_temp.to_frame()
+    if isinstance(data, pl.Series):
+        return pl.DataFrame(data)
+    return data
+
+
 class ValidationResult:
     """Container for validation results.
 
@@ -607,11 +628,8 @@ def check_temperature_profile(
     Returns:
         Dictionary with temperature profile analysis
     """
-    if isinstance(data, pa.Table):
-        df_temp = pl.from_arrow(data)
-        df = df_temp if isinstance(df_temp, pl.DataFrame) else df_temp.to_frame()
-    else:
-        df = data
+    # Optimize: use helper function to avoid unnecessary conversions
+    df = _ensure_polars_dataframe(data)
 
     if "sample_temperature" not in df.columns:
         return {"error": "No sample_temperature column found"}
@@ -649,10 +667,8 @@ def check_mass_data(
     Returns:
         Dictionary with mass data analysis
     """
-    df = pl.from_arrow(data) if isinstance(data, pa.Table) else data
-    # Ensure we have a DataFrame, not a Series
-    if isinstance(df, pl.Series):
-        df = pl.DataFrame(df)
+    # Optimize: use helper function to avoid unnecessary conversions
+    df = _ensure_polars_dataframe(data)
 
     if "mass" not in df.columns:
         return {"error": "No mass column found"}
@@ -691,10 +707,8 @@ def check_dsc_data(data: Union[pa.Table, pl.DataFrame]) -> dict[str, str | float
     Returns:
         Dictionary with DSC data analysis
     """
-    df = pl.from_arrow(data) if isinstance(data, pa.Table) else data
-    # Ensure we have a DataFrame, not a Series
-    if isinstance(df, pl.Series):
-        df = pl.DataFrame(df)
+    # Optimize: use helper function to avoid unnecessary conversions
+    df = _ensure_polars_dataframe(data)
 
     if "dsc_signal" not in df.columns:
         return {"error": "No dsc_signal column found"}

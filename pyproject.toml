@@ -1,6 +1,6 @@
 [project]
 name = "pyngb"
-version = "0.0.1"
+version = "0.0.2"
 description = "Unofficial parser for NETZSCH STA (Simultaneous Thermal Analysis) NGB instrument binary files. Not affiliated with, endorsed by, or approved by NETZSCH-Gerätebau GmbH."
 readme = "README.md"
 authors = [
