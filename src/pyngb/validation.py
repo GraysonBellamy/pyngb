@@ -44,7 +44,9 @@ def _ensure_polars_dataframe(data: Union[pa.Table, pl.DataFrame]) -> pl.DataFram
         return df_temp if isinstance(df_temp, pl.DataFrame) else df_temp.to_frame()
     if isinstance(data, pl.Series):
         return pl.DataFrame(data)
-    return data
+    # If data is not a recognized type, assume it's already a DataFrame-like object
+    # This should not happen in normal usage, but provides a fallback
+    return pl.DataFrame(data)
 
 
 class ValidationResult:
