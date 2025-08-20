@@ -189,6 +189,7 @@ for chunk in process_large_file_chunked("large_file.ngb-ss3"):
 **Solutions**:
 ```python
 import time
+import polars as pl
 
 # Measure parsing time
 start_time = time.time()
@@ -198,6 +199,42 @@ print(f"Parse time: {parse_time:.2f} seconds")
 
 # Check file complexity
 print(f"File size: {Path('sample.ngb-ss3').stat().st_size / 1024 / 1024:.1f} MB")
+
+# Optimize validation performance (v0.0.2+)
+from pyngb.validation import validate_sta_data
+
+# Convert once, reuse for multiple operations
+df = pl.from_arrow(table)
+
+# Validation with Polars DataFrame (zero conversion overhead)
+issues = validate_sta_data(df)
+
+# Multiple validation calls are now more efficient
+temp_analysis = check_temperature_profile(df)  # No conversion needed
+mass_analysis = check_mass_data(df)           # No conversion needed
+```
+
+### Conversion Overhead (Optimized in v0.0.2)
+
+**Problem**: Multiple conversions between PyArrow and Polars
+
+**Solutions**:
+```python
+# Before v0.0.2: Multiple conversions
+table = read_ngb("sample.ngb-ss3")
+df1 = pl.from_arrow(table)      # Conversion 1
+df2 = pl.from_arrow(table)      # Conversion 2 (redundant)
+validate_sta_data(table)        # Internal conversion 3
+
+# v0.0.2+: Optimized approach
+table = read_ngb("sample.ngb-ss3")
+df = pl.from_arrow(table)       # Single conversion
+
+# All subsequent operations use the DataFrame directly
+validate_sta_data(df)           # No conversion needed
+check_temperature_profile(df)   # No conversion needed
+check_mass_data(df)            # No conversion needed
+```
 print(f"Data points: {table.num_rows}")
 print(f"Columns: {table.num_columns}")
 
