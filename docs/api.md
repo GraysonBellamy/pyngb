@@ -26,6 +26,43 @@ metadata, data = read_ngb("sample.ngb-ss3", return_metadata=True)
 print(f"Sample: {metadata.get('sample_name', 'Unknown')}")
 ```
 
+### Baseline Subtraction
+
+::: pyngb.subtract_baseline
+    options:
+      heading_level: 3
+      show_source: true
+
+::: pyngb.BaselineSubtractor
+    options:
+      heading_level: 3
+      show_source: true
+
+#### Usage Examples
+
+```python
+# Standalone baseline subtraction
+from pyngb import subtract_baseline
+
+# Default behavior (sample_temperature axis for dynamic segments)
+corrected_df = subtract_baseline("sample.ngb-ss3", "baseline.ngb-bs3")
+
+# Custom axis selection
+corrected_df = subtract_baseline(
+    "sample.ngb-ss3",
+    "baseline.ngb-bs3",
+    dynamic_axis="time"
+)
+
+# Integrated approach
+from pyngb import read_ngb
+
+corrected_data = read_ngb(
+    "sample.ngb-ss3",
+    baseline_file="baseline.ngb-bs3"
+)
+```
+
 ## Batch Processing
 
 ### BatchProcessor Class
@@ -529,6 +566,49 @@ def robust_file_processing(files: list[str]):
 
     return results
 ```
+
+## Command Line Interface
+
+pyngb provides a comprehensive CLI for data processing and baseline subtraction:
+
+### Basic Usage
+
+```bash
+python -m pyngb input.ngb-ss3 [options]
+```
+
+### Arguments
+
+- **`input`**: Path to the input NGB file (required)
+- **`-o, --output`**: Output directory (default: current directory)
+- **`-f, --format`**: Output format: `parquet`, `csv`, or `all` (default: `parquet`)
+- **`-v, --verbose`**: Enable verbose logging
+- **`-b, --baseline`**: Path to baseline file for baseline subtraction
+- **`--dynamic-axis`**: Axis for dynamic segment alignment: `time`, `sample_temperature`, or `furnace_temperature` (default: `sample_temperature`)
+
+### Examples
+
+```bash
+# Basic conversion
+python -m pyngb sample.ngb-ss3
+
+# CSV output with verbose logging
+python -m pyngb sample.ngb-ss3 -f csv -v
+
+# Baseline subtraction with default settings
+python -m pyngb sample.ngb-ss3 -b baseline.ngb-bs3
+
+# Baseline subtraction with time axis alignment
+python -m pyngb sample.ngb-ss3 -b baseline.ngb-bs3 --dynamic-axis time
+
+# All formats with custom output directory
+python -m pyngb sample.ngb-ss3 -b baseline.ngb-bs3 -f all -o ./results/
+```
+
+### Output Files
+
+- Without baseline: `{input_name}.{format}`
+- With baseline: `{input_name}_baseline_subtracted.{format}`
 
 ---
 

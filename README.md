@@ -16,6 +16,7 @@ A comprehensive Python library for parsing and analyzing NETZSCH STA (Simultaneo
 ### Core Capabilities
 - 🚀 **High-Performance Parsing**: Optimized binary parsing with NumPy and PyArrow
 - 📊 **Rich Metadata Extraction**: Complete instrument settings, sample information, and measurement parameters
+- 🧮 **Baseline Subtraction**: Automatic baseline correction with temperature program validation
 - 🔧 **Flexible Data Access**: Multiple APIs for different use cases
 - 📦 **Modern Data Formats**: PyArrow tables with embedded metadata
 - 🔍 **Data Validation**: Built-in quality checking and validation tools
@@ -86,6 +87,28 @@ plt.xlabel('Time (s)')
 plt.ylabel('Mass (mg)')
 plt.title('Mass Loss')
 plt.show()
+```
+
+### Baseline Subtraction
+
+```python
+from pyngb import read_ngb, subtract_baseline
+
+# Method 1: Integrated baseline subtraction (recommended)
+corrected_data = read_ngb(
+    "sample.ngb-ss3",
+    baseline_file="baseline.ngb-bs3"
+)
+
+# Method 2: Standalone baseline subtraction
+corrected_df = subtract_baseline("sample.ngb-ss3", "baseline.ngb-bs3")
+
+# Advanced: Custom dynamic axis (default is sample_temperature)
+corrected_data = read_ngb(
+    "sample.ngb-ss3",
+    baseline_file="baseline.ngb-bs3",
+    dynamic_axis="time"  # or "furnace_temperature"
+)
 ```
 
 ## 📋 Complete Usage Guide
@@ -192,8 +215,21 @@ python -m pyngb sample.ngb-ss3
 # Convert to CSV with verbose output
 python -m pyngb sample.ngb-ss3 -f csv -v
 
-# Convert to all formats (Parquet, CSV, JSON metadata)
+# Convert to all formats (Parquet, CSV)
 python -m pyngb sample.ngb-ss3 -f all -o ./output/
+```
+
+### Baseline Subtraction via CLI
+
+```bash
+# Basic baseline subtraction
+python -m pyngb sample.ngb-ss3 -b baseline.ngb-bs3
+
+# Baseline subtraction with custom dynamic axis
+python -m pyngb sample.ngb-ss3 -b baseline.ngb-bs3 --dynamic-axis time
+
+# Baseline subtraction with all output formats
+python -m pyngb sample.ngb-ss3 -b baseline.ngb-bs3 -f all -o ./corrected/
 ```
 
 ### Batch Processing

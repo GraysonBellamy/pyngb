@@ -42,6 +42,36 @@ df.write_parquet("output.parquet")
 df.write_csv("output.csv")
 ```
 
+### Baseline Subtraction
+
+pyngb supports automatic baseline subtraction with temperature program validation:
+
+```python
+from pyngb import read_ngb, subtract_baseline
+
+# Method 1: Integrated approach (recommended)
+corrected_data = read_ngb(
+    "sample.ngb-ss3",
+    baseline_file="baseline.ngb-bs3"
+)
+
+# Method 2: Standalone function
+corrected_df = subtract_baseline("sample.ngb-ss3", "baseline.ngb-bs3")
+
+# Advanced options
+corrected_data = read_ngb(
+    "sample.ngb-ss3",
+    baseline_file="baseline.ngb-bs3",
+    dynamic_axis="time"  # Default: "sample_temperature"
+)
+```
+
+**Key Features:**
+- Automatic temperature program validation ensures scientific accuracy
+- Dynamic segments aligned by sample temperature (default) or time/furnace temperature
+- Isothermal segments always aligned by time
+- Only measurement columns (mass, DSC signal) are corrected
+
 ## Command Line Interface
 
 pyngb includes a powerful CLI for batch processing:
@@ -56,6 +86,22 @@ python -m pyngb sample.ngb-ss3 -f csv
 
 # Convert to both formats (Parquet and CSV)
 python -m pyngb sample.ngb-ss3 -f all
+```
+
+### Baseline Subtraction
+
+```bash
+# Basic baseline subtraction (default: sample_temperature axis)
+python -m pyngb sample.ngb-ss3 -b baseline.ngb-bs3
+
+# Use time axis for dynamic segments
+python -m pyngb sample.ngb-ss3 -b baseline.ngb-bs3 --dynamic-axis time
+
+# Use furnace temperature axis for dynamic segments
+python -m pyngb sample.ngb-ss3 -b baseline.ngb-bs3 --dynamic-axis furnace_temperature
+
+# Output includes "_baseline_subtracted" suffix
+python -m pyngb sample.ngb-ss3 -b baseline.ngb-bs3 -f all -o ./corrected/
 ```
 
 ### Multiple files

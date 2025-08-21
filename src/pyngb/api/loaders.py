@@ -17,23 +17,58 @@ __all__ = ["main", "read_ngb"]
 
 
 @overload
-def read_ngb(path: str, *, return_metadata: Literal[False] = False) -> pa.Table: ...
+def read_ngb(
+    path: str,
+    *,
+    return_metadata: Literal[False] = False,
+    baseline_file: None = None,
+    dynamic_axis: str = "time",
+) -> pa.Table: ...
 
 
 @overload
 def read_ngb(
-    path: str, *, return_metadata: Literal[True]
+    path: str,
+    *,
+    return_metadata: Literal[True],
+    baseline_file: None = None,
+    dynamic_axis: str = "time",
+) -> tuple[FileMetadata, pa.Table]: ...
+
+
+@overload
+def read_ngb(
+    path: str,
+    *,
+    return_metadata: Literal[False] = False,
+    baseline_file: str,
+    dynamic_axis: str = "time",
+) -> pa.Table: ...
+
+
+@overload
+def read_ngb(
+    path: str,
+    *,
+    return_metadata: Literal[True],
+    baseline_file: str,
+    dynamic_axis: str = "time",
 ) -> tuple[FileMetadata, pa.Table]: ...
 
 
 def read_ngb(
-    path: str, *, return_metadata: bool = False
+    path: str,
+    *,
+    return_metadata: bool = False,
+    baseline_file: str | None = None,
+    dynamic_axis: str = "sample_temperature",
 ) -> Union[pa.Table, tuple[FileMetadata, pa.Table]]:
     """
-    Read NETZSCH NGB file data.
+    Read NETZSCH NGB file data with optional baseline subtraction.
 
     This is the primary function for loading NGB files. By default, it returns
     a PyArrow table with embedded metadata. For direct metadata access, use return_metadata=True.
+    When baseline_file is provided, baseline subtraction is performed automatically.
 
     Parameters
     ----------
@@ -43,12 +78,20 @@ def read_ngb(
     return_metadata : bool, default False
         If False (default), return PyArrow table with embedded metadata.
         If True, return (metadata, data) tuple.
+    baseline_file : str or None, default None
+        Path to baseline file (.ngb-bs3) for baseline subtraction.
+        If provided, performs automatic baseline subtraction. The baseline file
+        must have an identical temperature program to the sample file.
+    dynamic_axis : str, default "sample_temperature"
+        Axis to use for dynamic segment alignment in baseline subtraction.
+        Options: "time", "sample_temperature", "furnace_temperature"
 
     Returns
     -------
     pa.Table or tuple[FileMetadata, pa.Table]
         - If return_metadata=False: PyArrow table with embedded metadata
         - If return_metadata=True: (metadata dict, PyArrow table) tuple
+        - If baseline_file provided: baseline-subtracted data
 
     Raises
     ------
@@ -146,6 +189,27 @@ def read_ngb(
             "hash": file_hash,
         }
 
+    # Handle baseline subtraction if requested
+    if baseline_file is not None:
+        from ..baseline import subtract_baseline
+
+        # Validate dynamic_axis
+        valid_axes = ["time", "sample_temperature", "furnace_temperature"]
+        if dynamic_axis not in valid_axes:
+            raise ValueError(
+                f"dynamic_axis must be one of {valid_axes}, got '{dynamic_axis}'"
+            )
+
+        # Perform baseline subtraction (this will load baseline metadata internally)
+        subtracted_df = subtract_baseline(
+            path,
+            baseline_file,
+            dynamic_axis,  # type: ignore  # We validated it above
+        )
+
+        # Convert back to PyArrow
+        data = subtracted_df.to_arrow()
+
     if return_metadata:
         return metadata, data
 
@@ -196,6 +260,15 @@ def main() -> int:
     parser_cli.add_argument(
         "-v", "--verbose", action="store_true", help="Enable verbose logging"
     )
+    parser_cli.add_argument(
+        "-b", "--baseline", help="Baseline file path for baseline subtraction"
+    )
+    parser_cli.add_argument(
+        "--dynamic-axis",
+        choices=["time", "sample_temperature", "furnace_temperature"],
+        default="sample_temperature",
+        help="Axis for dynamic segment alignment during baseline subtraction (default: sample_temperature)",
+    )
 
     args = parser_cli.parse_args()
 
@@ -221,7 +294,33 @@ def main() -> int:
         )
 
     try:
-        data = read_ngb(args.input)
+        # Validate baseline file if provided
+        if args.baseline:
+            baseline_path = Path(args.baseline)
+            if not baseline_path.exists():
+                logger.error("Baseline file does not exist: %s", args.baseline)
+                return 1
+            if not baseline_path.is_file():
+                logger.error("Baseline path is not a file: %s", args.baseline)
+                return 1
+            if baseline_path.suffix.lower() not in valid_extensions:
+                logger.warning(
+                    "Baseline file extension '%s' may not be a standard NGB format. Proceeding anyway.",
+                    baseline_path.suffix,
+                )
+
+        # Load data with optional baseline subtraction
+        if args.baseline:
+            logger.info(
+                "Loading data with baseline subtraction (dynamic_axis=%s)",
+                args.dynamic_axis,
+            )
+            data = read_ngb(
+                args.input, baseline_file=args.baseline, dynamic_axis=args.dynamic_axis
+            )
+        else:
+            data = read_ngb(args.input)
+
         output_path = Path(args.output)
 
         # Validate output directory
@@ -236,6 +335,10 @@ def main() -> int:
             return 1
 
         base_name = Path(args.input).stem
+        # Add suffix to indicate baseline subtraction was performed
+        if args.baseline:
+            base_name += "_baseline_subtracted"
+
         if args.format in ("parquet", "all"):
             pq.write_table(
                 data, output_path / f"{base_name}.parquet", compression="snappy"
@@ -247,7 +350,14 @@ def main() -> int:
             if isinstance(df, pl.DataFrame):
                 df.write_csv(output_path / f"{base_name}.csv")
 
-        logger.info("Successfully parsed %s", args.input)
+        if args.baseline:
+            logger.info(
+                "Successfully parsed %s with baseline subtraction from %s",
+                args.input,
+                args.baseline,
+            )
+        else:
+            logger.info("Successfully parsed %s", args.input)
         return 0
     except FileNotFoundError:
         logger.error("Input file not found: %s", args.input)

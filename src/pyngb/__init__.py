@@ -11,6 +11,7 @@ from __future__ import annotations
 from importlib.metadata import PackageNotFoundError, version
 
 from .api.loaders import read_ngb
+from .baseline import BaselineSubtractor, subtract_baseline
 from .batch import BatchProcessor, NGBDataset, process_directory, process_files
 from .constants import BinaryMarkers, DataType, FileMetadata, PatternConfig
 from .core.parser import NGBParser
@@ -31,6 +32,7 @@ __author__ = "Grayson Bellamy"
 __email__ = "gbellamy@umd.edu"
 
 __all__ = [
+    "BaselineSubtractor",
     "BatchProcessor",
     "BinaryMarkers",
     "DataType",
@@ -51,5 +53,6 @@ __all__ = [
     "process_directory",
     "process_files",
     "read_ngb",
+    "subtract_baseline",
     "validate_sta_data",
 ]
