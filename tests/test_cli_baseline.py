@@ -1,6 +1,7 @@
 """Tests for CLI baseline subtraction functionality."""
 
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -10,8 +11,8 @@ class TestCLIBaselineSubtraction:
 
     @property
     def python_exe(self):
-        """Get the Python executable path for the current virtual environment."""
-        return "/home/gbellamy/git/pynetzsch/.venv/bin/python"
+        """Get the Python executable path for the current environment."""
+        return sys.executable
 
     def test_cli_baseline_subtraction_help(self):
         """Test that CLI help includes baseline options."""
