@@ -477,6 +477,27 @@ def process_large_file_efficiently(file_path: str, chunk_size: int = 10000):
 3. **Chunk Large Files**: Use slicing for very large datasets
 4. **Cache Metadata**: Extract metadata once and reuse
 5. **Choose Appropriate Formats**: Parquet for storage, CSV for sharing
+6. **Optimize Conversions (v0.0.2+)**: Pass Polars DataFrames directly to validation functions
+
+### Optimized Data Processing (v0.0.2+)
+
+```python
+import polars as pl
+from pyngb import read_ngb
+from pyngb.validation import validate_sta_data, check_temperature_profile
+
+# Efficient workflow with minimal conversions
+table = read_ngb("sample.ngb-ss3")
+df = pl.from_arrow(table)  # Single conversion
+
+# All operations use the DataFrame directly (no additional conversions)
+issues = validate_sta_data(df)           # Zero conversion overhead
+temp_analysis = check_temperature_profile(df)  # Zero conversion overhead
+
+# Previous approach (pre-v0.0.2) required multiple conversions:
+# validate_sta_data(table)  # Internal PyArrow → Polars conversion
+# check_temperature_profile(table)  # Another PyArrow → Polars conversion
+```
 
 ### Memory Management
 
