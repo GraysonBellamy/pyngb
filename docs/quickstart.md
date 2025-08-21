@@ -222,6 +222,8 @@ print(stats)
     - Use `read_ngb()` for large datasets - it returns PyArrow tables which are more memory efficient
     - Convert to Polars DataFrames for analysis - they're faster than Pandas for most operations
     - Use Parquet format for storing processed data - it's much faster to read/write than CSV
+    - **New in v0.0.2**: Optimized conversions automatically reduce overhead when working with both PyArrow and Polars
+    - Pass Polars DataFrames directly to validation functions for zero-conversion overhead
 
 !!! warning "Common Pitfalls"
     - Always check if expected columns exist before using them
