@@ -9,11 +9,7 @@ from itertools import tee, zip_longest
 
 import polars as pl
 
-try:
-    from polars.exceptions import ShapeError  # type: ignore[import-untyped]
-except ImportError:
-    # Fallback for older versions of polars
-    ShapeError = ValueError  # type: ignore[misc,assignment]
+from polars.exceptions import ShapeError  # type: ignore[import-untyped]
 
 from ..binary import BinaryParser
 from ..constants import BinaryProcessing, PatternConfig, StreamMarkers
@@ -77,7 +73,7 @@ class DataStreamProcessor:
                             pl.Series(name=title, values=output)
                         )
                     except ShapeError:
-                        logger.debug("Shape mismatch when adding column '%s'", title)
+                        logger.debug(f"Shape mismatch when adding column '{title}'")
                 output = []
 
             # Check for data marker

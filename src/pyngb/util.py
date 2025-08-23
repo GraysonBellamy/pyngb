@@ -101,9 +101,7 @@ def get_hash(path: str, max_size_mb: int = 1000) -> Optional[str]:
         try:
             _ = hashlib.blake2b()  # type: ignore[call-arg]
         except Exception as e:  # pragma: no cover - exercised in tests via patch
-            logger.error(
-                "Unexpected error while generating hash for file %s: %s", path, e
-            )
+            logger.error(f"Unexpected error while generating hash for file {path}: {e}")
             return None
         # Check file size before hashing
         file_size = Path(path).stat().st_size
@@ -111,24 +109,21 @@ def get_hash(path: str, max_size_mb: int = 1000) -> Optional[str]:
 
         if file_size > max_size_bytes:
             logger.warning(
-                "File too large for hashing (%d MB > %d MB): %s",
-                file_size // (1024 * 1024),
-                max_size_mb,
-                path,
+                f"File too large for hashing ({file_size // (1024 * 1024)} MB > {max_size_mb} MB): {path}"
             )
             return None
 
         with open(path, "rb") as file:
             return hashlib.blake2b(file.read()).hexdigest()
     except FileNotFoundError:
-        logger.warning("File not found while generating hash: %s", path)
+        logger.warning(f"File not found while generating hash: {path}")
         return None
     except PermissionError:
-        logger.error("Permission denied while generating hash for file: %s", path)
+        logger.error(f"Permission denied while generating hash for file: {path}")
         return None
     except OSError as e:
-        logger.error("OS error while generating hash for file %s: %s", path, e)
+        logger.error(f"OS error while generating hash for file {path}: {e}")
         return None
     except Exception as e:
-        logger.error("Unexpected error while generating hash for file %s: %s", path, e)
+        logger.error(f"Unexpected error while generating hash for file {path}: {e}")
         return None

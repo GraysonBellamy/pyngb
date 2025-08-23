@@ -105,10 +105,10 @@ class BinaryParser:
                 )
             return value
         except (struct.error, ValueError) as e:
-            logger.debug("Failed to parse value: %s", e)
+            logger.debug(f"Failed to parse value: {e}")
             return None
         except Exception as e:
-            logger.debug("Unexpected error parsing value: %s", e)
+            logger.debug(f"Unexpected error parsing value: {e}")
             return None
 
     def split_tables(self, data: bytes) -> list[bytes]:
@@ -194,7 +194,7 @@ class BinaryParser:
                     memoryview(data)[: self.binary_config.MIN_FLOAT64_BYTES],
                 )
             except Exception as exc:
-                logger.debug("Failed partial parse in handle_corrupted_data: %s", exc)
+                logger.debug(f"Failed partial parse in handle_corrupted_data: {exc}")
 
         return []
 
