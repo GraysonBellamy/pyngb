@@ -10,11 +10,16 @@ from typing import Any, TypedDict
 
 __all__ = [  # noqa: RUF022 - order chosen for logical grouping
     "BinaryMarkers",
+    "BinaryProcessing",
     "DataType",
+    "DataTypeSizes",
     "FileMetadata",
     "PatternConfig",
+    "PatternOffsets",
     "REF_CRUCIBLE_SIG_FRAGMENT",
     "SAMPLE_CRUCIBLE_SIG_FRAGMENT",
+    "StreamMarkers",
+    "ValidationThresholds",
 ]
 
 
@@ -113,8 +118,7 @@ class BinaryMarkers:
     )
 
 
-# Constants for binary parsing
-START_DATA_HEADER_OFFSET = 6  # Bytes to skip after START_DATA marker to reach payload
+# Constants for binary parsing - moved to BinaryProcessing dataclass
 
 
 @dataclass
@@ -221,8 +225,6 @@ REF_CRUCIBLE_SIG_FRAGMENT = (
 
 # Binary structure constants for metadata extraction
 TEMP_PROG_TYPE_PREFIX = b"\x03\x80\x01"
-MFC_SIGNATURE = 0x1048  # MFC range signature
-GAS_CONTEXT_SIGNATURE = 0x1B
 
 # Control parameter signatures
 CONTROL_SIGNATURES = {
@@ -237,13 +239,88 @@ GAS_TYPES = ["NITROGEN", "OXYGEN", "ARGON", "HELIUM", "CARBON_DIOXIDE"]
 # MFC field names
 MFC_FIELD_NAMES = ["Purge 1", "Purge 2", "Protective"]
 
-# Search window sizes for structural extraction
-CRUCIBLE_MASS_SEARCH_WINDOW = 256
-CRUCIBLE_MASS_PREVIEW_SIZE = 64
-CONTROL_PARAM_SEARCH_OFFSET = 200
-
 # Application and license extraction constants
 APP_LICENSE_CATEGORY = b"\x00\x03"
 APP_LICENSE_FIELD = b"\x18\xfc"
-APP_LICENSE_SEARCH_RANGE = 120
 STRING_DATA_TYPE = b"\x1f"
+
+
+@dataclass(frozen=True)
+class StreamMarkers:
+    """Binary markers specific to NGB stream processing."""
+
+    # Stream 2 markers
+    STREAM2_HEADER: bytes = b"\x17"
+    STREAM2_DATA: bytes = b"\x75"
+
+    # Stream 3 markers
+    STREAM3_HEADER: bytes = b"\x80\x22\x2b"
+    STREAM3_DATA: bytes = b"\x75"  # Same as stream 2
+
+    # Position markers
+    STREAM2_HEADER_POS: int = 1  # table[1:2]
+    STREAM3_HEADER_POS: int = 22  # table[22:25]
+    DATA_MARKER_POS: int = 1  # table[1:2]
+
+
+@dataclass(frozen=True)
+class BinaryProcessing:
+    """Constants for binary data processing."""
+
+    TABLE_SPLIT_OFFSET: int = -2
+    MIN_FLOAT64_BYTES: int = 8
+    START_DATA_HEADER_OFFSET: int = 6
+
+    # Memory management
+    DEFAULT_MEMORY_LIMIT_MB: int = 500
+    LARGE_FILE_THRESHOLD_MB: int = 100
+
+
+@dataclass(frozen=True)
+class DataTypeSizes:
+    """Expected byte sizes for different data types."""
+
+    INT32_BYTES: int = 4
+    FLOAT32_BYTES: int = 4
+    FLOAT64_BYTES: int = 8
+    STRING_MIN_BYTES: int = 4  # Length prefix minimum
+
+
+@dataclass(frozen=True)
+class PatternOffsets:
+    """Byte offsets and window sizes for pattern matching."""
+
+    # Crucible mass extraction
+    CRUCIBLE_MASS_SEARCH_WINDOW: int = 256
+    CRUCIBLE_MASS_PREVIEW_SIZE: int = 64
+
+    # Control parameters
+    CONTROL_PARAM_SEARCH_OFFSET: int = 200
+
+    # Application license
+    APP_LICENSE_SEARCH_RANGE: int = 120
+
+    # MFC signature values
+    MFC_SIGNATURE: int = 0x1048
+    GAS_CONTEXT_SIGNATURE: int = 0x1B
+
+
+@dataclass(frozen=True)
+class ValidationThresholds:
+    """Thresholds for data validation."""
+
+    # Temperature ranges (Celsius)
+    MIN_TEMPERATURE: float = -200.0
+    MAX_TEMPERATURE: float = 2000.0
+
+    # Mass ranges (mg)
+    MIN_MASS: float = 0.0
+    MAX_MASS: float = 10000.0
+
+    # Flow rates (ml/min)
+    MIN_FLOW_RATE: float = 0.1
+    MAX_FLOW_RATE: float = 1000.0
+
+    # Heating rates (K/min)
+    MIN_HEATING_RATE: float = 0.0
+    MAX_HEATING_RATE: float = 100.0

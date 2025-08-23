@@ -91,7 +91,6 @@ markers = [
     "integration: marks tests as integration tests",
 ]
 filterwarnings = [
-    "ignore::DeprecationWarning:pyngb.cli",
     "ignore::RuntimeWarning:numpy",
     "ignore::UserWarning",
 ]

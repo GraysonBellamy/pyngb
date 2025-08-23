@@ -317,7 +317,7 @@ class TestGetHash:
 
         assert result is None
         mock_logger.warning.assert_called_once_with(
-            "File not found while generating hash: %s", "nonexistent_file.txt"
+            "File not found while generating hash: nonexistent_file.txt"
         )
 
     @patch("pyngb.util.logger")
@@ -332,7 +332,7 @@ class TestGetHash:
 
         assert result is None
         mock_logger.error.assert_called_once_with(
-            "Permission denied while generating hash for file: %s", "protected_file.txt"
+            "Permission denied while generating hash for file: protected_file.txt"
         )
 
     @patch("pyngb.util.logger")
@@ -350,13 +350,11 @@ class TestGetHash:
             # Check that error was logged with the exception object
             mock_logger.error.assert_called_once()
             call_args = mock_logger.error.call_args
-            assert (
-                call_args[0][0]
-                == "Unexpected error while generating hash for file %s: %s"
-            )
-            assert call_args[0][1] == temp_file.name
-            assert isinstance(call_args[0][2], Exception)
-            assert str(call_args[0][2]) == "Hash error"
+            # With f-strings, there's only one argument now (the formatted string)
+            logged_message = call_args[0][0]
+            assert "Unexpected error while generating hash for file" in logged_message
+            assert temp_file.name in logged_message
+            assert "Hash error" in logged_message
 
     @patch("pyngb.util.logger")
     @patch("pathlib.Path.stat")
@@ -376,10 +374,11 @@ class TestGetHash:
             # Check that error was logged with the OS error message
             mock_logger.error.assert_called_once()
             call_args = mock_logger.error.call_args
-            assert call_args[0][0] == "OS error while generating hash for file %s: %s"
-            assert call_args[0][1] == "test_file.txt"
-            assert isinstance(call_args[0][2], IOError)
-            assert str(call_args[0][2]) == "I/O error"
+            # With f-strings, there's only one argument now (the formatted string)
+            logged_message = call_args[0][0]
+            assert "OS error while generating hash for file" in logged_message
+            assert "test_file.txt" in logged_message
+            assert "I/O error" in logged_message
 
     def test_get_hash_deterministic(self):
         """Test that get_hash produces deterministic results."""

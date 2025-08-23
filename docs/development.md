@@ -370,8 +370,8 @@ All contributions go through code review:
 
 #### Extractors (`extractors/`)
 - **Purpose**: Specialized data extraction
-- **Key Files**: `metadata.py`, `streams.py`
-- **Responsibilities**: Extract metadata and measurement data
+- **Key Files**: `manager.py`, `base.py`, `basic_fields.py`, `mass.py`, `temperature.py`, `specialized.py`, `streams.py`
+- **Responsibilities**: Extract metadata and measurement data using modular, single-responsibility extractors
 
 #### Batch Processing (`batch.py`)
 - **Purpose**: Handle multiple files efficiently

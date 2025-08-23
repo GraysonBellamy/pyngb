@@ -2,7 +2,10 @@
 Data extraction components for NGB parsing.
 """
 
-from .metadata import MetadataExtractor
+from .manager import MetadataExtractor
 from .streams import DataStreamProcessor
 
-__all__ = ["DataStreamProcessor", "MetadataExtractor"]
+__all__ = [
+    "DataStreamProcessor",
+    "MetadataExtractor",
+]

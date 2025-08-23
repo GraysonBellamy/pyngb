@@ -278,19 +278,18 @@ def main() -> int:
     # Validate input file
     input_path = Path(args.input)
     if not input_path.exists():
-        logger.error("Input file does not exist: %s", args.input)
+        logger.error(f"Input file does not exist: {args.input}")
         return 1
 
     if not input_path.is_file():
-        logger.error("Input path is not a file: %s", args.input)
+        logger.error(f"Input path is not a file: {args.input}")
         return 1
 
     # Check if it's a valid NGB file extension
     valid_extensions = {".ngb-ss3", ".ngb-bs3"}
     if input_path.suffix.lower() not in valid_extensions:
         logger.warning(
-            "File extension '%s' may not be a standard NGB format. Proceeding anyway.",
-            input_path.suffix,
+            f"File extension '{input_path.suffix}' may not be a standard NGB format. Proceeding anyway."
         )
 
     try:
@@ -298,22 +297,20 @@ def main() -> int:
         if args.baseline:
             baseline_path = Path(args.baseline)
             if not baseline_path.exists():
-                logger.error("Baseline file does not exist: %s", args.baseline)
+                logger.error(f"Baseline file does not exist: {args.baseline}")
                 return 1
             if not baseline_path.is_file():
-                logger.error("Baseline path is not a file: %s", args.baseline)
+                logger.error(f"Baseline path is not a file: {args.baseline}")
                 return 1
             if baseline_path.suffix.lower() not in valid_extensions:
                 logger.warning(
-                    "Baseline file extension '%s' may not be a standard NGB format. Proceeding anyway.",
-                    baseline_path.suffix,
+                    f"Baseline file extension '{baseline_path.suffix}' may not be a standard NGB format. Proceeding anyway."
                 )
 
         # Load data with optional baseline subtraction
         if args.baseline:
             logger.info(
-                "Loading data with baseline subtraction (dynamic_axis=%s)",
-                args.dynamic_axis,
+                f"Loading data with baseline subtraction (dynamic_axis={args.dynamic_axis})"
             )
             data = read_ngb(
                 args.input, baseline_file=args.baseline, dynamic_axis=args.dynamic_axis
@@ -331,7 +328,7 @@ def main() -> int:
             test_file.touch()
             test_file.unlink()
         except (PermissionError, OSError) as e:
-            logger.error("Cannot write to output directory %s: %s", args.output, e)
+            logger.error(f"Cannot write to output directory {args.output}: {e}")
             return 1
 
         base_name = Path(args.input).stem
@@ -352,27 +349,25 @@ def main() -> int:
 
         if args.baseline:
             logger.info(
-                "Successfully parsed %s with baseline subtraction from %s",
-                args.input,
-                args.baseline,
+                f"Successfully parsed {args.input} with baseline subtraction from {args.baseline}"
             )
         else:
-            logger.info("Successfully parsed %s", args.input)
+            logger.info(f"Successfully parsed {args.input}")
         return 0
     except FileNotFoundError:
-        logger.error("Input file not found: %s", args.input)
+        logger.error(f"Input file not found: {args.input}")
         return 1
     except PermissionError:
         logger.error(
-            "Permission denied accessing file or output directory: %s", args.input
+            f"Permission denied accessing file or output directory: {args.input}"
         )
         return 1
     except OSError as e:
-        logger.error("OS error while processing file %s: %s", args.input, e)
+        logger.error(f"OS error while processing file {args.input}: {e}")
         return 1
     except ImportError as e:
-        logger.error("Required dependency not available: %s", e)
+        logger.error(f"Required dependency not available: {e}")
         return 1
     except Exception as e:
-        logger.error("Unexpected error while parsing file %s: %s", args.input, e)
+        logger.error(f"Unexpected error while parsing file {args.input}: {e}")
         return 1

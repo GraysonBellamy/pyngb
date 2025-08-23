@@ -156,13 +156,13 @@ class NGBParser:
                         )
 
         except zipfile.BadZipFile as e:
-            logger.error("Invalid ZIP archive: %s", e)
+            logger.error(f"Invalid ZIP archive: {e}")
             raise
         except NGBStreamNotFoundError:
             # Re-raise our custom exceptions as-is
             raise
         except Exception as e:
-            logger.error("Failed to parse NGB file: %s", e)
+            logger.error(f"Failed to parse NGB file: {e}")
             raise
 
         # Convert to PyArrow at API boundary for cross-language compatibility
