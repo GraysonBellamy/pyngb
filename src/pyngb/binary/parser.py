@@ -65,6 +65,81 @@ class BinaryParser:
         return pat
 
     @staticmethod
+    def _parse_string_enhanced(value: bytes) -> str | None:
+        """Enhanced string parsing supporting multiple NETZSCH NGB string formats.
+
+        Automatically detects and handles three formats found in NGB files:
+        1. Standard: 4-byte length prefix + UTF-8 data
+        2. Standard: 4-byte length prefix + UTF-16LE data (fallback)
+        3. NETZSCH proprietary: fffeff + char_count + UTF-16LE data
+
+        The parser tries formats in order of discovery frequency, with robust
+        error handling and Unicode support including special characters.
+
+        Args:
+            value: Binary string data from NGB field payload
+
+        Returns:
+            Decoded string with null bytes stripped, or None if all parsing attempts fail
+
+        Note:
+            This method was enhanced through reverse engineering analysis to support
+            the proprietary fffeff format discovered in NETZSCH instrument data.
+        """
+        if len(value) < 4:
+            return None
+
+        try:
+            # Try fffeff format first (discovered through reverse engineering)
+            if value.startswith(b"\xff\xfe\xff") and len(value) >= 4:
+                char_count = value[3]
+                expected_bytes = 4 + (
+                    char_count * 2
+                )  # 4 header + char_count UTF-16LE chars
+                if len(value) >= expected_bytes:
+                    string_bytes = value[4:expected_bytes]
+                    try:
+                        decoded = string_bytes.decode(
+                            "utf-16le", errors="ignore"
+                        ).strip("\x00")
+                        if decoded:  # Only return if we got meaningful text
+                            return decoded
+                    except UnicodeDecodeError:
+                        pass
+
+            # Try standard format (4-byte length prefix)
+            length = struct.unpack("<I", value[:4])[0]
+            if length <= len(value) - 4 and length > 0:
+                string_bytes = value[4 : 4 + length]
+
+                # Try UTF-8 first (as documented)
+                try:
+                    decoded = (
+                        string_bytes.decode("utf-8", errors="ignore")
+                        .strip()
+                        .replace("\x00", "")
+                    )
+                    if decoded:
+                        return decoded
+                except UnicodeDecodeError:
+                    pass
+
+                # Try UTF-16LE fallback
+                try:
+                    decoded = string_bytes.decode("utf-16le", errors="ignore").strip(
+                        "\x00"
+                    )
+                    if decoded:
+                        return decoded
+                except UnicodeDecodeError:
+                    pass
+
+        except (struct.error, IndexError):
+            pass
+
+        return None
+
+    @staticmethod
     def parse_value(data_type: bytes, value: bytes) -> Any:
         """Parse binary value based on data type.
 
@@ -92,17 +167,7 @@ class BinaryParser:
                     raise ValueError(f"FLOAT64 requires 8 bytes, got {len(value)}")
                 return struct.unpack("<d", value)[0]
             if data_type == DataType.STRING.value:
-                if len(value) < 4:
-                    raise ValueError(
-                        f"STRING requires at least 4 bytes for length prefix, got {len(value)}"
-                    )
-                # Skip 4-byte length; strip nulls.
-                return (
-                    value[4:]
-                    .decode("utf-8", errors="ignore")
-                    .strip()
-                    .replace("\x00", "")
-                )
+                return BinaryParser._parse_string_enhanced(value)
             return value
         except (struct.error, ValueError) as e:
             logger.debug(f"Failed to parse value: {e}")
