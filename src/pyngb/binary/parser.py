@@ -9,7 +9,7 @@ import re
 import struct
 from typing import Any
 
-from ..constants import START_DATA_HEADER_OFFSET, BinaryMarkers, DataType
+from ..constants import BinaryMarkers, BinaryProcessing, DataType
 from .handlers import DataTypeRegistry
 
 __all__ = ["BinaryParser"]
@@ -45,27 +45,13 @@ class BinaryParser:
         - Leverages NumPy frombuffer for fast array parsing
     """
 
-    # Offsets and constants
-    # NOTE: NGB stream tables are separated by a known byte sequence. Historical
-    # logic used a "-2" adjustment before each separator to align table
-    # boundaries with the actual end of the preceding table. Capture this as a
-    # named constant to avoid magic numbers and clarify intent.
-    TABLE_SPLIT_OFFSET: int = -2
-
-    # Minimum byte length to attempt partial FLOAT64 recovery when handling
-    # corrupted data (8 bytes is the size of one IEEE-754 float64 value).
-    MIN_FLOAT64_BYTES: int = 8
-
     def __init__(self, markers: BinaryMarkers | None = None):
         self.markers = markers or BinaryMarkers()
+        self.binary_config = BinaryProcessing()
         self._compiled_patterns: dict[str, re.Pattern[bytes]] = {}
         self._data_type_registry = DataTypeRegistry()
 
-        # Maintain a precompiled table separator regex for compatibility with
-        # existing tests that assert this cache is populated at init time.
-        # Even though split_tables now uses a faster bytes.find approach, we
-        # keep this compiled pattern to preserve expected state and allow
-        # potential future regex uses.
+        # Precompile commonly used patterns for performance
         self._compiled_patterns["table_sep"] = re.compile(
             self.markers.TABLE_SEPARATOR, re.DOTALL
         )
@@ -165,7 +151,7 @@ class BinaryParser:
             idx = data.find(sep, search_pos)
             if idx == -1:
                 break
-            cut = idx + self.TABLE_SPLIT_OFFSET
+            cut = idx + self.binary_config.TABLE_SPLIT_OFFSET
             if cut < 0:
                 cut = 0
             indices.append(cut)
@@ -200,11 +186,12 @@ class BinaryParser:
         logger.warning(f"Handling corrupted data in {context}: {len(data)} bytes")
 
         # Try to recover partial data if possible
-        if len(data) >= self.MIN_FLOAT64_BYTES:
+        if len(data) >= self.binary_config.MIN_FLOAT64_BYTES:
             try:
                 # Try to extract what we can
                 return self._data_type_registry.parse_data(
-                    DataType.FLOAT64.value, memoryview(data)[: self.MIN_FLOAT64_BYTES]
+                    DataType.FLOAT64.value,
+                    memoryview(data)[: self.binary_config.MIN_FLOAT64_BYTES],
                 )
             except Exception as exc:
                 logger.debug("Failed partial parse in handle_corrupted_data: %s", exc)
@@ -280,7 +267,7 @@ class BinaryParser:
         # Advance to the first byte after the START_DATA header
         # The payload begins after the START_DATA marker offset to skip
         # marker and header bytes present in the stream format.
-        start_idx += START_DATA_HEADER_OFFSET
+        start_idx += self.binary_config.START_DATA_HEADER_OFFSET
 
         # Find end marker in the remaining data
         end_idx = table.find(self.markers.END_DATA, start_idx)
