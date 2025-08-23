@@ -16,7 +16,7 @@ except ImportError:
     ShapeError = ValueError  # type: ignore[misc,assignment]
 
 from ..binary import BinaryParser
-from ..constants import START_DATA_HEADER_OFFSET, PatternConfig
+from ..constants import BinaryProcessing, PatternConfig, StreamMarkers
 from ..exceptions import NGBDataTypeError
 
 __all__ = ["DataStreamProcessor"]
@@ -31,6 +31,8 @@ class DataStreamProcessor:
     def __init__(self, config: PatternConfig, parser: BinaryParser) -> None:
         self.config = config
         self.parser = parser
+        self.binary_config = BinaryProcessing()
+        self.stream_markers = StreamMarkers()
         self._table_sep_re = self.parser._get_compiled_pattern(
             "table_sep", self.parser.markers.TABLE_SEPARATOR
         )
@@ -61,7 +63,12 @@ class DataStreamProcessor:
         markers = self.parser.markers
 
         for table in stream_table:
-            if table[1:2] == b"\x17":  # header
+            # Check for header marker
+            header_slice = table[
+                self.stream_markers.STREAM2_HEADER_POS : self.stream_markers.STREAM2_HEADER_POS
+                + len(self.stream_markers.STREAM2_HEADER)
+            ]
+            if header_slice == self.stream_markers.STREAM2_HEADER:
                 title = table[0:1].hex()
                 title = col_map.get(title, title)
                 if len(output) > 1:
@@ -73,13 +80,18 @@ class DataStreamProcessor:
                         logger.debug("Shape mismatch when adding column '%s'", title)
                 output = []
 
-            if table[1:2] == b"\x75":  # data
+            # Check for data marker
+            data_slice = table[
+                self.stream_markers.DATA_MARKER_POS : self.stream_markers.DATA_MARKER_POS
+                + len(self.stream_markers.STREAM2_DATA)
+            ]
+            if data_slice == self.stream_markers.STREAM2_DATA:
                 start_idx = table.find(markers.START_DATA)
                 if start_idx == -1:
                     logger.debug("START_DATA marker not found in table - skipping")
                     continue
 
-                payload_start = start_idx + START_DATA_HEADER_OFFSET
+                payload_start = start_idx + self.binary_config.START_DATA_HEADER_OFFSET
                 data = table[payload_start:]
                 end_data = data.find(markers.END_DATA)
                 if end_data == -1:
@@ -122,18 +134,28 @@ class DataStreamProcessor:
         markers = self.parser.markers
 
         for table in stream_table:
-            if table[22:25] == b"\x80\x22\x2b":  # header
+            # Check for Stream 3 header marker
+            header_slice = table[
+                self.stream_markers.STREAM3_HEADER_POS : self.stream_markers.STREAM3_HEADER_POS
+                + len(self.stream_markers.STREAM3_HEADER)
+            ]
+            if header_slice == self.stream_markers.STREAM3_HEADER:
                 title = table[0:1].hex()
                 title = col_map.get(title, title)
                 output = []
 
-            if table[1:2] == b"\x75":  # data
+            # Check for data marker (same as Stream 2)
+            data_slice = table[
+                self.stream_markers.DATA_MARKER_POS : self.stream_markers.DATA_MARKER_POS
+                + len(self.stream_markers.STREAM3_DATA)
+            ]
+            if data_slice == self.stream_markers.STREAM3_DATA:
                 start_idx = table.find(markers.START_DATA)
                 if start_idx == -1:
                     logger.debug("START_DATA marker not found in table - skipping")
                     continue
 
-                payload_start = start_idx + START_DATA_HEADER_OFFSET
+                payload_start = start_idx + self.binary_config.START_DATA_HEADER_OFFSET
                 data = table[payload_start:]
                 end_data = data.find(markers.END_DATA)
                 if end_data == -1:
