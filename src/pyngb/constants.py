@@ -86,7 +86,7 @@ class DataType(Enum):
     INT32 = b"\x03"  # 32-bit signed integer (little-endian)
     FLOAT32 = b"\x04"  # 32-bit IEEE 754 float (little-endian)
     FLOAT64 = b"\x05"  # 64-bit IEEE 754 double (little-endian)
-    STRING = b"\x1f"  # UTF-8 string with 4-byte length prefix
+    STRING = b"\x1f"  # Enhanced string parsing: supports both standard (4-byte length + UTF-8) and NETZSCH (fffeff + char_count + UTF-16LE) formats
 
 
 @dataclass(frozen=True)

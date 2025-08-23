@@ -2,6 +2,7 @@
 Unit tests for pyngb binary parser.
 """
 
+import struct
 from unittest.mock import patch
 
 from pyngb.binary.parser import BinaryParser
@@ -60,6 +61,67 @@ class TestBinaryParser:
         value = b"\x07\x00\x00\x00Hel\x00lo\x00\x00"
         result = BinaryParser.parse_value(DataType.STRING.value, value)
         assert result == "Hello"  # Nulls should be stripped
+
+    def test_parse_value_string_fffeff_format(self):
+        """Test parsing STRING values with NETZSCH fffeff format."""
+        # NETZSCH format: fffeff + char_count + UTF-16LE data
+        # "Hello" = 5 characters in UTF-16LE
+        char_count = 5
+        utf16le_data = "Hello".encode("utf-16le")
+        value = b"\xff\xfe\xff" + bytes([char_count]) + utf16le_data
+
+        result = BinaryParser.parse_value(DataType.STRING.value, value)
+        assert result == "Hello"
+
+    def test_parse_value_string_fffeff_with_special_chars(self):
+        """Test fffeff format with special characters."""
+        test_string = "Müller"
+        char_count = len(test_string)
+        utf16le_data = test_string.encode("utf-16le")
+        value = b"\xff\xfe\xff" + bytes([char_count]) + utf16le_data
+
+        result = BinaryParser.parse_value(DataType.STRING.value, value)
+        assert result == test_string
+
+    def test_parse_value_string_fffeff_with_nulls(self):
+        """Test fffeff format with null padding."""
+        test_string = "Test"
+        char_count = len(test_string)
+        utf16le_data = test_string.encode("utf-16le") + b"\x00\x00"  # Add null padding
+        value = b"\xff\xfe\xff" + bytes([char_count]) + utf16le_data
+
+        result = BinaryParser.parse_value(DataType.STRING.value, value)
+        assert result == test_string
+
+    def test_parse_value_string_fffeff_invalid(self):
+        """Test fffeff format with invalid data."""
+        # Too short for claimed character count
+        value = b"\xff\xfe\xff\x10" + b"short"  # Claims 16 chars but only has 5 bytes
+
+        result = BinaryParser.parse_value(DataType.STRING.value, value)
+        # Should fall back to standard parsing or return None
+        assert result is None or isinstance(result, str)
+
+    def test_parse_value_string_standard_format(self):
+        """Test standard format still works after enhancement."""
+        # Standard 4-byte length prefix + UTF-8
+        test_string = "Standard"
+        length = len(test_string.encode("utf-8"))
+        value = struct.pack("<I", length) + test_string.encode("utf-8")
+
+        result = BinaryParser.parse_value(DataType.STRING.value, value)
+        assert result == test_string
+
+    def test_parse_value_string_utf16le_fallback(self):
+        """Test UTF-16LE fallback in standard format."""
+        # Standard format with UTF-16LE data
+        test_string = "UTF16Test"
+        utf16le_data = test_string.encode("utf-16le")
+        length = len(utf16le_data)
+        value = struct.pack("<I", length) + utf16le_data
+
+        result = BinaryParser.parse_value(DataType.STRING.value, value)
+        assert result == test_string
 
     def test_parse_value_unknown_type(self):
         """Test parsing unknown data type returns the raw value."""
