@@ -244,7 +244,6 @@ APP_LICENSE_CATEGORY = b"\x00\x03"
 APP_LICENSE_FIELD = b"\x18\xfc"
 STRING_DATA_TYPE = b"\x1f"
 
-
 @dataclass(frozen=True)
 class StreamMarkers:
     """Binary markers specific to NGB stream processing."""
