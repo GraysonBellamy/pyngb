@@ -306,7 +306,8 @@ class TestAdvancedUseCases:
     def test_parser_component_integration(self):
         """Test direct interaction with parser components."""
         from pyngb.binary import BinaryParser
-        from pyngb.extractors import DataStreamProcessor, MetadataExtractor
+        from pyngb.extractors import DataStreamProcessor
+        from pyngb.extractors.manager import MetadataExtractor
 
         config = PatternConfig()
 

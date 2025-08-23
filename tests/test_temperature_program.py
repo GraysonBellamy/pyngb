@@ -18,7 +18,7 @@ from pyngb.batch import BatchProcessor
 from pyngb.binary.parser import BinaryParser
 from pyngb.constants import PatternConfig
 from pyngb.core.parser import NGBParser
-from pyngb.extractors import MetadataExtractor
+from pyngb.extractors.manager import MetadataExtractor
 
 logger = logging.getLogger(__name__)
 

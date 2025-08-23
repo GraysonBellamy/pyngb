@@ -348,9 +348,31 @@ except FileNotFoundError:
 
 ### Metadata Extraction Module
 
-::: pyngb.extractors.metadata.MetadataExtractor
+::: pyngb.extractors.manager.MetadataExtractor
     options:
       heading_level: 3
+      show_source: false
+
+#### Specialized Extractors
+
+::: pyngb.extractors.base.BaseMetadataExtractor
+    options:
+      heading_level: 4
+      show_source: false
+
+::: pyngb.extractors.basic_fields.BasicFieldExtractor
+    options:
+      heading_level: 4
+      show_source: false
+
+::: pyngb.extractors.mass.MassExtractor
+    options:
+      heading_level: 4
+      show_source: false
+
+::: pyngb.extractors.temperature.TemperatureProgramExtractor
+    options:
+      heading_level: 4
       show_source: false
 
 ### Stream Processing Module
