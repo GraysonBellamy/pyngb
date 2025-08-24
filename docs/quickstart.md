@@ -188,6 +188,61 @@ if 'dsc_signal' in df.columns:
     plt.show()
 ```
 
+### DTG (Derivative Thermogravimetry) Analysis
+
+```python
+from pyngb import dtg
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Load data and calculate DTG
+table = read_ngb("sample.ngb-ss3")
+df = pl.from_arrow(table)
+
+if 'mass' in df.columns:
+    # Convert to numpy arrays
+    time = df.get_column('time').to_numpy()
+    mass = df.get_column('mass').to_numpy()
+    temperature = df.get_column('sample_temperature').to_numpy()
+
+    # Calculate DTG - dead simple, one line
+    dtg_values = dtg(time, mass)
+
+    # Compare different smoothing levels
+    dtg_strict = dtg(time, mass, smooth="strict")   # Preserve features
+    dtg_medium = dtg(time, mass, smooth="medium")   # Balanced (default)
+    dtg_loose = dtg(time, mass, smooth="loose")     # Remove noise
+
+    # Create DTG comparison plot
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
+
+    # Mass loss plot
+    ax1.plot(temperature, mass, 'b-', linewidth=2, label='Mass')
+    ax1.set_ylabel('Mass (mg)')
+    ax1.set_title('Thermogravimetric Analysis')
+    ax1.grid(True, alpha=0.3)
+    ax1.legend()
+
+    # DTG plot with different smoothing
+    ax2.plot(temperature, dtg_strict, 'g-', alpha=0.7, label='Strict smoothing')
+    ax2.plot(temperature, dtg_medium, 'r-', linewidth=2, label='Medium smoothing')
+    ax2.plot(temperature, dtg_loose, 'b-', alpha=0.7, label='Loose smoothing')
+    ax2.set_xlabel('Temperature (°C)')
+    ax2.set_ylabel('DTG (mg/min)')
+    ax2.set_title('Derivative Thermogravimetry')
+    ax2.grid(True, alpha=0.3)
+    ax2.legend()
+
+    plt.tight_layout()
+    plt.show()
+
+    # Print DTG summary
+    print(f"DTG Analysis Summary:")
+    print(f"Maximum mass loss rate: {np.max(np.abs(dtg_medium)):.3f} mg/min")
+    print(f"Temperature at max rate: {temperature[np.argmax(np.abs(dtg_medium))]:.1f}°C")
+    print(f"Total mass loss: {mass[0] - mass[-1]:.3f} mg ({((mass[0] - mass[-1])/mass[0]*100):.1f}%)")
+```
+
 ### Batch Processing Multiple Files
 
 ```python
@@ -229,37 +284,49 @@ if results:
     print("Summary saved to processing_summary.csv")
 ```
 
-### Data Analysis Workflow
+### Data Analysis Workflow with DTG
 
 ```python
 import polars as pl
-from pyngb import read_ngb
+from pyngb import read_ngb, dtg
+import numpy as np
 
-# Load multiple files and combine
+# Load multiple files and calculate DTG for each
 files = ["sample1.ngb-ss3", "sample2.ngb-ss3", "sample3.ngb-ss3"]
-all_data = []
+analysis_results = []
 
 for file in files:
     table = read_ngb(file)
     df = pl.from_arrow(table)
-    df = df.with_columns(pl.lit(file).alias("source_file"))
-    all_data.append(df)
 
-# Combine all data
-combined_df = pl.concat(all_data)
+    # Calculate DTG if mass data is available
+    if 'mass' in df.columns:
+        time = df.get_column('time').to_numpy()
+        mass = df.get_column('mass').to_numpy()
+        temperature = df.get_column('sample_temperature').to_numpy()
 
-# Analysis
-print("Combined dataset shape:", combined_df.shape)
+        # One line DTG calculation with smart defaults
+        dtg_values = dtg(time, mass)
 
-# Group by source file and get statistics
-stats = combined_df.group_by("source_file").agg([
-    pl.col("sample_temperature").mean().alias("avg_temp"),
-    pl.col("sample_temperature").max().alias("max_temp"),
-    pl.col("time").max().alias("duration")
-])
+        analysis_results.append({
+            'file': file,
+            'duration': time.max(),
+            'temp_range': f"{temperature.min():.1f}-{temperature.max():.1f}°C",
+            'mass_loss': mass[0] - mass[-1],
+            'mass_loss_percent': ((mass[0] - mass[-1]) / mass[0]) * 100,
+            'max_dtg_rate': np.max(np.abs(dtg_values)),
+            'temp_at_max_rate': temperature[np.argmax(np.abs(dtg_values))]
+        })
 
-print("Statistics by file:")
-print(stats)
+# Create summary DataFrame
+if analysis_results:
+    summary_df = pl.DataFrame(analysis_results)
+    print("DTG Analysis Summary:")
+    print(summary_df)
+
+    # Save results
+    summary_df.write_csv("dtg_analysis_summary.csv")
+    print("Results saved to dtg_analysis_summary.csv")
 ```
 
 ## Tips and Best Practices
@@ -277,6 +344,8 @@ print(stats)
     - Be aware of memory usage with very large datasets
 
 !!! info "Next Steps"
-    - Check the [API Reference](api.md) for detailed function documentation
+    - Check the [DTG Analysis Guide](user-guide/dtg-analysis.md) for comprehensive DTG documentation
+    - See the [API Reference](api.md) for detailed function documentation
+    - Browse [Data Analysis](user-guide/data-analysis.md) for advanced multi-sample workflows
     - See [Development](development.md) for contributing guidelines
     - Browse the [troubleshooting guide](troubleshooting.md) for common issues
