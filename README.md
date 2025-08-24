@@ -345,8 +345,7 @@ Common data columns extracted from NGB files:
 
 | Column | Description | Units |
 |--------|-------------|--------|
-| `dtg` | Derivative thermogravimetry | mg/min |
-| `dtg_temperature` | Temperature-based derivative | mg/°C |
+| `dtg` | Derivative thermogravimetry (time-based) | mg/min |
 
 ### Metadata Fields
 
