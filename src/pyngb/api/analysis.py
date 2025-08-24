@@ -76,7 +76,8 @@ def add_dtg(
 
     # Convert to DataFrame for easier manipulation
     df = pl.from_arrow(table)
-    assert isinstance(df, pl.DataFrame)  # Type narrowing for mypy
+    if not isinstance(df, pl.DataFrame):
+        raise TypeError("Failed to convert PyArrow table to Polars DataFrame")
 
     # Get data arrays
     time = df.get_column("time").to_numpy()
@@ -147,7 +148,8 @@ def calculate_table_dtg(
 
     # Convert to DataFrame and extract arrays
     df = pl.from_arrow(table)
-    assert isinstance(df, pl.DataFrame)  # Type narrowing for mypy
+    if not isinstance(df, pl.DataFrame):
+        raise TypeError("Failed to convert PyArrow table to Polars DataFrame")
     time = df.get_column("time").to_numpy()
     mass = df.get_column("mass").to_numpy()
 
