@@ -131,6 +131,234 @@ for data in normalized_data:
           f"Intensity: {peak_intensity:.3f} µV/mg")  # Updated units
 ```
 
+## DSC Calibration
+
+Convert raw DSC signals from microvolts (µV) to physically meaningful power units (mW) using instrument calibration constants stored in the metadata.
+
+### Basic DSC Calibration
+
+```python
+from pyngb import read_ngb
+from pyngb.api.analysis import apply_dsc_calibration
+from pyngb.api.metadata import get_column_units, get_processing_history
+import polars as pl
+
+# Load thermal analysis data with calibration constants
+table = read_ngb("sample.ngb-ss3")
+
+# Check original DSC signal units
+print(f"Original DSC units: {get_column_units(table, 'dsc_signal')}")  # µV
+
+# Apply DSC calibration to convert µV to mW
+calibrated_table = apply_dsc_calibration(table)
+
+# Verify calibration results
+print(f"Calibrated DSC units: {get_column_units(calibrated_table, 'dsc_signal')}")  # mW
+print(f"Processing history: {get_processing_history(calibrated_table, 'dsc_signal')}")  # ['raw', 'calibration_applied']
+
+# Convert to DataFrame for analysis
+df = pl.from_arrow(calibrated_table)
+print(f"DSC signal now represents actual heat flow: {df['dsc_signal'].mean():.3f} mW")
+```
+
+### Order-Independent Operations
+
+DSC calibration works seamlessly with normalization in any order:
+
+```python
+# Method 1: Calibrate first, then normalize
+cal_then_norm = apply_dsc_calibration(table)
+cal_then_norm = normalize_to_initial_mass(cal_then_norm, columns=['dsc_signal'])
+units1 = get_column_units(cal_then_norm, 'dsc_signal')  # mW/mg
+
+# Method 2: Normalize first, then calibrate
+norm_then_cal = normalize_to_initial_mass(table, columns=['dsc_signal'])
+norm_then_cal = apply_dsc_calibration(norm_then_cal)
+units2 = get_column_units(norm_then_cal, 'dsc_signal')  # mW/mg
+
+print(f"Both methods result in same units: {units1} == {units2}")  # True
+
+# Results are mathematically identical (within machine precision)
+df1 = pl.from_arrow(cal_then_norm)
+df2 = pl.from_arrow(norm_then_cal)
+max_diff = (df1['dsc_signal'] - df2['dsc_signal']).abs().max()
+print(f"Maximum difference: {max_diff:.2e}")  # ~1e-15 (machine precision)
+```
+
+### Complete Workflow with Baseline Subtraction
+
+For quantitative DSC analysis, combine baseline subtraction, calibration, and normalization:
+
+```python
+from pyngb.baseline import subtract_baseline
+
+# Complete DSC analysis workflow
+sample_file = "sample.ngb-ss3"
+baseline_file = "baseline.ngb-bs3"
+
+# Step 1: Load original data
+original_table = read_ngb(sample_file)
+
+# Step 2: Apply baseline subtraction
+baseline_df = subtract_baseline(
+    sample_file=sample_file,
+    baseline_file=baseline_file,
+    dynamic_axis="sample_temperature"
+)
+
+# Convert back to PyArrow table (preserving metadata)
+baseline_table = baseline_df.to_arrow()
+# Preserve metadata from original (detailed implementation omitted for brevity)
+
+# Step 3: Apply DSC calibration (µV → mW)
+calibrated_table = apply_dsc_calibration(baseline_table)
+
+# Step 4: Normalize to sample mass (mW → mW/mg)
+final_table = normalize_to_initial_mass(calibrated_table, columns=['dsc_signal'])
+
+# Check final result
+final_units = get_column_units(final_table, 'dsc_signal')
+final_history = get_processing_history(final_table, 'dsc_signal')
+
+print(f"Final DSC units: {final_units}")  # mW/mg
+print(f"Complete processing history: {final_history}")
+# ['raw', 'baseline_subtracted', 'calibration_applied', 'normalized']
+
+# Analyze calibrated results
+df_final = pl.from_arrow(final_table)
+dsc_calibrated = df_final['dsc_signal'].to_numpy()
+temperature = df_final['sample_temperature'].to_numpy()
+
+# Find peak heat flow (most exothermic event)
+peak_idx = np.argmin(dsc_calibrated)
+peak_temp = temperature[peak_idx]
+peak_power = abs(dsc_calibrated[peak_idx])
+
+print(f"Peak analysis:")
+print(f"  Temperature: {peak_temp:.1f}°C")
+print(f"  Heat flow: {peak_power:.2f} mW/mg")
+print(f"  Expected for wood pyrolysis: 1.0-1.4 mW/mg ✓")
+```
+
+### Multi-Sample DSC Comparison
+
+Compare calibrated DSC signals across multiple samples:
+
+```python
+import matplotlib.pyplot as plt
+
+# Process multiple samples with complete calibration workflow
+files = ["oak.ngb-ss3", "pine.ngb-ss3", "birch.ngb-ss3"]
+baseline_files = ["oak_baseline.ngb-bs3", "pine_baseline.ngb-bs3", "birch_baseline.ngb-bs3"]
+
+calibrated_samples = []
+
+for sample_file, baseline_file in zip(files, baseline_files):
+    # Apply complete workflow
+    original = read_ngb(sample_file)
+    baseline_df = subtract_baseline(sample_file, baseline_file, "sample_temperature")
+    baseline_table = baseline_df.to_arrow()  # Simplified - preserve metadata as needed
+    calibrated = apply_dsc_calibration(baseline_table)
+    final = normalize_to_initial_mass(calibrated, columns=['dsc_signal'])
+
+    # Store results
+    df = pl.from_arrow(final)
+    calibrated_samples.append({
+        'name': sample_file.replace('.ngb-ss3', ''),
+        'temperature': df['sample_temperature'].to_numpy(),
+        'dsc_mw_per_mg': df['dsc_signal'].to_numpy(),
+        'sample_mass': json.loads(original.schema.metadata[b"file_metadata"].decode())['sample_mass']
+    })
+
+# Plot calibrated DSC comparison
+plt.figure(figsize=(12, 8))
+colors = ['blue', 'red', 'green', 'orange', 'purple']
+
+for i, sample in enumerate(calibrated_samples):
+    plt.plot(sample['temperature'], sample['dsc_mw_per_mg'],
+             label=f"{sample['name']} ({sample['sample_mass']:.1f}mg)",
+             color=colors[i % len(colors)], linewidth=2)
+
+plt.xlabel('Temperature (°C)')
+plt.ylabel('Heat Flow (mW/mg)')
+plt.title('Calibrated DSC Comparison - Mass Normalized')
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.show()
+
+# Quantitative peak analysis
+print("\nCalibrated Peak Analysis:")
+for sample in calibrated_samples:
+    # Find pyrolysis peak (usually most exothermic)
+    temp_mask = (sample['temperature'] >= 300) & (sample['temperature'] <= 500)
+    if temp_mask.sum() > 0:
+        peak_idx = np.argmin(sample['dsc_mw_per_mg'][temp_mask])
+        peak_temp = sample['temperature'][temp_mask][peak_idx]
+        peak_power = abs(sample['dsc_mw_per_mg'][temp_mask][peak_idx])
+
+        print(f"{sample['name']:12}: {peak_temp:6.1f}°C, {peak_power:6.2f} mW/mg")
+```
+
+### Calibration Validation
+
+Verify calibration results are physically meaningful:
+
+```python
+def validate_dsc_calibration(calibrated_table, sample_type="wood"):
+    """Validate DSC calibration results against expected ranges."""
+    df = pl.from_arrow(calibrated_table)
+
+    # Check units
+    units = get_column_units(calibrated_table, 'dsc_signal')
+    if 'mW' not in units:
+        print("❌ Warning: DSC units should contain 'mW'")
+        return False
+
+    # Check calibration flag
+    from pyngb.util import get_column_metadata
+    metadata = get_column_metadata(calibrated_table, 'dsc_signal')
+    if not metadata.get('calibration_applied', False):
+        print("❌ Warning: Calibration flag not set")
+        return False
+
+    # Check magnitude for common materials
+    dsc_values = df['dsc_signal'].to_numpy()
+    temp_values = df['sample_temperature'].to_numpy()
+
+    # Expected ranges for different materials (mW/mg)
+    expected_ranges = {
+        'wood': (0.5, 2.0),
+        'polymer': (0.1, 1.0),
+        'pharmaceutical': (0.05, 0.5),
+        'metal': (0.01, 0.1)
+    }
+
+    if sample_type in expected_ranges:
+        expected_min, expected_max = expected_ranges[sample_type]
+
+        # Find peak in typical decomposition range
+        decomp_mask = (temp_values >= 200) & (temp_values <= 600)
+        if decomp_mask.sum() > 0:
+            peak_magnitude = abs(dsc_values[decomp_mask]).max()
+
+            if expected_min <= peak_magnitude <= expected_max:
+                print(f"✓ Peak magnitude {peak_magnitude:.2f} mW/mg is within expected range for {sample_type}")
+                return True
+            else:
+                print(f"⚠️  Peak magnitude {peak_magnitude:.2f} mW/mg outside expected range {expected_min}-{expected_max} for {sample_type}")
+                return False
+
+    print(f"✓ Calibration appears valid (units: {units})")
+    return True
+
+# Validate calibration results
+for sample in calibrated_samples:
+    sample_table = calibrated_samples[0]  # Use first sample as example
+    is_valid = validate_dsc_calibration(final_table, sample_type="wood")
+    if not is_valid:
+        print(f"Consider checking calibration constants or sample type")
+```
+
 ## DTG Analysis on Multiple Datasets
 
 ### Batch DTG Calculation

@@ -16,6 +16,7 @@ from ..analysis import dtg
 
 __all__ = [
     "add_dtg",
+    "apply_dsc_calibration",
     "calculate_table_dtg",
     "normalize_to_initial_mass",
 ]
@@ -331,5 +332,182 @@ def normalize_to_initial_mass(
         }
 
         new_table = set_column_metadata(new_table, col, updated_metadata, replace=True)
+
+    return new_table
+
+
+def apply_dsc_calibration(
+    table: pa.Table,
+    temperature_column: str = "sample_temperature",
+    dsc_column: str = "dsc_signal",
+) -> pa.Table:
+    """
+    Apply DSC calibration to convert µV to mW using calibration constants from metadata.
+
+    This function applies the DSC calibration formula:
+    y = (P2 + P3*z + P4*z^2 + P5*z^3)*exp(-z^2)
+    where z = (T-P0)/P1
+
+    The calibration factor y represents sensitivity in µV/mW.
+    The calibrated signal is dsc_signal_µV / y to get power in mW.
+
+    The function updates the DSC column in place, changing units from µV to mW
+    and adding "calibration_applied" to the processing history. A "calibration_applied"
+    flag is also added to the column metadata to track calibration status.
+
+    Parameters
+    ----------
+    table : pa.Table
+        PyArrow table containing thermal analysis data with embedded metadata
+        containing calibration constants
+    temperature_column : str, default "sample_temperature"
+        Name of the temperature column to use for calibration (in °C)
+    dsc_column : str, default "dsc_signal"
+        Name of the DSC signal column to calibrate (in µV)
+
+    Returns
+    -------
+    pa.Table
+        Table with calibrated DSC column in mW, updated units, and calibration
+        status added to metadata
+
+    Raises
+    ------
+    ValueError
+        If required columns are missing, calibration constants not found in metadata,
+        or if calibration has already been applied
+    KeyError
+        If required calibration constants (P0-P5) are missing
+
+    Examples
+    --------
+    >>> from pyngb import read_ngb
+    >>> from pyngb.api.analysis import apply_dsc_calibration
+    >>> from pyngb.api.metadata import get_column_units
+    >>>
+    >>> # Load data with metadata
+    >>> table = read_ngb("sample.ngb-ss3")
+    >>> print(f"Before: {get_column_units(table, 'dsc_signal')}")  # "µV"
+    >>>
+    >>> # Apply DSC calibration
+    >>> calibrated_table = apply_dsc_calibration(table)
+    >>> print(f"After: {get_column_units(calibrated_table, 'dsc_signal')}")  # "mW"
+    >>>
+    >>> # Check calibrated values
+    >>> df = calibrated_table.to_pandas()
+    >>> print(f"Calibrated DSC: {df['dsc_signal'].iloc[100]:.6f} mW")
+    """
+    # Check required columns
+    column_names = table.column_names
+    if temperature_column not in column_names:
+        raise ValueError(f"Table must contain '{temperature_column}' column")
+    if dsc_column not in column_names:
+        raise ValueError(f"Table must contain '{dsc_column}' column")
+
+    # Check if calibration has already been applied
+    from ..util import get_column_metadata
+
+    dsc_metadata = get_column_metadata(table, dsc_column)
+    if dsc_metadata and dsc_metadata.get("calibration_applied", False):
+        raise ValueError(
+            f"Calibration has already been applied to column '{dsc_column}'"
+        )
+
+    # Extract metadata from table schema
+    if not table.schema.metadata:
+        raise ValueError(
+            "Table metadata is missing - cannot retrieve calibration constants"
+        )
+
+    metadata_bytes = table.schema.metadata.get(b"file_metadata")
+    if not metadata_bytes:
+        raise ValueError("No file_metadata found in table schema")
+
+    try:
+        metadata = json.loads(metadata_bytes.decode())
+    except (json.JSONDecodeError, UnicodeDecodeError) as e:
+        raise ValueError(f"Failed to parse table metadata: {e}") from e
+
+    # Get calibration constants from metadata
+    calibration_constants = metadata.get("calibration_constants")
+    if calibration_constants is None:
+        raise ValueError("calibration_constants not found in metadata")
+
+    # Check for required calibration parameters P0-P5
+    required_params = ["p0", "p1", "p2", "p3", "p4", "p5"]
+    missing_params = [p for p in required_params if p not in calibration_constants]
+    if missing_params:
+        raise KeyError(f"Missing calibration constants: {missing_params}")
+
+    # Extract calibration constants
+    P0 = calibration_constants["p0"]
+    P1 = calibration_constants["p1"]
+    P2 = calibration_constants["p2"]
+    P3 = calibration_constants["p3"]
+    P4 = calibration_constants["p4"]
+    P5 = calibration_constants["p5"]
+
+    # Convert to DataFrame for easier manipulation
+    df = pl.from_arrow(table)
+    if not isinstance(df, pl.DataFrame):
+        raise TypeError("Failed to convert PyArrow table to Polars DataFrame")
+
+    # Get temperature and DSC signal arrays
+    temperature = df.get_column(temperature_column).to_numpy()
+    dsc_signal = df.get_column(dsc_column).to_numpy()
+
+    # Calculate calibration factor using the formula
+    # z = (T - P0) / P1
+    z = (temperature - P0) / P1
+
+    # y = (P2 + P3*z + P4*z^2 + P5*z^3) * exp(-z^2)
+    y = (P2 + P3 * z + P4 * z**2 + P5 * z**3) * np.exp(-(z**2))
+
+    # Apply calibration: calibrated_signal = dsc_signal_uV / y (converts µV to mW)
+    # where y is sensitivity in µV/mW, so µV ÷ (µV/mW) = mW
+    calibrated_dsc = dsc_signal / y
+
+    # Update DSC column with calibrated values
+    df = df.with_columns(pl.Series(dsc_column, calibrated_dsc))
+
+    # Convert back to PyArrow table while preserving all metadata
+    new_table = df.to_arrow()
+    if table.schema.metadata:
+        new_table = new_table.replace_schema_metadata(table.schema.metadata)
+
+    # Preserve column-level metadata for all existing columns
+    from ..util import get_column_metadata, set_column_metadata
+
+    for col in table.column_names:
+        if col in new_table.column_names:  # Column exists in new table
+            original_metadata = get_column_metadata(table, col)
+            if original_metadata:  # If original column had metadata
+                new_table = set_column_metadata(
+                    new_table, col, original_metadata, replace=True
+                )
+
+    # Update metadata for the calibrated DSC column
+    original_dsc_metadata = get_column_metadata(table, dsc_column) or {}
+
+    # Determine appropriate units based on current state
+    current_units = original_dsc_metadata.get("units", "µV")
+
+    # If already normalized (units contain "/mg"), preserve the normalization
+    new_units = "mW/mg" if "/mg" in current_units else "mW"
+
+    # Update units and add processing steps
+    updated_dsc_metadata = {
+        **original_dsc_metadata,  # Preserve all original metadata
+        "units": new_units,  # Update units appropriately
+        "processing_history": [
+            *original_dsc_metadata.get("processing_history", []),
+            "calibration_applied",
+        ],  # Add processing step
+        "calibration_applied": True,  # Add calibration flag
+    }
+
+    new_table = set_column_metadata(
+        new_table, dsc_column, updated_dsc_metadata, replace=True
+    )
 
     return new_table

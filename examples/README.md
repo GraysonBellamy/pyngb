@@ -6,10 +6,11 @@ This directory contains practical examples demonstrating how to use pyngb for va
 
 ### Basic Usage
 - **[basic_parsing.py](basic_parsing.py)**: Simple file parsing and data extraction
+- **[baseline_subtraction_demo.py](baseline_subtraction_demo.py)**: Baseline correction examples
 
 ### Advanced Features
 - **[batch_processing.py](batch_processing.py)**: Processing multiple files efficiently
-- **[batch_processing_example.py](batch_processing_example.py)**: Validation + batch + dataset
+- **[cli_baseline_examples.sh](cli_baseline_examples.sh)**: Command-line baseline subtraction
 
 ### Integration Examples
 - (Bring your own) Jupyter notebook to try code snippets from docs

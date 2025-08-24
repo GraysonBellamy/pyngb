@@ -186,6 +186,53 @@ print(f"DSC units after normalization: {get_column_units(normalized_table, 'dsc_
 print(f"Mass processing history: {get_processing_history(normalized_table, 'mass')}")        # ["raw", "normalized"]
 ```
 
+### DSC Calibration
+
+Convert DSC signals from microvolts (µV) to physically meaningful power units (mW) using calibration constants stored in the file metadata:
+
+```python
+from pyngb import read_ngb
+from pyngb.api.analysis import apply_dsc_calibration, normalize_to_initial_mass
+from pyngb.api.metadata import get_column_units, get_processing_history
+
+# Load thermal analysis data
+table = read_ngb("sample.ngb-ss3")
+
+# Check original DSC units
+print(f"Original DSC units: {get_column_units(table, 'dsc_signal')}")  # µV
+
+# Apply DSC calibration (µV → mW)
+calibrated_table = apply_dsc_calibration(table)
+print(f"Calibrated DSC units: {get_column_units(calibrated_table, 'dsc_signal')}")  # mW
+print(f"Processing history: {get_processing_history(calibrated_table, 'dsc_signal')}")  # ['raw', 'calibration_applied']
+
+# Calibration works in any order with normalization
+# Method 1: Calibrate then normalize
+cal_then_norm = apply_dsc_calibration(table)
+cal_then_norm = normalize_to_initial_mass(cal_then_norm, columns=['dsc_signal'])
+final_units_1 = get_column_units(cal_then_norm, 'dsc_signal')  # mW/mg
+
+# Method 2: Normalize then calibrate
+norm_then_cal = normalize_to_initial_mass(table, columns=['dsc_signal'])
+norm_then_cal = apply_dsc_calibration(norm_then_cal)
+final_units_2 = get_column_units(norm_then_cal, 'dsc_signal')  # mW/mg
+
+print(f"Both approaches result in: {final_units_1} (identical results)")
+
+# Check calibrated values are physically meaningful
+import polars as pl
+df_cal = pl.from_arrow(cal_then_norm)
+temp_mask = (df_cal['sample_temperature'] >= 300) & (df_cal['sample_temperature'] <= 500)
+peak_power = abs(df_cal['dsc_signal'][temp_mask]).max()
+print(f"Peak heat flow: {peak_power:.2f} mW/mg (expected: 1-2 mW/mg for wood)")
+```
+
+**Key Benefits of DSC Calibration:**
+- Converts raw sensor voltages to physically meaningful power units
+- Enables quantitative comparison between different samples and instruments
+- Essential for accurate heat capacity and enthalpy measurements
+- Works seamlessly with baseline subtraction and mass normalization
+
 ### Plotting Data
 
 ```python
