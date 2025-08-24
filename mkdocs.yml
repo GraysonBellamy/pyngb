@@ -95,6 +95,9 @@ nav:
     - Basic Usage: user-guide/basic-usage.md
     - Batch Processing: user-guide/batch-processing.md
     - Data Analysis: user-guide/data-analysis.md
+    - Column Metadata: user-guide/column-metadata.md
+    - DTG Analysis: user-guide/dtg-analysis.md
+    - Baseline Subtraction: user-guide/baseline-subtraction.md
     - Command Line: user-guide/command-line.md
     - Validation: api/data-validation.md
   - API Reference:

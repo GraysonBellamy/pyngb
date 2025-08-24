@@ -148,6 +148,44 @@ print(df.select(pl.col("sample_temperature", "time", "dsc_signal")).describe())
 print(df.null_count())
 ```
 
+### Column Metadata Tracking
+
+pyngb automatically tracks metadata for all columns including units, processing history, and baseline correction status:
+
+```python
+from pyngb import read_ngb
+from pyngb.api.metadata import get_column_units, get_processing_history, inspect_column_metadata
+
+# Load data - automatic metadata initialization
+table = read_ngb("sample.ngb-ss3")
+
+# Check column units (automatically assigned)
+print(f"Mass units: {get_column_units(table, 'mass')}")        # "mg"
+print(f"DSC units: {get_column_units(table, 'dsc_signal')}")   # "µV"
+print(f"Time units: {get_column_units(table, 'time')}")        # "min"
+
+# Check processing history
+print(f"Mass history: {get_processing_history(table, 'mass')}")  # ["raw"]
+
+# Full metadata inspection
+mass_metadata = inspect_column_metadata(table, 'mass')
+print(f"Complete mass metadata: {mass_metadata}")
+# {'units': 'mg', 'processing_history': ['raw'], 'source': 'measurement', 'baseline_subtracted': False}
+
+# Metadata is preserved through analysis operations
+from pyngb.api.analysis import add_dtg, normalize_to_initial_mass
+
+# Add DTG - preserves existing metadata, adds DTG metadata
+table_with_dtg = add_dtg(table)
+print(f"DTG units: {get_column_units(table_with_dtg, 'dtg')}")  # "mg/min"
+
+# Normalize - updates units and processing history in place
+normalized_table = normalize_to_initial_mass(table_with_dtg)
+print(f"Mass units after normalization: {get_column_units(normalized_table, 'mass')}")      # "mg/mg"
+print(f"DSC units after normalization: {get_column_units(normalized_table, 'dsc_signal')}")  # "µV/mg"
+print(f"Mass processing history: {get_processing_history(normalized_table, 'mass')}")        # ["raw", "normalized"]
+```
+
 ### Plotting Data
 
 ```python

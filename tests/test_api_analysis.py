@@ -299,24 +299,26 @@ class TestNormalizeToInitialMass:
         self.table = self.table.cast(schema)
 
     def test_normalize_default_columns(self):
-        """Test normalization with default columns (mass and dsc_signal)."""
+        """Test normalization with default columns (mass and dsc_signal) in place."""
+        # Store original values for comparison
+        original_df = pl.from_arrow(self.table)
+        original_mass = original_df["mass"].to_numpy()
+        original_dsc = original_df["dsc_signal"].to_numpy()
+        original_time = original_df["time"].to_numpy()
+
         result_table = normalize_to_initial_mass(self.table)
 
-        # Check that normalized columns were added
-        assert (
-            result_table.num_columns == self.table.num_columns + 2
-        )  # +mass_normalized +dsc_signal_normalized
+        # Check that no new columns were added (in-place normalization)
+        assert result_table.num_columns == self.table.num_columns
         assert result_table.num_rows == self.table.num_rows
+        assert result_table.column_names == self.table.column_names
 
         # Convert to dataframes for comparison
-        original_df = pl.from_arrow(self.table)
         result_df = pl.from_arrow(result_table)
 
-        # Check normalization is correct
-        original_mass = original_df["mass"].to_numpy()
-        normalized_mass = result_df["mass_normalized"].to_numpy()
-        original_dsc = original_df["dsc_signal"].to_numpy()
-        normalized_dsc = result_df["dsc_signal_normalized"].to_numpy()
+        # Check normalization is correct (columns updated in place)
+        normalized_mass = result_df["mass"].to_numpy()
+        normalized_dsc = result_df["dsc_signal"].to_numpy()
 
         # Values should be divided by sample_mass (15.75)
         expected_mass = original_mass / 15.75
@@ -325,50 +327,36 @@ class TestNormalizeToInitialMass:
         np.testing.assert_allclose(normalized_mass, expected_mass)
         np.testing.assert_allclose(normalized_dsc, expected_dsc)
 
-        # Original columns should be unchanged
-        np.testing.assert_array_equal(
-            original_df["mass"].to_numpy(), result_df["mass"].to_numpy()
-        )
-        np.testing.assert_array_equal(
-            original_df["dsc_signal"].to_numpy(), result_df["dsc_signal"].to_numpy()
-        )
-        np.testing.assert_array_equal(
-            original_df["time"].to_numpy(), result_df["time"].to_numpy()
-        )
+        # Unchanged columns should remain the same
+        np.testing.assert_array_equal(original_time, result_df["time"].to_numpy())
         np.testing.assert_array_equal(
             original_df["sample_temperature"].to_numpy(),
             result_df["sample_temperature"].to_numpy(),
         )
 
     def test_normalize_specific_columns(self):
-        """Test normalization with specific columns."""
+        """Test normalization with specific columns (in place)."""
+        # Store original values
+        original_df = pl.from_arrow(self.table)
+        original_mass = original_df["mass"].to_numpy()
+        original_dsc = original_df["dsc_signal"].to_numpy()
+
         result_table = normalize_to_initial_mass(self.table, columns=["mass"])
 
-        # Check that only one normalized column was added
-        assert (
-            result_table.num_columns == self.table.num_columns + 1
-        )  # +mass_normalized
+        # Check that no new columns were added (in-place normalization)
+        assert result_table.num_columns == self.table.num_columns
+        assert result_table.column_names == self.table.column_names
 
         # Convert to dataframes for comparison
-        original_df = pl.from_arrow(self.table)
         result_df = pl.from_arrow(result_table)
 
-        # Only mass should be normalized
-        original_mass = original_df["mass"].to_numpy()
-        normalized_mass = result_df["mass_normalized"].to_numpy()
+        # Only mass should be normalized (in place)
+        normalized_mass = result_df["mass"].to_numpy()
         expected_mass = original_mass / 15.75
         np.testing.assert_allclose(normalized_mass, expected_mass)
 
-        # Original mass column should be unchanged
-        np.testing.assert_array_equal(
-            original_df["mass"].to_numpy(), result_df["mass"].to_numpy()
-        )
-
-        # DSC signal should be unchanged and no normalized version created
-        np.testing.assert_array_equal(
-            original_df["dsc_signal"].to_numpy(), result_df["dsc_signal"].to_numpy()
-        )
-        assert "dsc_signal_normalized" not in result_df.columns
+        # DSC signal should be unchanged (not normalized)
+        np.testing.assert_array_equal(original_dsc, result_df["dsc_signal"].to_numpy())
 
     def test_metadata_preservation(self):
         """Test that metadata is preserved after normalization."""
@@ -518,10 +506,10 @@ class TestNormalizeToInitialMass:
         schema = table.schema.with_metadata(schema_metadata)
         table = table.cast(schema)
 
-        # Normalize
+        # Normalize (in place)
         result_table = normalize_to_initial_mass(table, columns=["mass"])
         result_df = pl.from_arrow(result_table)
-        normalized_mass = result_df["mass_normalized"].to_numpy()
+        normalized_mass = result_df["mass"].to_numpy()  # Column updated in place
 
         # Initial mass should be close to initial_offset / sample_mass
         expected_initial = 0.05 / 8.75  # ~0.0057

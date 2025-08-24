@@ -91,10 +91,31 @@ def add_dtg(
     # Add DTG column
     df = df.with_columns(pl.Series(column_name, dtg_values))
 
-    # Convert back to PyArrow table while preserving metadata
+    # Convert back to PyArrow table while preserving all metadata
     new_table = df.to_arrow()
+
+    # Preserve table-level metadata
     if table.schema.metadata:
         new_table = new_table.replace_schema_metadata(table.schema.metadata)
+
+    # Preserve column-level metadata for all existing columns
+    from ..util import set_column_metadata, get_column_metadata
+
+    for col in table.column_names:
+        if col in new_table.column_names:  # Column exists in new table
+            original_metadata = get_column_metadata(table, col)
+            if original_metadata:  # If original column had metadata
+                new_table = set_column_metadata(
+                    new_table, col, original_metadata, replace=True
+                )
+
+    # Set metadata for the new DTG column
+    dtg_metadata = {
+        "units": "mg/min",
+        "processing_history": ["calculated"],
+        "source": "derived",
+    }
+    new_table = set_column_metadata(new_table, column_name, dtg_metadata, replace=True)
 
     return new_table
 
@@ -168,7 +189,8 @@ def normalize_to_initial_mass(
 
     This function normalizes specified columns (typically 'mass' and DSC signals)
     by dividing by the initial sample mass stored in the table's metadata.
-    New columns with '_normalized' suffix are created, preserving the original data.
+    The columns are updated in place, with units changed to show per-mass normalization
+    (e.g., "mg" becomes "mg/mg") and "normalized" added to the processing history.
     The mass column starts at zero (tare weight), so the initial sample mass
     must be retrieved from the extraction metadata.
 
@@ -183,8 +205,8 @@ def normalize_to_initial_mass(
     Returns
     -------
     pa.Table
-        New table with additional normalized columns (suffixed with '_normalized')
-        and preserved metadata
+        Table with specified columns normalized in place, updated units showing
+        per-mass normalization, and "normalized" added to processing history
 
     Raises
     ------
@@ -197,20 +219,23 @@ def normalize_to_initial_mass(
     --------
     >>> from pyngb import read_ngb
     >>> from pyngb.api.analysis import normalize_to_initial_mass
+    >>> from pyngb.api.metadata import get_column_units, get_processing_history
     >>>
     >>> # Load data with metadata
-    >>> metadata, table = read_ngb("sample.ngb-ss3")
+    >>> table = read_ngb("sample.ngb-ss3")
+    >>> print(f"Before: {get_column_units(table, 'mass')}")  # "mg"
     >>>
-    >>> # Normalize mass and DSC to initial sample mass
+    >>> # Normalize mass and DSC to initial sample mass (in place)
     >>> normalized_table = normalize_to_initial_mass(table)
+    >>> print(f"After: {get_column_units(normalized_table, 'mass')}")  # "mg/mg"
+    >>> print(f"History: {get_processing_history(normalized_table, 'mass')}")  # ["raw", "normalized"]
     >>>
     >>> # Normalize only specific columns
     >>> normalized_table = normalize_to_initial_mass(table, columns=['mass'])
     >>>
-    >>> # Check normalized values (original columns preserved)
+    >>> # Check normalized values
     >>> df = normalized_table.to_pandas()
-    >>> print(f"Original mass: {df['mass'].iloc[0]:.3f}")
-    >>> print(f"Normalized mass: {df['mass_normalized'].iloc[0]:.3f}")
+    >>> print(f"Normalized mass: {df['mass'].iloc[0]:.6f}")  # Now in mg/mg units
     """
     # Extract metadata from table schema
     if not table.schema.metadata:
@@ -258,22 +283,53 @@ def normalize_to_initial_mass(
     if not isinstance(df, pl.DataFrame):
         raise TypeError("Failed to convert PyArrow table to Polars DataFrame")
 
-    # Normalize specified columns
+    # Normalize specified columns in place
     normalization_exprs = []
     for col in columns:
         # Check if column is numeric
         if not df[col].dtype.is_numeric():
             raise ValueError(f"Column '{col}' is not numeric and cannot be normalized")
-        normalization_exprs.append(
-            (pl.col(col) / sample_mass).alias(f"{col}_normalized")
-        )
+        # Update the column in place by dividing by sample mass
+        normalization_exprs.append((pl.col(col) / sample_mass).alias(col))
 
-    # Apply normalizations
+    # Apply normalizations (updates existing columns)
     df = df.with_columns(normalization_exprs)
 
     # Convert back to PyArrow table while preserving all metadata
     new_table = df.to_arrow()
     if table.schema.metadata:
         new_table = new_table.replace_schema_metadata(table.schema.metadata)
+
+    # Preserve column-level metadata for all existing columns
+    from ..util import get_column_metadata, set_column_metadata
+
+    for col in table.column_names:
+        if col in new_table.column_names:  # Column exists in new table
+            original_metadata = get_column_metadata(table, col)
+            if original_metadata:  # If original column had metadata
+                new_table = set_column_metadata(
+                    new_table, col, original_metadata, replace=True
+                )
+
+    # Update metadata for normalized columns
+    for col in columns:
+        # Get original column metadata
+        original_metadata = get_column_metadata(table, col) or {}
+
+        # Update units to show per-mass normalization
+        original_units = original_metadata.get("units", "unknown")
+        updated_units = f"{original_units}/mg"
+
+        # Update metadata
+        updated_metadata = {
+            **original_metadata,  # Preserve all original metadata
+            "units": updated_units,  # Update units
+            "processing_history": [
+                *original_metadata.get("processing_history", []),
+                "normalized",
+            ],  # Add processing step
+        }
+
+        new_table = set_column_metadata(new_table, col, updated_metadata, replace=True)
 
     return new_table
