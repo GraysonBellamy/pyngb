@@ -191,42 +191,43 @@ if 'dsc_signal' in df.columns:
 ### DTG (Derivative Thermogravimetry) Analysis
 
 ```python
-from pyngb import dtg
+from pyngb.api.analysis import add_dtg
 import matplotlib.pyplot as plt
 import numpy as np
 
-# Load data and calculate DTG
+# Load data
 table = read_ngb("sample.ngb-ss3")
 df = pl.from_arrow(table)
 
 if 'mass' in df.columns:
-    # Convert to numpy arrays
-    time = df.get_column('time').to_numpy()
-    mass = df.get_column('mass').to_numpy()
-    temperature = df.get_column('sample_temperature').to_numpy()
+    # Method 1: Add DTG column directly to table (recommended)
+    table_with_dtg = add_dtg(table, method="savgol", smooth="medium")
+    df_with_dtg = pl.from_arrow(table_with_dtg)
 
-    # Calculate DTG - dead simple, one line
-    dtg_values = dtg(time, mass)
+    print(f"Added DTG column: {table_with_dtg.column_names[-1]}")
 
-    # Compare different smoothing levels
-    dtg_strict = dtg(time, mass, smooth="strict")   # Preserve features
-    dtg_medium = dtg(time, mass, smooth="medium")   # Balanced (default)
-    dtg_loose = dtg(time, mass, smooth="loose")     # Remove noise
+    # Method 2: Compare different smoothing levels
+    table_strict = add_dtg(table, smooth="strict", column_name="dtg_strict")
+    table_loose = add_dtg(table, smooth="loose", column_name="dtg_loose")
+
+    # Combine for comparison
+    df_strict = pl.from_arrow(table_strict)
+    df_loose = pl.from_arrow(table_loose)
 
     # Create DTG comparison plot
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
 
     # Mass loss plot
-    ax1.plot(temperature, mass, 'b-', linewidth=2, label='Mass')
+    ax1.plot(df_with_dtg['sample_temperature'], df_with_dtg['mass'], 'b-', linewidth=2, label='Mass')
     ax1.set_ylabel('Mass (mg)')
     ax1.set_title('Thermogravimetric Analysis')
     ax1.grid(True, alpha=0.3)
     ax1.legend()
 
     # DTG plot with different smoothing
-    ax2.plot(temperature, dtg_strict, 'g-', alpha=0.7, label='Strict smoothing')
-    ax2.plot(temperature, dtg_medium, 'r-', linewidth=2, label='Medium smoothing')
-    ax2.plot(temperature, dtg_loose, 'b-', alpha=0.7, label='Loose smoothing')
+    ax2.plot(df_strict['sample_temperature'], df_strict['dtg_strict'], 'g-', alpha=0.7, label='Strict smoothing')
+    ax2.plot(df_with_dtg['sample_temperature'], df_with_dtg['dtg'], 'r-', linewidth=2, label='Medium smoothing')
+    ax2.plot(df_loose['sample_temperature'], df_loose['dtg_loose'], 'b-', alpha=0.7, label='Loose smoothing')
     ax2.set_xlabel('Temperature (°C)')
     ax2.set_ylabel('DTG (mg/min)')
     ax2.set_title('Derivative Thermogravimetry')
@@ -236,10 +237,14 @@ if 'mass' in df.columns:
     plt.tight_layout()
     plt.show()
 
-    # Print DTG summary
+    # Print DTG summary using table data
+    dtg_values = df_with_dtg['dtg'].to_numpy()
+    temperature = df_with_dtg['sample_temperature'].to_numpy()
+    mass = df_with_dtg['mass'].to_numpy()
+
     print(f"DTG Analysis Summary:")
-    print(f"Maximum mass loss rate: {np.max(np.abs(dtg_medium)):.3f} mg/min")
-    print(f"Temperature at max rate: {temperature[np.argmax(np.abs(dtg_medium))]:.1f}°C")
+    print(f"Maximum mass loss rate: {np.max(np.abs(dtg_values)):.3f} mg/min")
+    print(f"Temperature at max rate: {temperature[np.argmax(np.abs(dtg_values))]:.1f}°C")
     print(f"Total mass loss: {mass[0] - mass[-1]:.3f} mg ({((mass[0] - mass[-1])/mass[0]*100):.1f}%)")
 ```
 

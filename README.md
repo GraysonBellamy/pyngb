@@ -93,30 +93,33 @@ plt.show()
 ### DTG (Derivative Thermogravimetry) Analysis
 
 ```python
-from pyngb import dtg
-import numpy as np
+from pyngb.api.analysis import add_dtg
+import polars as pl
 
-# Convert PyArrow table to numpy arrays
-time = df['time'].to_numpy()
-mass = df['mass'].to_numpy()
+# Method 1: Add DTG column directly to your table (recommended)
+table_with_dtg = add_dtg(table, method="savgol", smooth="medium")
+df = pl.from_arrow(table_with_dtg)
 
-# Basic DTG calculation - one line, perfect results
-dtg_values = dtg(time, mass)
+print(f"Added DTG column. Shape: {table_with_dtg.num_rows} x {table_with_dtg.num_columns}")
+print(f"Columns: {table_with_dtg.column_names}")
 
-# Method selection for comparison
-dtg_savgol = dtg(time, mass, method="savgol")    # Recommended
-dtg_gradient = dtg(time, mass, method="gradient") # For comparison
+# Method 2: Compare different smoothing levels in one workflow
+dtg_strict = add_dtg(table, smooth="strict", column_name="dtg_strict")
+dtg_medium = add_dtg(table, smooth="medium", column_name="dtg_medium")
+dtg_loose = add_dtg(table, smooth="loose", column_name="dtg_loose")
 
-# Simple smoothing control
-dtg_strict = dtg(time, mass, smooth="strict")  # Preserve all features
-dtg_medium = dtg(time, mass, smooth="medium")   # Balanced (default)
-dtg_loose = dtg(time, mass, smooth="loose")     # Remove noise
+# Combine all DTG columns for comparison
+df_comparison = pl.from_arrow(dtg_strict).join(
+    pl.from_arrow(dtg_medium).select(["dtg_medium"]), how="inner", left_on=None, right_on=None
+).join(
+    pl.from_arrow(dtg_loose).select(["dtg_loose"]), how="inner", left_on=None, right_on=None
+)
 
 # Plot DTG results
 plt.figure(figsize=(12, 6))
-plt.plot(df['sample_temperature'], dtg_strict, label='Strict smoothing', alpha=0.7)
-plt.plot(df['sample_temperature'], dtg_medium, label='Medium smoothing', linewidth=2)
-plt.plot(df['sample_temperature'], dtg_loose, label='Loose smoothing', alpha=0.7)
+plt.plot(df_comparison['sample_temperature'], df_comparison['dtg_strict'], label='Strict smoothing', alpha=0.7)
+plt.plot(df_comparison['sample_temperature'], df_comparison['dtg_medium'], label='Medium smoothing', linewidth=2)
+plt.plot(df_comparison['sample_temperature'], df_comparison['dtg_loose'], label='Loose smoothing', alpha=0.7)
 plt.xlabel('Temperature (°C)')
 plt.ylabel('DTG (mg/min)')
 plt.title('Derivative Thermogravimetry')
