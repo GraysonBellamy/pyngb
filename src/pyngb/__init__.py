@@ -22,7 +22,14 @@ from .api.metadata import (
 )
 from .baseline import BaselineSubtractor, subtract_baseline
 from .batch import BatchProcessor, NGBDataset, process_directory, process_files
-from .constants import BinaryMarkers, DataType, FileMetadata, PatternConfig
+from .constants import (
+    BinaryMarkers,
+    DataType,
+    FileMetadata,
+    PatternConfig,
+    BaseColumnMetadata,
+    BaselinableColumnMetadata,
+)
 from .core.parser import NGBParser
 from .exceptions import (
     NGBCorruptedFileError,
@@ -41,6 +48,8 @@ __author__ = "Grayson Bellamy"
 __email__ = "gbellamy@umd.edu"
 
 __all__ = [
+    "BaseColumnMetadata",
+    "BaselinableColumnMetadata",
     "BaselineSubtractor",
     "BatchProcessor",
     "BinaryMarkers",
