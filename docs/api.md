@@ -208,10 +208,17 @@ print(result.report())
       heading_level: 3
       show_source: true
 
+### Normalization Functions
+
+::: pyngb.api.analysis.normalize_to_initial_mass
+    options:
+      heading_level: 3
+      show_source: true
+
 ### DTG Analysis Examples
 
 ```python
-from pyngb import dtg, dtg_custom, add_dtg, calculate_table_dtg
+from pyngb import dtg, dtg_custom, add_dtg, calculate_table_dtg, normalize_to_initial_mass
 import numpy as np
 
 # Basic DTG calculation - dead simple
@@ -245,6 +252,14 @@ print(f"Added DTG column. New shape: {table_with_dtg.num_rows} x {table_with_dtg
 # Calculate DTG array from table
 dtg_array = calculate_table_dtg(table, smooth="strict")
 print(f"DTG array shape: {dtg_array.shape}")
+
+# Normalize data to initial sample mass for quantitative analysis
+normalized_table = normalize_to_initial_mass(table)
+print(f"Added normalized columns: {[c for c in normalized_table.column_names if '_normalized' in c]}")
+
+# Combine normalization with DTG analysis
+normalized_with_dtg = add_dtg(normalized_table, column_name="dtg_normalized")
+print(f"Complete analysis table shape: {normalized_with_dtg.num_rows} x {normalized_with_dtg.num_columns}")
 ```
 
 ### Method and Smoothing Comparison

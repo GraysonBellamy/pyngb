@@ -191,7 +191,7 @@ if 'dsc_signal' in df.columns:
 ### DTG (Derivative Thermogravimetry) Analysis
 
 ```python
-from pyngb.api.analysis import add_dtg
+from pyngb.api.analysis import add_dtg, normalize_to_initial_mass
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -246,6 +246,16 @@ if 'mass' in df.columns:
     print(f"Maximum mass loss rate: {np.max(np.abs(dtg_values)):.3f} mg/min")
     print(f"Temperature at max rate: {temperature[np.argmax(np.abs(dtg_values))]:.1f}°C")
     print(f"Total mass loss: {mass[0] - mass[-1]:.3f} mg ({((mass[0] - mass[-1])/mass[0]*100):.1f}%)")
+
+    # Normalize data for quantitative cross-sample comparison
+    metadata, _ = read_ngb("sample.ngb-ss3", return_metadata=True)
+    normalized_table = normalize_to_initial_mass(table)
+    df_normalized = pl.from_arrow(normalized_table)
+
+    print(f"\nNormalization Summary:")
+    print(f"Sample mass from metadata: {metadata['sample_mass']:.1f} mg")
+    print(f"Normalized mass range: {df_normalized['mass_normalized'].min():.6f} to {df_normalized['mass_normalized'].max():.6f}")
+    print(f"Added columns: {[c for c in df_normalized.columns if '_normalized' in c]}")
 ```
 
 ### Batch Processing Multiple Files

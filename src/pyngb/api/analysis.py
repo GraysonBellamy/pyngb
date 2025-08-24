@@ -2,11 +2,12 @@
 High-level API functions for thermal analysis calculations.
 
 This module provides convenient functions for performing DTG analysis
-on PyArrow tables with the simplified DTG interface.
+and mass normalization on PyArrow tables.
 """
 
 from __future__ import annotations
 
+import json
 import numpy as np
 import polars as pl
 import pyarrow as pa
@@ -16,6 +17,7 @@ from ..analysis import dtg
 __all__ = [
     "add_dtg",
     "calculate_table_dtg",
+    "normalize_to_initial_mass",
 ]
 
 
@@ -155,3 +157,123 @@ def calculate_table_dtg(
 
     # Calculate and return DTG
     return dtg(time, mass, method=method, smooth=smooth)
+
+
+def normalize_to_initial_mass(
+    table: pa.Table,
+    columns: list[str] | None = None,
+) -> pa.Table:
+    """
+    Normalize mass and DSC columns to the initial sample mass from metadata.
+
+    This function normalizes specified columns (typically 'mass' and DSC signals)
+    by dividing by the initial sample mass stored in the table's metadata.
+    New columns with '_normalized' suffix are created, preserving the original data.
+    The mass column starts at zero (tare weight), so the initial sample mass
+    must be retrieved from the extraction metadata.
+
+    Parameters
+    ----------
+    table : pa.Table
+        PyArrow table containing thermal analysis data with embedded metadata
+    columns : list of str, optional
+        Column names to normalize. If None, defaults to ['mass', 'dsc_signal']
+        if they exist in the table
+
+    Returns
+    -------
+    pa.Table
+        New table with additional normalized columns (suffixed with '_normalized')
+        and preserved metadata
+
+    Raises
+    ------
+    ValueError
+        If sample_mass is not found in metadata or is zero/negative
+    KeyError
+        If specified columns are not found in the table
+
+    Examples
+    --------
+    >>> from pyngb import read_ngb
+    >>> from pyngb.api.analysis import normalize_to_initial_mass
+    >>>
+    >>> # Load data with metadata
+    >>> metadata, table = read_ngb("sample.ngb-ss3")
+    >>>
+    >>> # Normalize mass and DSC to initial sample mass
+    >>> normalized_table = normalize_to_initial_mass(table)
+    >>>
+    >>> # Normalize only specific columns
+    >>> normalized_table = normalize_to_initial_mass(table, columns=['mass'])
+    >>>
+    >>> # Check normalized values (original columns preserved)
+    >>> df = normalized_table.to_pandas()
+    >>> print(f"Original mass: {df['mass'].iloc[0]:.3f}")
+    >>> print(f"Normalized mass: {df['mass_normalized'].iloc[0]:.3f}")
+    """
+    # Extract metadata from table schema
+    if not table.schema.metadata:
+        raise ValueError(
+            "Table metadata is missing - cannot retrieve initial sample mass"
+        )
+
+    metadata_bytes = table.schema.metadata.get(b"file_metadata")
+    if not metadata_bytes:
+        raise ValueError("No file_metadata found in table schema")
+
+    try:
+        metadata = json.loads(metadata_bytes.decode())
+    except (json.JSONDecodeError, UnicodeDecodeError) as e:
+        raise ValueError(f"Failed to parse table metadata: {e}") from e
+
+    # Get initial sample mass from metadata
+    sample_mass = metadata.get("sample_mass")
+    if sample_mass is None:
+        raise ValueError("sample_mass not found in metadata")
+
+    if not isinstance(sample_mass, (int, float)) or sample_mass <= 0:
+        raise ValueError(
+            f"Invalid sample_mass value: {sample_mass} (must be positive number)"
+        )
+
+    # Determine columns to normalize
+    column_names = table.column_names
+    if columns is None:
+        # Default to mass and DSC columns if they exist
+        default_columns = ["mass", "dsc_signal"]
+        columns = [col for col in default_columns if col in column_names]
+        if not columns:
+            raise ValueError(
+                f"No default normalization columns found. Available: {column_names}"
+            )
+    else:
+        # Check that specified columns exist
+        missing_columns = [col for col in columns if col not in column_names]
+        if missing_columns:
+            raise KeyError(f"Columns not found in table: {missing_columns}")
+
+    # Convert to DataFrame for easier manipulation
+    df = pl.from_arrow(table)
+    if not isinstance(df, pl.DataFrame):
+        raise TypeError("Failed to convert PyArrow table to Polars DataFrame")
+
+    # Normalize specified columns
+    normalization_exprs = []
+    for col in columns:
+        # Check if column is numeric
+        if not df[col].dtype.is_numeric():
+            raise ValueError(f"Column '{col}' is not numeric and cannot be normalized")
+        normalization_exprs.append(
+            (pl.col(col) / sample_mass).alias(f"{col}_normalized")
+        )
+
+    # Apply normalizations
+    df = df.with_columns(normalization_exprs)
+
+    # Convert back to PyArrow table while preserving all metadata
+    new_table = df.to_arrow()
+    if table.schema.metadata:
+        new_table = new_table.replace_schema_metadata(table.schema.metadata)
+
+    return new_table

@@ -31,6 +31,100 @@ if {'time', 'sample_temperature'} <= set(combined.columns):
     print(stats)
 ```
 
+## Mass and DSC Normalization
+
+Normalize thermal analysis data to initial sample mass for quantitative comparison across samples with different masses.
+
+### Basic Normalization
+
+```python
+from pyngb import read_ngb
+from pyngb.api.analysis import normalize_to_initial_mass
+import polars as pl
+
+# Load thermal analysis data
+metadata, table = read_ngb("sample.ngb-ss3")
+
+# Normalize mass and DSC to initial sample mass
+normalized_table = normalize_to_initial_mass(table)
+df = pl.from_arrow(normalized_table)
+
+print(f"Sample mass from metadata: {metadata['sample_mass']:.3f} mg")
+print(f"Original columns: {table.column_names}")
+print(f"Normalized columns: {[c for c in df.columns if '_normalized' in c]}")
+
+# Compare original vs normalized values
+print(f"Mass starts at: {df['mass'][0]:.6f} mg (tared)")
+print(f"Normalized mass starts at: {df['mass_normalized'][0]:.6f} (fraction of initial)")
+```
+
+### Cross-Sample Comparison
+
+```python
+# Normalize multiple samples for comparison
+files = ["sample_5mg.ngb-ss3", "sample_12mg.ngb-ss3", "sample_8mg.ngb-ss3"]
+normalized_data = []
+
+for file_path in files:
+    metadata, table = read_ngb(file_path)
+    normalized_table = normalize_to_initial_mass(table)
+    df = pl.from_arrow(normalized_table)
+
+    normalized_data.append({
+        'file': file_path,
+        'initial_mass': metadata['sample_mass'],
+        'df': df,
+        'final_mass_fraction': df['mass_normalized'][-1]  # Fraction remaining
+    })
+
+# Compare mass loss across samples
+print("Sample Comparison (normalized to initial mass):")
+for data in normalized_data:
+    mass_loss_percent = (1 - data['final_mass_fraction']) * 100
+    print(f"{data['file']}: {data['initial_mass']:.1f}mg → {mass_loss_percent:.1f}% mass loss")
+```
+
+### Quantitative DSC Analysis
+
+```python
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Normalize and analyze DSC signals
+plt.figure(figsize=(12, 8))
+
+for i, data in enumerate(normalized_data):
+    df = data['df']
+    temperature = df['sample_temperature'].to_numpy()
+    dsc_normalized = df['dsc_signal_normalized'].to_numpy()
+
+    sample_name = data['file'].replace('.ngb-ss3', '')
+    plt.plot(temperature, dsc_normalized,
+             label=f'{sample_name} ({data["initial_mass"]:.1f}mg)',
+             linewidth=2, alpha=0.8)
+
+plt.xlabel('Temperature (°C)')
+plt.ylabel('Normalized DSC Signal (W/g)')
+plt.title('DSC Comparison - Normalized to Initial Sample Mass')
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.show()
+
+# Calculate specific heat capacity peaks
+for data in normalized_data:
+    df = data['df']
+    dsc_norm = df['dsc_signal_normalized'].to_numpy()
+    temp = df['sample_temperature'].to_numpy()
+
+    # Find peak DSC signal (endothermic events)
+    peak_idx = np.argmin(dsc_norm)  # Most negative value
+    peak_temp = temp[peak_idx]
+    peak_intensity = abs(dsc_norm[peak_idx])
+
+    print(f"{data['file']}: Peak at {peak_temp:.1f}°C, "
+          f"Intensity: {peak_intensity:.3f} W/g")
+```
+
 ## DTG Analysis on Multiple Datasets
 
 ### Batch DTG Calculation

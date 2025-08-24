@@ -7,7 +7,7 @@ import polars as pl
 import pyarrow as pa
 import pytest
 
-from pyngb.api.analysis import add_dtg, calculate_table_dtg
+from pyngb.api.analysis import add_dtg, calculate_table_dtg, normalize_to_initial_mass
 
 
 class TestAddDTG:
@@ -255,6 +255,283 @@ class TestErrorHandling:
         except (ValueError, TypeError, pa.ArrowTypeError):
             # Either error is acceptable for invalid input
             pass
+
+
+class TestNormalizeToInitialMass:
+    """Test the normalize_to_initial_mass function."""
+
+    def setup_method(self):
+        """Set up test data with metadata."""
+        import json
+
+        # Create sample data with mass starting near zero (tared)
+        time = np.linspace(0, 100, 50)
+        mass = 0.0 + np.cumsum(
+            np.random.RandomState(42).normal(-0.01, 0.005, len(time))
+        )
+        dsc_signal = np.random.RandomState(42).normal(0, 2.5, len(time))
+        temperature = 25 + 2 * time
+
+        # Create PyArrow table
+        self.table = pa.table(
+            {
+                "time": time,
+                "mass": mass,
+                "dsc_signal": dsc_signal,
+                "sample_temperature": temperature,
+                "other_data": np.random.RandomState(42).normal(0, 1, len(time)),
+            }
+        )
+
+        # Add metadata with sample_mass (initial mass before taring)
+        metadata = {
+            "sample_mass": 15.75,  # mg
+            "instrument": "NETZSCH STA 449 F3",
+            "crucible_mass": 42.15,
+        }
+
+        # Store metadata as file_metadata in schema
+        schema_metadata = {
+            b"file_metadata": json.dumps(metadata).encode(),
+            b"type": b"STA",
+        }
+        schema = self.table.schema.with_metadata(schema_metadata)
+        self.table = self.table.cast(schema)
+
+    def test_normalize_default_columns(self):
+        """Test normalization with default columns (mass and dsc_signal)."""
+        result_table = normalize_to_initial_mass(self.table)
+
+        # Check that normalized columns were added
+        assert (
+            result_table.num_columns == self.table.num_columns + 2
+        )  # +mass_normalized +dsc_signal_normalized
+        assert result_table.num_rows == self.table.num_rows
+
+        # Convert to dataframes for comparison
+        original_df = pl.from_arrow(self.table)
+        result_df = pl.from_arrow(result_table)
+
+        # Check normalization is correct
+        original_mass = original_df["mass"].to_numpy()
+        normalized_mass = result_df["mass_normalized"].to_numpy()
+        original_dsc = original_df["dsc_signal"].to_numpy()
+        normalized_dsc = result_df["dsc_signal_normalized"].to_numpy()
+
+        # Values should be divided by sample_mass (15.75)
+        expected_mass = original_mass / 15.75
+        expected_dsc = original_dsc / 15.75
+
+        np.testing.assert_allclose(normalized_mass, expected_mass)
+        np.testing.assert_allclose(normalized_dsc, expected_dsc)
+
+        # Original columns should be unchanged
+        np.testing.assert_array_equal(
+            original_df["mass"].to_numpy(), result_df["mass"].to_numpy()
+        )
+        np.testing.assert_array_equal(
+            original_df["dsc_signal"].to_numpy(), result_df["dsc_signal"].to_numpy()
+        )
+        np.testing.assert_array_equal(
+            original_df["time"].to_numpy(), result_df["time"].to_numpy()
+        )
+        np.testing.assert_array_equal(
+            original_df["sample_temperature"].to_numpy(),
+            result_df["sample_temperature"].to_numpy(),
+        )
+
+    def test_normalize_specific_columns(self):
+        """Test normalization with specific columns."""
+        result_table = normalize_to_initial_mass(self.table, columns=["mass"])
+
+        # Check that only one normalized column was added
+        assert (
+            result_table.num_columns == self.table.num_columns + 1
+        )  # +mass_normalized
+
+        # Convert to dataframes for comparison
+        original_df = pl.from_arrow(self.table)
+        result_df = pl.from_arrow(result_table)
+
+        # Only mass should be normalized
+        original_mass = original_df["mass"].to_numpy()
+        normalized_mass = result_df["mass_normalized"].to_numpy()
+        expected_mass = original_mass / 15.75
+        np.testing.assert_allclose(normalized_mass, expected_mass)
+
+        # Original mass column should be unchanged
+        np.testing.assert_array_equal(
+            original_df["mass"].to_numpy(), result_df["mass"].to_numpy()
+        )
+
+        # DSC signal should be unchanged and no normalized version created
+        np.testing.assert_array_equal(
+            original_df["dsc_signal"].to_numpy(), result_df["dsc_signal"].to_numpy()
+        )
+        assert "dsc_signal_normalized" not in result_df.columns
+
+    def test_metadata_preservation(self):
+        """Test that metadata is preserved after normalization."""
+        result_table = normalize_to_initial_mass(self.table)
+
+        # Metadata should be identical
+        assert result_table.schema.metadata == self.table.schema.metadata
+
+    def test_missing_metadata_error(self):
+        """Test error when table has no metadata."""
+        table_no_meta = pa.table(
+            {
+                "time": [1, 2, 3],
+                "mass": [0.1, 0.2, 0.3],
+            }
+        )
+
+        with pytest.raises(ValueError, match="Table metadata is missing"):
+            normalize_to_initial_mass(table_no_meta)
+
+    def test_missing_file_metadata_error(self):
+        """Test error when file_metadata key is missing."""
+        # Table with metadata but no file_metadata key
+        schema_metadata = {b"other_key": b"other_value"}
+        schema = pa.table(
+            {
+                "time": [1, 2, 3],
+                "mass": [0.1, 0.2, 0.3],
+            }
+        ).schema.with_metadata(schema_metadata)
+
+        table = pa.table(
+            {
+                "time": [1, 2, 3],
+                "mass": [0.1, 0.2, 0.3],
+            }
+        ).cast(schema)
+
+        with pytest.raises(ValueError, match="No file_metadata found"):
+            normalize_to_initial_mass(table)
+
+    def test_missing_sample_mass_error(self):
+        """Test error when sample_mass is not in metadata."""
+        import json
+
+        metadata = {"instrument": "NETZSCH STA 449 F3"}  # No sample_mass
+        schema_metadata = {
+            b"file_metadata": json.dumps(metadata).encode(),
+        }
+
+        table = pa.table(
+            {
+                "time": [1, 2, 3],
+                "mass": [0.1, 0.2, 0.3],
+            }
+        )
+        schema = table.schema.with_metadata(schema_metadata)
+        table = table.cast(schema)
+
+        with pytest.raises(ValueError, match="sample_mass not found"):
+            normalize_to_initial_mass(table)
+
+    def test_invalid_sample_mass_error(self):
+        """Test error when sample_mass is invalid."""
+        import json
+
+        # Test zero mass
+        metadata = {"sample_mass": 0.0}
+        schema_metadata = {b"file_metadata": json.dumps(metadata).encode()}
+
+        table = pa.table(
+            {
+                "time": [1, 2, 3],
+                "mass": [0.1, 0.2, 0.3],
+            }
+        )
+        schema = table.schema.with_metadata(schema_metadata)
+        table = table.cast(schema)
+
+        with pytest.raises(ValueError, match="Invalid sample_mass value"):
+            normalize_to_initial_mass(table)
+
+        # Test negative mass
+        metadata = {"sample_mass": -5.0}
+        schema_metadata = {b"file_metadata": json.dumps(metadata).encode()}
+        schema = table.schema.with_metadata(schema_metadata)
+        table = table.cast(schema)
+
+        with pytest.raises(ValueError, match="Invalid sample_mass value"):
+            normalize_to_initial_mass(table)
+
+    def test_missing_column_error(self):
+        """Test error when specified columns don't exist."""
+        with pytest.raises(KeyError, match="Columns not found"):
+            normalize_to_initial_mass(self.table, columns=["nonexistent_column"])
+
+    def test_non_numeric_column_error(self):
+        """Test error when trying to normalize non-numeric columns."""
+
+        # Add a string column
+        table_with_string = self.table.append_column(
+            "string_col", pa.array(["a", "b", "c"] * 17)[:50]
+        )
+
+        with pytest.raises(ValueError, match="not numeric and cannot be normalized"):
+            normalize_to_initial_mass(table_with_string, columns=["string_col"])
+
+    def test_no_default_columns_error(self):
+        """Test error when no default columns are found."""
+        # Create table without mass or dsc_signal
+        table_no_defaults = pa.table(
+            {
+                "time": [1, 2, 3],
+                "temperature": [25, 50, 75],
+            }
+        )
+
+        # Add required metadata
+        import json
+
+        metadata = {"sample_mass": 10.0}
+        schema_metadata = {b"file_metadata": json.dumps(metadata).encode()}
+        schema = table_no_defaults.schema.with_metadata(schema_metadata)
+        table_no_defaults = table_no_defaults.cast(schema)
+
+        with pytest.raises(ValueError, match="No default normalization columns found"):
+            normalize_to_initial_mass(table_no_defaults)
+
+    def test_realistic_mass_normalization(self):
+        """Test realistic mass normalization scenario."""
+        # Create realistic data: mass starts at ~0 (tared) then changes
+        time = np.linspace(0, 120, 100)  # 2 hour experiment
+
+        # Simulate mass loss during heating
+        mass_loss = np.cumsum(
+            np.where(time > 30, -0.02, 0)
+        )  # Start losing mass after 30min
+        mass = 0.05 + mass_loss + np.random.RandomState(42).normal(0, 0.005, len(time))
+
+        table = pa.table({"time": time, "mass": mass})
+
+        # Add metadata with realistic initial sample mass
+        import json
+
+        metadata = {"sample_mass": 8.75}  # 8.75 mg initial mass
+        schema_metadata = {b"file_metadata": json.dumps(metadata).encode()}
+        schema = table.schema.with_metadata(schema_metadata)
+        table = table.cast(schema)
+
+        # Normalize
+        result_table = normalize_to_initial_mass(table, columns=["mass"])
+        result_df = pl.from_arrow(result_table)
+        normalized_mass = result_df["mass_normalized"].to_numpy()
+
+        # Initial mass should be close to initial_offset / sample_mass
+        expected_initial = 0.05 / 8.75  # ~0.0057
+        assert abs(normalized_mass[0] - expected_initial) < 0.001
+
+        # Final mass should show the loss as fraction
+        final_mass_loss = abs(mass[-1])  # Total mass change
+        expected_final_normalized = abs(normalized_mass[-1] - normalized_mass[0])
+        expected_loss_fraction = final_mass_loss / 8.75
+        assert abs(expected_final_normalized - expected_loss_fraction) < 0.01
 
 
 if __name__ == "__main__":
