@@ -153,7 +153,7 @@ print("Custom vs Default correlation:",
 Work directly with your NGB data tables using the convenient table-based functions:
 
 ```python
-from pyngb.api.analysis import add_dtg, calculate_table_dtg
+from pyngb.api.analysis import add_dtg, calculate_table_dtg, normalize_to_initial_mass
 
 # Method 1: Add DTG column to existing table (most common approach)
 table_with_dtg = add_dtg(table, method="savgol", smooth="medium")
@@ -173,6 +173,45 @@ table_multi = add_dtg(table_multi, smooth="loose", column_name="dtg_loose")
 df = pl.from_arrow(table_multi)
 print(f"Columns: {df.columns}")  # Shows dtg_strict and dtg_loose columns
 ```
+
+### Mass and DSC Normalization
+
+Normalize data to initial sample mass for quantitative analysis and cross-sample comparison:
+
+```python
+# Normalize mass and DSC data to initial sample mass (from metadata)
+normalized_table = normalize_to_initial_mass(table)
+df_norm = pl.from_arrow(normalized_table)
+
+print(f"Original columns: {table.column_names}")
+print(f"After normalization: {normalized_table.column_names}")
+# Shows original columns plus mass_normalized, dsc_signal_normalized
+
+# Compare original vs normalized mass
+print(f"Original mass range: {df_norm['mass'].min():.3f} to {df_norm['mass'].max():.3f} mg")
+print(f"Normalized mass range: {df_norm['mass_normalized'].min():.3f} to {df_norm['mass_normalized'].max():.3f}")
+
+# Normalize specific columns only
+mass_only_normalized = normalize_to_initial_mass(table, columns=['mass'])
+df_mass = pl.from_arrow(mass_only_normalized)
+print(f"Mass-only normalization adds: {[c for c in df_mass.columns if c not in table.column_names]}")
+
+# Combine with DTG analysis for complete workflow
+normalized_table = normalize_to_initial_mass(table)
+final_table = add_dtg(normalized_table, column_name="dtg_normalized")
+df_final = pl.from_arrow(final_table)
+
+# Now you have: original data + normalized data + DTG on normalized data
+print("Complete analysis columns:")
+for col in df_final.columns:
+    print(f"  {col}")
+```
+
+This normalization allows you to:
+- **Compare samples** with different initial masses
+- **Express results as fractions** of initial sample mass
+- **Standardize DTG analysis** across different sample sizes
+- **Perform quantitative analysis** independent of sample size
 
 ## Practical Examples
 
