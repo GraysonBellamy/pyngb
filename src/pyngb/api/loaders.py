@@ -215,6 +215,12 @@ def read_ngb(
 
     # Attach metadata to the Arrow table
     data = set_metadata(data, tbl_meta={"file_metadata": metadata, "type": "STA"})
+
+    # Initialize column metadata for all columns
+    from ..util import initialize_table_column_metadata
+
+    data = initialize_table_column_metadata(data)
+
     return data
 
 

@@ -215,6 +215,140 @@ print(result.report())
       heading_level: 3
       show_source: true
 
+## Column Metadata System
+
+pyngb provides comprehensive column-level metadata tracking for thermal analysis data, enabling complete provenance and traceability through analysis workflows.
+
+### Column Metadata Functions
+
+::: pyngb.get_column_units
+    options:
+      heading_level: 3
+      show_source: true
+
+::: pyngb.set_column_units
+    options:
+      heading_level: 3
+      show_source: true
+
+::: pyngb.get_column_baseline_status
+    options:
+      heading_level: 3
+      show_source: true
+
+::: pyngb.mark_baseline_corrected
+    options:
+      heading_level: 3
+      show_source: true
+
+::: pyngb.inspect_column_metadata
+    options:
+      heading_level: 3
+      show_source: true
+
+### Column Metadata Types
+
+::: pyngb.BaseColumnMetadata
+    options:
+      heading_level: 3
+      show_source: true
+
+::: pyngb.BaselinableColumnMetadata
+    options:
+      heading_level: 3
+      show_source: true
+
+### Column Metadata Examples
+
+```python
+from pyngb import read_ngb
+from pyngb.api.metadata import (
+    get_column_units, set_column_units,
+    get_processing_history, add_column_processing_step,
+    get_column_baseline_status, mark_baseline_corrected,
+    inspect_column_metadata
+)
+
+# Load data - columns automatically get default metadata
+table = read_ngb("sample.ngb-ss3")
+
+# Basic metadata queries
+print(f"DSC signal units: {get_column_units(table, 'dsc_signal')}")  # "µV"
+print(f"Mass units: {get_column_units(table, 'mass')}")  # "mg"
+print(f"Time units: {get_column_units(table, 'time')}")  # "min"
+
+# Check processing history
+history = get_processing_history(table, 'mass')
+print(f"Mass processing history: {history}")  # ["raw"]
+
+# Check baseline correction status (only applicable to mass and DSC)
+mass_baseline = get_column_baseline_status(table, 'mass')
+dsc_baseline = get_column_baseline_status(table, 'dsc_signal')
+time_baseline = get_column_baseline_status(table, 'time')  # Returns None (not applicable)
+
+print(f"Mass baseline corrected: {mass_baseline}")    # False
+print(f"DSC baseline corrected: {dsc_baseline}")      # False
+print(f"Time baseline status: {time_baseline}")       # None
+
+# Complete metadata inspection
+metadata = inspect_column_metadata(table, 'mass')
+print(f"Complete mass metadata: {metadata}")
+# {'units': 'mg', 'processing_history': ['raw'], 'source': 'measurement', 'baseline_subtracted': False}
+
+# Custom metadata modifications
+# Change units
+table = set_column_units(table, 'mass', 'g')
+print(f"Updated mass units: {get_column_units(table, 'mass')}")  # "g"
+
+# Add processing step
+table = add_column_processing_step(table, 'mass', 'filtered')
+updated_history = get_processing_history(table, 'mass')
+print(f"Updated history: {updated_history}")  # ["raw", "filtered"]
+
+# Mark as baseline corrected (affects units automatically during normalization)
+table = mark_baseline_corrected(table, ['mass', 'dsc_signal'])
+mass_status = get_column_baseline_status(table, 'mass')
+print(f"Mass now baseline corrected: {mass_status}")  # True
+```
+
+### Analysis Workflow with Metadata Tracking
+
+```python
+from pyngb import read_ngb
+from pyngb.api.analysis import add_dtg, normalize_to_initial_mass
+
+# 1. Load raw data (automatic metadata initialization)
+table = read_ngb("sample.ngb-ss3")
+print("Raw data loaded with default metadata")
+
+# 2. Add DTG analysis (preserves existing metadata, adds DTG metadata)
+table_with_dtg = add_dtg(table, method="savgol", smooth="medium")
+dtg_units = get_column_units(table_with_dtg, 'dtg')
+dtg_history = get_processing_history(table_with_dtg, 'dtg')
+print(f"DTG added - Units: {dtg_units}, History: {dtg_history}")  # mg/min, ["calculated"]
+
+# 3. Normalize to initial mass (updates columns in place)
+normalized_table = normalize_to_initial_mass(table_with_dtg)
+
+# Check updated metadata after normalization
+mass_units = get_column_units(normalized_table, 'mass')
+mass_history = get_processing_history(normalized_table, 'mass')
+dsc_units = get_column_units(normalized_table, 'dsc_signal')
+
+print(f"After normalization:")
+print(f"  Mass: {mass_units} (history: {mass_history})")      # mg/mg ["raw", "normalized"]
+print(f"  DSC: {dsc_units} (history: {get_processing_history(normalized_table, 'dsc_signal')})")  # µV/mg ["raw", "normalized"]
+
+# 4. Apply baseline correction (if baseline file available)
+baseline_table = read_ngb("sample.ngb-ss3", baseline_file="baseline.ngb-bs3")
+baseline_corrected = mark_baseline_corrected(baseline_table, ['mass', 'dsc_signal'])
+
+# Check final metadata
+final_mass_metadata = inspect_column_metadata(baseline_corrected, 'mass')
+print(f"Final mass metadata: {final_mass_metadata}")
+# Shows complete provenance: units, processing history, baseline status, source
+```
+
 ### DTG Analysis Examples
 
 ```python
@@ -253,13 +387,28 @@ print(f"Added DTG column. New shape: {table_with_dtg.num_rows} x {table_with_dtg
 dtg_array = calculate_table_dtg(table, smooth="strict")
 print(f"DTG array shape: {dtg_array.shape}")
 
-# Normalize data to initial sample mass for quantitative analysis
+# Normalize data to initial sample mass for quantitative analysis (in place)
 normalized_table = normalize_to_initial_mass(table)
-print(f"Added normalized columns: {[c for c in normalized_table.column_names if '_normalized' in c]}")
+print(f"Normalized in place. Shape unchanged: {normalized_table.num_rows} x {normalized_table.num_columns}")
 
 # Combine normalization with DTG analysis
-normalized_with_dtg = add_dtg(normalized_table, column_name="dtg_normalized")
+normalized_with_dtg = add_dtg(normalized_table)
 print(f"Complete analysis table shape: {normalized_with_dtg.num_rows} x {normalized_with_dtg.num_columns}")
+
+# Column Metadata Example
+from pyngb import get_column_units, get_column_baseline_status, inspect_column_metadata
+
+# Check column units after analysis
+print(f"Mass units after normalization: {get_column_units(normalized_table, 'mass')}")  # "mg/mg"
+print(f"DSC units after normalization: {get_column_units(normalized_table, 'dsc_signal')}")  # "µV/mg"
+
+# Check baseline status
+baseline_status = get_column_baseline_status(normalized_table, 'mass')
+print(f"Mass baseline corrected: {baseline_status}")  # False (no baseline applied yet)
+
+# Full metadata inspection
+mass_metadata = inspect_column_metadata(normalized_table, 'mass')
+print(f"Mass metadata: {mass_metadata}")
 ```
 
 ### Method and Smoothing Comparison

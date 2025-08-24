@@ -11,6 +11,10 @@ from typing import Any, TypedDict
 __all__ = [  # noqa: RUF022 - order chosen for logical grouping
     "BinaryMarkers",
     "BinaryProcessing",
+    "BaseColumnMetadata",
+    "BaselinableColumnMetadata",
+    "DEFAULT_COLUMN_METADATA",
+    "FIELD_APPLICABILITY",
     "DataType",
     "DataTypeSizes",
     "FileMetadata",
@@ -68,6 +72,93 @@ class FileMetadata(TypedDict, total=False):
     sample_xp: float
     sample_tn: float
     sample_tv: float
+
+
+class BaseColumnMetadata(TypedDict, total=False):
+    """Base column metadata structure for all thermal analysis data columns.
+
+    This defines metadata fields that apply to all column types.
+    """
+
+    units: str  # Physical units (e.g., "mg", "°C", "mW", "mg/min")
+    processing_history: list[
+        str
+    ]  # Processing steps applied (e.g., ["raw", "smoothed"])
+    source: str  # Data origin (e.g., "measurement", "calculated", "derived")
+
+
+class BaselinableColumnMetadata(BaseColumnMetadata, total=False):
+    """Extended metadata for columns that support baseline correction.
+
+    This includes the baseline_subtracted field for signals like mass and DSC
+    that can be baseline-corrected.
+    """
+
+    baseline_subtracted: bool  # True if baseline correction has been applied
+
+
+# Define which metadata fields apply to which column types
+FIELD_APPLICABILITY = {
+    "units": "all",  # All columns have units
+    "processing_history": "all",  # All columns have processing history
+    "source": "all",  # All columns have a source
+    "baseline_subtracted": [
+        "mass",
+        "dsc_signal",
+    ],  # Only these can be baseline corrected
+}
+
+# Default metadata for common column types
+DEFAULT_COLUMN_METADATA = {
+    "time": {"units": "min", "processing_history": ["raw"], "source": "measurement"},
+    "mass": {
+        "units": "mg",
+        "processing_history": ["raw"],
+        "source": "measurement",
+        "baseline_subtracted": False,
+    },
+    "sample_temperature": {
+        "units": "°C",
+        "processing_history": ["raw"],
+        "source": "measurement",
+    },
+    "furnace_temperature": {
+        "units": "°C",
+        "processing_history": ["raw"],
+        "source": "measurement",
+    },
+    "dsc_signal": {
+        "units": "µV",
+        "processing_history": ["raw"],
+        "source": "measurement",
+        "baseline_subtracted": False,
+    },
+    "dtg": {
+        "units": "mg/min",
+        "processing_history": ["calculated"],
+        "source": "derived",
+    },
+    "purge_flow_1": {
+        "units": "ml/min",
+        "processing_history": ["raw"],
+        "source": "measurement",
+    },
+    "purge_flow_2": {
+        "units": "ml/min",
+        "processing_history": ["raw"],
+        "source": "measurement",
+    },
+    "protective_flow": {
+        "units": "ml/min",
+        "processing_history": ["raw"],
+        "source": "measurement",
+    },
+    "furnace_power": {
+        "units": "W",
+        "processing_history": ["raw"],
+        "source": "measurement",
+    },
+}
 
 
 class DataType(Enum):

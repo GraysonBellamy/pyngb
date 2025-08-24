@@ -45,17 +45,23 @@ import polars as pl
 # Load thermal analysis data
 metadata, table = read_ngb("sample.ngb-ss3")
 
-# Normalize mass and DSC to initial sample mass
+# Normalize mass and DSC to initial sample mass (in place)
 normalized_table = normalize_to_initial_mass(table)
 df = pl.from_arrow(normalized_table)
 
 print(f"Sample mass from metadata: {metadata['sample_mass']:.3f} mg")
-print(f"Original columns: {table.column_names}")
-print(f"Normalized columns: {[c for c in df.columns if '_normalized' in c]}")
+print(f"Columns (unchanged count): {normalized_table.column_names}")
 
-# Compare original vs normalized values
-print(f"Mass starts at: {df['mass'][0]:.6f} mg (tared)")
-print(f"Normalized mass starts at: {df['mass_normalized'][0]:.6f} (fraction of initial)")
+# Check updated units after normalization
+from pyngb.api.metadata import get_column_units
+mass_units = get_column_units(normalized_table, 'mass')
+dsc_units = get_column_units(normalized_table, 'dsc_signal')
+print(f"Mass units after normalization: {mass_units}")  # mg/mg
+print(f"DSC units after normalization: {dsc_units}")    # µV/mg
+
+# Compare values - columns updated in place
+print(f"Mass starts at: {df['mass'][0]:.6f} (fraction of initial mass)")
+print(f"DSC starts at: {df['dsc_signal'][0]:.6f} (per mg of initial mass)")
 ```
 
 ### Cross-Sample Comparison
@@ -74,7 +80,7 @@ for file_path in files:
         'file': file_path,
         'initial_mass': metadata['sample_mass'],
         'df': df,
-        'final_mass_fraction': df['mass_normalized'][-1]  # Fraction remaining
+        'final_mass_fraction': df['mass'][-1]  # Fraction remaining (column updated in place)
     })
 
 # Compare mass loss across samples
@@ -96,7 +102,7 @@ plt.figure(figsize=(12, 8))
 for i, data in enumerate(normalized_data):
     df = data['df']
     temperature = df['sample_temperature'].to_numpy()
-    dsc_normalized = df['dsc_signal_normalized'].to_numpy()
+    dsc_normalized = df['dsc_signal'].to_numpy()  # Column updated in place
 
     sample_name = data['file'].replace('.ngb-ss3', '')
     plt.plot(temperature, dsc_normalized,
@@ -104,7 +110,7 @@ for i, data in enumerate(normalized_data):
              linewidth=2, alpha=0.8)
 
 plt.xlabel('Temperature (°C)')
-plt.ylabel('Normalized DSC Signal (W/g)')
+plt.ylabel('Normalized DSC Signal (µV/mg)')  # Updated units
 plt.title('DSC Comparison - Normalized to Initial Sample Mass')
 plt.legend()
 plt.grid(True, alpha=0.3)
@@ -113,7 +119,7 @@ plt.show()
 # Calculate specific heat capacity peaks
 for data in normalized_data:
     df = data['df']
-    dsc_norm = df['dsc_signal_normalized'].to_numpy()
+    dsc_norm = df['dsc_signal'].to_numpy()  # Column updated in place
     temp = df['sample_temperature'].to_numpy()
 
     # Find peak DSC signal (endothermic events)
@@ -122,7 +128,7 @@ for data in normalized_data:
     peak_intensity = abs(dsc_norm[peak_idx])
 
     print(f"{data['file']}: Peak at {peak_temp:.1f}°C, "
-          f"Intensity: {peak_intensity:.3f} W/g")
+          f"Intensity: {peak_intensity:.3f} µV/mg")  # Updated units
 ```
 
 ## DTG Analysis on Multiple Datasets
