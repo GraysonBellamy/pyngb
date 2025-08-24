@@ -15,7 +15,31 @@ pyNGB implements a **dramatically simplified** DTG interface focused on the 90% 
 
 ## Quick Start
 
-### Dead Simple DTG Calculation
+### Table-Based DTG Analysis (Recommended)
+
+```python
+from pyngb import read_ngb
+from pyngb.api.analysis import add_dtg
+import polars as pl
+
+# Load your data
+table = read_ngb("sample.ngb-ss3")
+
+# Add DTG column directly to your table - one line, perfect results
+table_with_dtg = add_dtg(table, method="savgol", smooth="medium")
+
+# Convert to DataFrame for analysis
+df = pl.from_arrow(table_with_dtg)
+print(f"Added DTG column: {table_with_dtg.column_names[-1]}")
+print(f"DTG range: {df['dtg'].min():.3f} to {df['dtg'].max():.3f} mg/min")
+
+# Your data now includes DTG as a regular column alongside time, mass, temperature
+print(f"Columns: {df.columns}")
+```
+
+This approach integrates DTG seamlessly into your data workflow and keeps everything organized in one table.
+
+### Alternative: Standalone DTG Calculation
 
 ```python
 from pyngb import read_ngb, dtg
@@ -35,7 +59,7 @@ dtg_values = dtg(time, mass)
 print(f"DTG range: {dtg_values.min():.3f} to {dtg_values.max():.3f} mg/min")
 ```
 
-That's it! The `dtg()` function uses smart defaults that work great for 90% of thermal analysis data.
+Both approaches use the same smart defaults that work great for 90% of thermal analysis data.
 
 ## Method Selection
 
@@ -126,22 +150,28 @@ print("Custom vs Default correlation:",
 
 ## Integration with PyArrow Tables
 
-Work directly with your NGB data tables:
+Work directly with your NGB data tables using the convenient table-based functions:
 
 ```python
-from pyngb import add_dtg, calculate_table_dtg
+from pyngb.api.analysis import add_dtg, calculate_table_dtg
 
-# Method 1: Add DTG column to existing table
+# Method 1: Add DTG column to existing table (most common approach)
 table_with_dtg = add_dtg(table, method="savgol", smooth="medium")
 print(f"Added DTG. New shape: {table_with_dtg.num_rows} x {table_with_dtg.num_columns}")
 
-# Method 2: Calculate DTG as array
+# Method 2: Calculate DTG as array (for custom processing)
 dtg_array = calculate_table_dtg(table, smooth="strict")
 print(f"DTG array shape: {dtg_array.shape}")
 
 # Method 3: Custom column name and parameters
 table_rates = add_dtg(table, method="gradient", smooth="loose",
                      column_name="mass_loss_rate")
+
+# Method 4: Multiple DTG columns for comparison
+table_multi = add_dtg(table, smooth="strict", column_name="dtg_strict")
+table_multi = add_dtg(table_multi, smooth="loose", column_name="dtg_loose")
+df = pl.from_arrow(table_multi)
+print(f"Columns: {df.columns}")  # Shows dtg_strict and dtg_loose columns
 ```
 
 ## Practical Examples
@@ -185,24 +215,24 @@ print(f"Found {len(peaks)} peaks at temperatures: {temperature[peaks]}")
 ### Batch Processing Multiple Files
 
 ```python
-from pyngb import read_ngb, dtg
+from pyngb import read_ngb
+from pyngb.api.analysis import add_dtg
 import numpy as np
 
-# Process multiple files
+# Process multiple files using table-based approach
 files = ["sample1.ngb-ss3", "sample2.ngb-ss3", "sample3.ngb-ss3"]
 results = []
 
 for file_path in files:
+    # Load data and add DTG column in one step
     table = read_ngb(file_path)
-    df = pl.from_arrow(table)
+    table_with_dtg = add_dtg(table, method="savgol", smooth="medium")
+    df = pl.from_arrow(table_with_dtg)
 
-    # Extract data
-    time = df.get_column('time').to_numpy()
+    # All data including DTG is now available in the DataFrame
+    dtg_values = df.get_column('dtg').to_numpy()
     mass = df.get_column('mass').to_numpy()
     temperature = df.get_column('sample_temperature').to_numpy()
-
-    # Calculate DTG with smart defaults
-    dtg_values = dtg(time, mass)
 
     # Store results
     results.append({
