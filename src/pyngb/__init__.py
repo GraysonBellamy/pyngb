@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from importlib.metadata import PackageNotFoundError, version
 
+from .analysis import dtg, dtg_custom
+from .api.analysis import add_dtg, calculate_table_dtg
 from .api.loaders import read_ngb
 from .baseline import BaselineSubtractor, subtract_baseline
 from .batch import BatchProcessor, NGBDataset, process_directory, process_files
@@ -50,6 +52,10 @@ __all__ = [
     "__author__",
     "__email__",
     "__version__",
+    "add_dtg",
+    "calculate_table_dtg",
+    "dtg",
+    "dtg_custom",
     "process_directory",
     "process_files",
     "read_ngb",

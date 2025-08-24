@@ -30,6 +30,7 @@ A comprehensive Python library for parsing and analyzing NETZSCH STA (Simultaneo
 - 🔄 **Format Conversion**: Export to Parquet, CSV, and JSON
 - 📈 **Dataset Management**: Tools for managing collections of NGB files
 - 🔀 **Concurrent Processing**: Thread-safe operations and parallel execution
+- 📊 **DTG Analysis**: Simple, powerful derivative thermogravimetry calculation
 - 📝 **Rich Documentation**: Complete API documentation with examples
 
 ## 🚀 Quick Start
@@ -86,6 +87,40 @@ plt.plot(df['time'], df['mass'])
 plt.xlabel('Time (s)')
 plt.ylabel('Mass (mg)')
 plt.title('Mass Loss')
+plt.show()
+```
+
+### DTG (Derivative Thermogravimetry) Analysis
+
+```python
+from pyngb import dtg
+import numpy as np
+
+# Convert PyArrow table to numpy arrays
+time = df['time'].to_numpy()
+mass = df['mass'].to_numpy()
+
+# Basic DTG calculation - one line, perfect results
+dtg_values = dtg(time, mass)
+
+# Method selection for comparison
+dtg_savgol = dtg(time, mass, method="savgol")    # Recommended
+dtg_gradient = dtg(time, mass, method="gradient") # For comparison
+
+# Simple smoothing control
+dtg_strict = dtg(time, mass, smooth="strict")  # Preserve all features
+dtg_medium = dtg(time, mass, smooth="medium")   # Balanced (default)
+dtg_loose = dtg(time, mass, smooth="loose")     # Remove noise
+
+# Plot DTG results
+plt.figure(figsize=(12, 6))
+plt.plot(df['sample_temperature'], dtg_strict, label='Strict smoothing', alpha=0.7)
+plt.plot(df['sample_temperature'], dtg_medium, label='Medium smoothing', linewidth=2)
+plt.plot(df['sample_temperature'], dtg_loose, label='Loose smoothing', alpha=0.7)
+plt.xlabel('Temperature (°C)')
+plt.ylabel('DTG (mg/min)')
+plt.title('Derivative Thermogravimetry')
+plt.legend()
 plt.show()
 ```
 
@@ -262,7 +297,10 @@ pyngb uses a modular, extensible architecture designed for performance and maint
 ```
 pyngb/
 ├── api/                    # High-level user interface
-│   └── loaders.py         # Main loading functions
+│   ├── loaders.py         # Main loading functions
+│   └── analysis.py        # DTG analysis API
+├── analysis/              # Simplified analysis tools
+│   └── dtg.py             # Clean DTG calculation
 ├── binary/                # Low-level binary parsing
 │   ├── parser.py          # Binary structure parsing
 │   └── handlers.py        # Data type handlers
@@ -302,6 +340,12 @@ Common data columns extracted from NGB files:
 | `purge_flow_1` | Primary purge gas flow | mL/min |
 | `purge_flow_2` | Secondary purge gas flow | mL/min |
 | `protective_flow` | Protective gas flow | mL/min |
+
+**Derived Columns (via DTG analysis):**
+
+| Column | Description | Units |
+|--------|-------------|--------|
+| `dtg` | Derivative thermogravimetry (time-based) | mg/min |
 
 ### Metadata Fields
 

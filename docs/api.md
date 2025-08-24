@@ -182,6 +182,148 @@ print(f"Warnings: {result.summary()['warning_count']}")
 print(result.report())
 ```
 
+## DTG Analysis
+
+### Core DTG Functions
+
+::: pyngb.analysis.dtg
+    options:
+      heading_level: 3
+      show_source: true
+
+::: pyngb.analysis.dtg_custom
+    options:
+      heading_level: 3
+      show_source: true
+
+### High-Level DTG API
+
+::: pyngb.api.analysis.add_dtg
+    options:
+      heading_level: 3
+      show_source: true
+
+::: pyngb.api.analysis.calculate_table_dtg
+    options:
+      heading_level: 3
+      show_source: true
+
+### DTG Analysis Examples
+
+```python
+from pyngb import dtg, dtg_custom, add_dtg, calculate_table_dtg
+import numpy as np
+
+# Basic DTG calculation - dead simple
+time = np.linspace(0, 3600, 1000)  # 1 hour experiment
+mass = np.linspace(50, 45, 1000)   # 5 mg mass loss
+
+# Method 1: One line, perfect results
+dtg_values = dtg(time, mass)
+print(f"DTG range: {dtg_values.min():.3f} to {dtg_values.max():.3f} mg/min")
+
+# Method 2: Choose calculation method
+dtg_savgol = dtg(time, mass, method="savgol")    # Recommended
+dtg_gradient = dtg(time, mass, method="gradient") # For comparison
+
+# Method 3: Control smoothing level
+dtg_strict = dtg(time, mass, smooth="strict")  # Preserve features
+dtg_medium = dtg(time, mass, smooth="medium")   # Balanced (default)
+dtg_loose = dtg(time, mass, smooth="loose")     # Remove noise
+
+# Method 4: Advanced control for power users
+dtg_custom_result = dtg_custom(time, mass, method="savgol", window=31, polyorder=3)
+
+# Method 5: Table integration
+from pyngb import read_ngb
+table = read_ngb("sample.ngb-ss3")
+
+# Add DTG column to table
+table_with_dtg = add_dtg(table, method="savgol", smooth="medium")
+print(f"Added DTG column. New shape: {table_with_dtg.num_rows} x {table_with_dtg.num_columns}")
+
+# Calculate DTG array from table
+dtg_array = calculate_table_dtg(table, smooth="strict")
+print(f"DTG array shape: {dtg_array.shape}")
+```
+
+### Method and Smoothing Comparison
+
+```python
+# Compare calculation methods
+methods = ["savgol", "gradient"]
+smoothing_levels = ["strict", "medium", "loose"]
+
+results = {}
+for method in methods:
+    for smooth in smoothing_levels:
+        key = f"{method}_{smooth}"
+        results[key] = dtg(time, mass, method=method, smooth=smooth)
+
+# Analyze results
+for key, dtg_result in results.items():
+    print(f"{key}: max_abs={np.max(np.abs(dtg_result)):.3f}, "
+          f"std={np.std(dtg_result):.3f} mg/min")
+
+# Method correlation analysis
+import matplotlib.pyplot as plt
+
+plt.figure(figsize=(12, 8))
+for i, (key, dtg_result) in enumerate(results.items()):
+    plt.subplot(2, 3, i+1)
+    plt.plot(time, dtg_result, linewidth=1.5)
+    plt.title(key.replace('_', ' + '))
+    plt.ylabel('DTG (mg/min)')
+    if i >= 3:  # Bottom row
+        plt.xlabel('Time (s)')
+
+plt.tight_layout()
+plt.show()
+```
+
+### Power User Examples
+
+```python
+# Custom parameter validation
+def validate_dtg_params(time, mass, window, polyorder):
+    """Validate DTG parameters before calculation."""
+    if len(time) != len(mass):
+        return False, "Array length mismatch"
+    if window >= len(time):
+        return False, f"Window ({window}) too large for data ({len(time)})"
+    if window % 2 == 0:
+        return False, "Window must be odd"
+    if polyorder >= window:
+        return False, f"Polyorder ({polyorder}) must be less than window ({window})"
+    return True, "Parameters valid"
+
+# Use custom validation
+is_valid, msg = validate_dtg_params(time, mass, window=31, polyorder=3)
+if is_valid:
+    dtg_result = dtg_custom(time, mass, window=31, polyorder=3)
+    print("Custom DTG calculation successful")
+else:
+    print(f"Parameter error: {msg}")
+
+# Performance comparison
+import time as time_module
+
+methods_to_test = [
+    ("default", lambda: dtg(time, mass)),
+    ("savgol_strict", lambda: dtg(time, mass, method="savgol", smooth="strict")),
+    ("gradient_loose", lambda: dtg(time, mass, method="gradient", smooth="loose")),
+    ("custom", lambda: dtg_custom(time, mass, window=25, polyorder=2))
+]
+
+print("Performance Comparison:")
+for name, func in methods_to_test:
+    start = time_module.time()
+    for _ in range(100):  # Run 100 times
+        result = func()
+    end = time_module.time()
+    print(f"  {name}: {(end-start)*1000:.1f}ms for 100 runs")
+```
+
 ## Core Parser Classes
 
 ### NGBParser
