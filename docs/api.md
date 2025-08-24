@@ -215,6 +215,61 @@ print(result.report())
       heading_level: 3
       show_source: true
 
+### DSC Calibration Functions
+
+::: pyngb.api.analysis.apply_dsc_calibration
+    options:
+      heading_level: 3
+      show_source: true
+
+#### DSC Calibration Examples
+
+```python
+from pyngb import read_ngb
+from pyngb.api.analysis import apply_dsc_calibration, normalize_to_initial_mass
+from pyngb.api.metadata import get_column_units, get_processing_history
+from pyngb.baseline import subtract_baseline
+
+# Basic DSC calibration
+table = read_ngb("sample.ngb-ss3")
+calibrated_table = apply_dsc_calibration(table)
+
+print(f"Original units: {get_column_units(table, 'dsc_signal')}")        # µV
+print(f"Calibrated units: {get_column_units(calibrated_table, 'dsc_signal')}")  # mW
+
+# Complete workflow with baseline subtraction and normalization
+sample_file = "sample.ngb-ss3"
+baseline_file = "baseline.ngb-bs3"
+
+# Step 1: Baseline subtraction
+baseline_df = subtract_baseline(sample_file, baseline_file, "sample_temperature")
+baseline_table = baseline_df.to_arrow()
+
+# Step 2: DSC calibration (µV → mW)
+calibrated_table = apply_dsc_calibration(baseline_table)
+
+# Step 3: Mass normalization (mW → mW/mg)
+final_table = normalize_to_initial_mass(calibrated_table, columns=['dsc_signal'])
+
+final_units = get_column_units(final_table, 'dsc_signal')  # mW/mg
+final_history = get_processing_history(final_table, 'dsc_signal')
+# ['raw', 'baseline_subtracted', 'calibration_applied', 'normalized']
+
+# Order independence - both approaches give identical results
+method1 = apply_dsc_calibration(table)
+method1 = normalize_to_initial_mass(method1, columns=['dsc_signal'])
+
+method2 = normalize_to_initial_mass(table, columns=['dsc_signal'])
+method2 = apply_dsc_calibration(method2)
+
+# Results are mathematically identical within machine precision
+import polars as pl
+df1 = pl.from_arrow(method1)
+df2 = pl.from_arrow(method2)
+max_diff = (df1['dsc_signal'] - df2['dsc_signal']).abs().max()
+print(f"Maximum difference: {max_diff:.2e}")  # ~1e-15
+```
+
 ## Column Metadata System
 
 pyngb provides comprehensive column-level metadata tracking for thermal analysis data, enabling complete provenance and traceability through analysis workflows.

@@ -88,13 +88,15 @@ class BaseColumnMetadata(TypedDict, total=False):
 
 
 class BaselinableColumnMetadata(BaseColumnMetadata, total=False):
-    """Extended metadata for columns that support baseline correction.
+    """Extended metadata for columns that support baseline correction and calibration.
 
     This includes the baseline_subtracted field for signals like mass and DSC
-    that can be baseline-corrected.
+    that can be baseline-corrected, and calibration_applied for DSC signals
+    that can be calibrated from µV to mW.
     """
 
     baseline_subtracted: bool  # True if baseline correction has been applied
+    calibration_applied: bool  # True if calibration has been applied (DSC only)
 
 
 # Define which metadata fields apply to which column types
@@ -106,6 +108,9 @@ FIELD_APPLICABILITY = {
         "mass",
         "dsc_signal",
     ],  # Only these can be baseline corrected
+    "calibration_applied": [
+        "dsc_signal",
+    ],  # Only DSC signals can be calibrated
 }
 
 # Default metadata for common column types
@@ -132,6 +137,7 @@ DEFAULT_COLUMN_METADATA = {
         "processing_history": ["raw"],
         "source": "measurement",
         "baseline_subtracted": False,
+        "calibration_applied": False,
     },
     "dtg": {
         "units": "mg/min",
