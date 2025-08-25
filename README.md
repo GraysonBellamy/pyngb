@@ -73,14 +73,6 @@ python -m pyngb --help
 - **[Troubleshooting](docs/troubleshooting.md)** - Common issues and solutions
 - **[Contributing](docs/contributing.md)** - Development guidelines
 
-## Performance
-
-| Operation | Performance |
-|-----------|-------------|
-| Parse 10MB file | ~0.5 seconds |
-| Batch process 100 files | ~30 seconds (4 cores) |
-| Memory usage | ~2x file size |
-
 ## License
 
 MIT License. See [LICENSE.txt](LICENSE.txt) for details.
