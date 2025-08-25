@@ -9,33 +9,44 @@ edit_uri: edit/main/docs/
 
 theme:
   name: material
+  custom_dir: docs/overrides
   palette:
     - scheme: default
-      primary: blue
+      primary: green
       accent: blue
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
     - scheme: slate
-      primary: blue
+      primary: green
       accent: blue
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
   features:
     - navigation.tabs
+    - navigation.tabs.sticky
     - navigation.sections
     - navigation.expand
     - navigation.top
     - navigation.tracking
+    - navigation.instant
+    - navigation.instant.progress
     - search.highlight
     - search.share
     - search.suggest
     - content.code.copy
     - content.code.annotate
     - content.tabs.link
+    - content.action.edit
+    - toc.follow
+    - toc.integrate
   icon:
     repo: fontawesome/brands/github
+    edit: material/pencil
+    view: material/eye
+  logo: https://img.icons8.com/color/48/000000/test-tube.png
+  favicon: https://img.icons8.com/color/32/000000/test-tube.png
 
 plugins:
   - search:
@@ -86,33 +97,12 @@ markdown_extensions:
   - pymdownx.tilde
 
 nav:
-  - Home: index.md
-  - Getting Started:
-    - Installation: installation.md
-    - Quick Start: quickstart.md
-    - Troubleshooting: troubleshooting.md
-  - User Guide:
-    - Basic Usage: user-guide/basic-usage.md
-    - Batch Processing: user-guide/batch-processing.md
-    - Data Analysis: user-guide/data-analysis.md
-    - Column Metadata: user-guide/column-metadata.md
-    - DTG Analysis: user-guide/dtg-analysis.md
-    - Baseline Subtraction: user-guide/baseline-subtraction.md
-    - Command Line: user-guide/command-line.md
-    - Validation: api/data-validation.md
-  - API Reference:
-    - Overview: api.md
-    - Core Functions: api/core-functions.md
-    - Batch Processing: api/batch-processing.md
-    - Data Validation: api/data-validation.md
-    - Configuration: api/configuration.md
-    - Exceptions: api/exceptions.md
-    - Utilities: api/utilities.md
-  - Development:
-    - Contributing: development.md
-    - Testing: development/testing.md
-    - Architecture: development/architecture.md
-    - Performance: development/performance.md
+  - Home: ../README.md
+  - Getting Started: getting-started.md
+  - User Guide: user-guide.md
+  - API Reference: api-reference.md
+  - Troubleshooting: troubleshooting.md
+  - Contributing: contributing.md
 
 extra:
   social:
