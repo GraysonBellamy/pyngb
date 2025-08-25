@@ -1,6 +1,6 @@
-# Troubleshooting Guide
+# Troubleshooting
 
-This guide helps you resolve common issues when using pyngb. If you don't find your issue here, please check our [GitHub Issues](https://github.com/GraysonBellamy/pyngb/issues) or create a new issue.
+Common issues and solutions when using pyngb.
 
 ## Installation Issues
 
@@ -16,29 +16,29 @@ pip install --upgrade pip
 # Try with explicit PyPI index
 pip install --index-url https://pypi.org/simple/ pyngb
 
-# Install from source if needed
+# Install from source
 pip install git+https://github.com/GraysonBellamy/pyngb.git
 ```
 
 ### Dependency Conflicts
 
-**Problem**: Installation fails due to dependency conflicts
+**Problem**: Installation fails due to conflicting dependencies
 
 **Solutions**:
 ```bash
 # Create clean virtual environment
 python -m venv pyngb_env
-source pyngb_env/bin/activate  # On Windows: pyngb_env\Scripts\activate
+source pyngb_env/bin/activate  # Windows: pyngb_env\Scripts\activate
 pip install pyngb
 
-# Or use uv for better dependency resolution
+# Use uv for better dependency resolution
 pip install uv
 uv pip install pyngb
 ```
 
-### ImportError After Installation
+### Import Errors
 
-**Problem**: `ImportError: No module named 'pyngb'`
+**Problem**: `ImportError: No module named 'pyngb'` after installation
 
 **Solutions**:
 ```bash
@@ -55,249 +55,142 @@ pip install pyngb
 
 ## File Parsing Issues
 
-### FileNotFoundError
+### File Not Found
 
 **Problem**: File exists but pyngb can't find it
 
 **Solutions**:
 ```python
 from pathlib import Path
+from pyngb import read_ngb
 
 # Use absolute paths
 file_path = Path("sample.ngb-ss3").absolute()
 table = read_ngb(str(file_path))
 
-# Check file exists
+# Check file exists and extension
 if not Path("sample.ngb-ss3").exists():
     print("File not found!")
 
-# Check current directory
-print("Current directory:", Path.cwd())
-print("Files in directory:", list(Path.cwd().glob("*.ngb-ss3")))
+# List available NGB files
+ngb_files = list(Path.cwd().glob("*.ngb-*"))
+print(f"Found {len(ngb_files)} NGB files")
 ```
 
 ### Corrupted File Error
 
-**Problem**: `NGBCorruptedFileError` when parsing
+**Problem**: File appears corrupted or invalid
 
 **Solutions**:
 ```python
-from pyngb import NGBCorruptedFileError
-
-try:
-    table = read_ngb("sample.ngb-ss3")
-except NGBCorruptedFileError as e:
-    print(f"File appears corrupted: {e}")
-
-    # Try basic file checks
-    with open("sample.ngb-ss3", "rb") as f:
-        header = f.read(10)
-        print(f"File header: {header}")
-
-    # Check if it's a valid ZIP
-    import zipfile
-    try:
-        with zipfile.ZipFile("sample.ngb-ss3", "r") as z:
-            print("File contents:", z.namelist())
-    except zipfile.BadZipFile:
-        print("Not a valid ZIP file")
-```
-
-### Unsupported Version Error
-
-**Problem**: `NGBUnsupportedVersionError` for newer files
-
-**Solutions**:
-```python
-# Check file version information
 import zipfile
+from pathlib import Path
 
-with zipfile.ZipFile("sample.ngb-ss3", "r") as z:
-    print("ZIP contents:", z.namelist())
+# Check if file is valid ZIP
+try:
+    with zipfile.ZipFile("sample.ngb-ss3", "r") as z:
+        print("ZIP contents:", z.namelist())
 
-    # Look for version information
-    for name in z.namelist():
-        if "version" in name.lower():
-            content = z.read(name)
-            print(f"{name}: {content[:100]}")
+        # Check for expected files
+        expected = ["measurement", "metadata"]
+        found = [name for name in z.namelist() if any(exp in name.lower() for exp in expected)]
+        print("Expected files found:", found)
 
-# Report unsupported files as issues
-print("Please report this file format to: https://github.com/GraysonBellamy/pyngb/issues")
+except zipfile.BadZipFile:
+    print("File is not a valid ZIP - may be corrupted")
+
+    # Check file size
+    size = Path("sample.ngb-ss3").stat().st_size
+    print(f"File size: {size} bytes")
+    if size < 1000:
+        print("File seems too small to be valid NGB")
 ```
 
 ### Empty or Missing Data
 
-**Problem**: File parses but returns no data
+**Problem**: File parses but contains no useful data
 
 **Solutions**:
 ```python
+import json
+from pyngb import read_ngb
+
 table = read_ngb("sample.ngb-ss3")
 
-# Check table structure
-print(f"Rows: {table.num_rows}")
-print(f"Columns: {table.num_columns}")
-print(f"Column names: {table.column_names}")
+# Check data structure
+print(f"Shape: {table.num_rows} rows × {table.num_columns} columns")
+print(f"Columns: {table.column_names}")
 
 # Check metadata
-import json
 if b'file_metadata' in table.schema.metadata:
     metadata = json.loads(table.schema.metadata[b'file_metadata'])
-    print(f"Metadata keys: {list(metadata.keys())}")
-else:
-    print("No metadata found")
+    print(f"Sample: {metadata.get('sample_name', 'Unknown')}")
+    print(f"Instrument: {metadata.get('instrument', 'Unknown')}")
 
-# Check raw file structure
-import zipfile
-with zipfile.ZipFile("sample.ngb-ss3", "r") as z:
-    for name in z.namelist():
-        size = z.getinfo(name).file_size
-        print(f"{name}: {size} bytes")
+    # Check temperature program
+    if 'temperature_program' in metadata:
+        stages = len([k for k in metadata['temperature_program'].keys() if k.startswith('stage_')])
+        print(f"Temperature program has {stages} stages")
+else:
+    print("No metadata found - this may indicate parsing issues")
 ```
 
 ## Memory and Performance Issues
 
-### Out of Memory Errors
+### Out of Memory
 
 **Problem**: `MemoryError` when processing large files
 
 **Solutions**:
 ```python
-# Check file size first
 from pathlib import Path
-file_size = Path("large_file.ngb-ss3").stat().st_size
-print(f"File size: {file_size / 1024 / 1024:.1f} MB")
 
-# Process in chunks for very large files
-def process_large_file_chunked(file_path, chunk_size=10000):
-    table = read_ngb(file_path)
+# Check file size
+file_size = Path("large_file.ngb-ss3").stat().st_size
+print(f"File size: {file_size / (1024**2):.1f} MB")
+
+# For files >100MB, consider chunking
+if file_size > 100 * 1024 * 1024:
+    print("Large file detected - using chunked processing")
+
+    table = read_ngb("large_file.ngb-ss3")
+    chunk_size = 10000
 
     for i in range(0, table.num_rows, chunk_size):
-        chunk = table.slice(i, min(chunk_size, table.num_rows - i))
+        end_idx = min(i + chunk_size, table.num_rows)
+        chunk = table.slice(i, end_idx - i)
         # Process chunk
-        yield chunk
-
-# Use generators to reduce memory usage
-for chunk in process_large_file_chunked("large_file.ngb-ss3"):
-    # Process each chunk
-    pass
+        print(f"Processing rows {i} to {end_idx}")
 ```
 
-### Slow Parsing Performance
+### Slow Performance
 
 **Problem**: Parsing takes too long
 
 **Solutions**:
 ```python
 import time
-import polars as pl
 
-# Measure parsing time
+# Measure parsing performance
 start_time = time.time()
 table = read_ngb("sample.ngb-ss3")
 parse_time = time.time() - start_time
+
 print(f"Parse time: {parse_time:.2f} seconds")
+print(f"Rate: {table.num_rows / parse_time:.0f} rows/second")
 
-# Check file complexity
-print(f"File size: {Path('sample.ngb-ss3').stat().st_size / 1024 / 1024:.1f} MB")
-
-# Optimize validation performance (v0.0.2+)
-from pyngb.validation import validate_sta_data
-
-# Convert once, reuse for multiple operations
-df = pl.from_arrow(table)
-
-# Validation with Polars DataFrame (zero conversion overhead)
-issues = validate_sta_data(df)
-
-# Multiple validation calls are now more efficient
-temp_analysis = check_temperature_profile(df)  # No conversion needed
-mass_analysis = check_mass_data(df)           # No conversion needed
-```
-
-### Conversion Overhead (Optimized in v0.0.2)
-
-**Problem**: Multiple conversions between PyArrow and Polars
-
-**Solutions**:
-```python
-# Before v0.0.2: Multiple conversions
-table = read_ngb("sample.ngb-ss3")
-df1 = pl.from_arrow(table)      # Conversion 1
-df2 = pl.from_arrow(table)      # Conversion 2 (redundant)
-validate_sta_data(table)        # Internal conversion 3
-
-# v0.0.2+: Optimized approach
-table = read_ngb("sample.ngb-ss3")
-df = pl.from_arrow(table)       # Single conversion
-
-# All subsequent operations use the DataFrame directly
-validate_sta_data(df)           # No conversion needed
-check_temperature_profile(df)   # No conversion needed
-check_mass_data(df)            # No conversion needed
-```
-print(f"Data points: {table.num_rows}")
-print(f"Columns: {table.num_columns}")
-
-# Use batch processing for multiple files
+# For multiple files, use batch processing
 from pyngb import BatchProcessor
-processor = BatchProcessor(max_workers=4)  # Use multiple cores
-```
 
-### Memory Leaks in Batch Processing
-
-**Problem**: Memory usage grows when processing many files
-
-**Solutions**:
-```python
-import gc
-
-def process_files_memory_safe(file_list):
-    for i, file_path in enumerate(file_list):
-        table = read_ngb(file_path)
-
-        # Process immediately
-        process_table(table)
-
-        # Clear reference
-        del table
-
-        # Force garbage collection every 10 files
-        if i % 10 == 0:
-            gc.collect()
+processor = BatchProcessor(max_workers=4)
+results = processor.process_files(file_list, skip_errors=True)
 ```
 
 ## Data Quality Issues
 
-### Unexpected Column Names
+### Missing Expected Columns
 
-**Problem**: Expected columns are missing or have different names
-
-**Solutions**:
-```python
-table = read_ngb("sample.ngb-ss3")
-
-# Check available columns
-print("Available columns:", table.column_names)
-
-# Check for common variations
-common_names = ["time", "sample_temperature", "mass", "dsc_signal"]
-available = set(table.column_names)
-
-for name in common_names:
-    if name in available:
-        print(f"✓ Found: {name}")
-    else:
-        # Look for similar names
-        similar = [col for col in available if name.lower() in col.lower()]
-        if similar:
-            print(f"? Possible matches for '{name}': {similar}")
-        else:
-            print(f"✗ Missing: {name}")
-```
-
-### NaN or Invalid Values
-
-**Problem**: Data contains NaN or unrealistic values
+**Problem**: Required columns like 'mass' or 'temperature' are missing
 
 **Solutions**:
 ```python
@@ -306,324 +199,279 @@ import polars as pl
 table = read_ngb("sample.ngb-ss3")
 df = pl.from_arrow(table)
 
-# Check for NaN values
-print("Null counts per column:")
-print(df.null_count())
+# Check for required columns
+required = ["time", "sample_temperature", "mass"]
+available = set(df.columns)
 
-# Check for infinite values
-for col in df.columns:
-    if df[col].dtype in [pl.Float32, pl.Float64]:
-        inf_count = df.filter(pl.col(col).is_infinite()).height
-        if inf_count > 0:
-            print(f"Column '{col}' has {inf_count} infinite values")
+for col in required:
+    if col in available:
+        print(f"✓ Found: {col}")
+    else:
+        # Look for similar names
+        similar = [c for c in available if col.lower() in c.lower() or c.lower() in col.lower()]
+        if similar:
+            print(f"? Possible matches for '{col}': {similar}")
+        else:
+            print(f"✗ Missing: {col}")
 
-# Check data ranges
-print("\nData ranges:")
-for col in df.columns:
-    if df[col].dtype in [pl.Float32, pl.Float64, pl.Int32, pl.Int64]:
-        min_val = df[col].min()
-        max_val = df[col].max()
-        print(f"{col}: {min_val} to {max_val}")
+print(f"\nAll available columns: {sorted(df.columns)}")
 ```
 
-### Validation Failures
+### NaN or Invalid Values
 
-**Problem**: Data validation reports many issues
+**Problem**: Data contains NaN, infinite, or unrealistic values
 
 **Solutions**:
 ```python
-from pyngb.validation import QualityChecker, validate_sta_data
+import polars as pl
+import numpy as np
 
-# Get detailed validation report
 df = pl.from_arrow(table)
-checker = QualityChecker(df)
-result = checker.full_validation()
 
-print("Validation Summary:")
-print(f"Valid: {result.is_valid}")
-print(f"Errors: {result.summary()['error_count']}")
-print(f"Warnings: {result.summary()['warning_count']}")
+# Check for null values
+print("Null counts:")
+print(df.null_count())
 
-# Get detailed report
-print("\nDetailed Report:")
-print(result.report())
+# Check for infinite values in numeric columns
+for col in df.columns:
+    if df[col].dtype in [pl.Float32, pl.Float64]:
+        values = df[col].to_numpy()
+        inf_count = np.sum(np.isinf(values))
+        if inf_count > 0:
+            print(f"Column '{col}': {inf_count} infinite values")
 
-# Check specific issues
-issues = validate_sta_data(df)
-for issue in issues:
-    print(f"Issue: {issue}")
+# Check data ranges
+print("\nData ranges:")
+numeric_cols = [col for col in df.columns if df[col].dtype in [pl.Float32, pl.Float64]]
+print(df.select(numeric_cols).describe())
+
+# Look for outliers
+if "mass" in df.columns:
+    mass_values = df["mass"].to_numpy()
+    mass_change = abs(mass_values[-1] - mass_values[0])
+    if mass_change < 0.01:
+        print(f"Warning: Very small mass change ({mass_change:.3f} mg)")
+```
+
+## Baseline Subtraction Issues
+
+### Temperature Program Mismatch
+
+**Problem**: Baseline subtraction fails due to incompatible temperature programs
+
+**Solutions**:
+```python
+import json
+from pyngb import read_ngb
+
+# Compare temperature programs
+sample_metadata, _ = read_ngb("sample.ngb-ss3", return_metadata=True)
+baseline_metadata, _ = read_ngb("baseline.ngb-bs3", return_metadata=True)
+
+sample_program = sample_metadata.get('temperature_program', {})
+baseline_program = baseline_metadata.get('temperature_program', {})
+
+print("Sample temperature program:")
+for stage, params in sample_program.items():
+    if stage.startswith('stage_'):
+        print(f"  {stage}: {params}")
+
+print("\nBaseline temperature program:")
+for stage, params in baseline_program.items():
+    if stage.startswith('stage_'):
+        print(f"  {stage}: {params}")
+
+# Check for differences
+sample_stages = set(sample_program.keys())
+baseline_stages = set(baseline_program.keys())
+
+if sample_stages != baseline_stages:
+    print(f"\nStage mismatch:")
+    print(f"  Sample has: {sample_stages}")
+    print(f"  Baseline has: {baseline_stages}")
+```
+
+### Dynamic Axis Issues
+
+**Problem**: Baseline subtraction with wrong alignment axis
+
+**Solutions**:
+```python
+from pyngb import read_ngb
+
+# Try different dynamic axes
+axes = ["time", "sample_temperature", "furnace_temperature"]
+
+for axis in axes:
+    try:
+        corrected = read_ngb(
+            "sample.ngb-ss3",
+            baseline_file="baseline.ngb-bs3",
+            dynamic_axis=axis
+        )
+        print(f"✓ Success with axis: {axis}")
+        print(f"  Result shape: {corrected.num_rows} × {corrected.num_columns}")
+        break
+    except Exception as e:
+        print(f"✗ Failed with axis {axis}: {e}")
 ```
 
 ## Batch Processing Issues
 
-### Batch Processing Fails
+### Processing Failures
 
 **Problem**: Batch processing stops or fails
 
 **Solutions**:
 ```python
 from pyngb import BatchProcessor
+from pathlib import Path
 
 # Use error tolerance
 processor = BatchProcessor(max_workers=2, verbose=True)
+
+# Get list of files
+files = list(Path(".").glob("*.ngb-ss3"))
+print(f"Found {len(files)} files to process")
+
+# Process with error handling
 results = processor.process_files(
-    file_list,
-    skip_errors=True,  # Continue even if some files fail
+    [str(f) for f in files],
+    skip_errors=True,  # Continue even if some fail
     output_dir="./output/"
 )
 
-# Check results
+# Analyze results
 successful = [r for r in results if r["status"] == "success"]
 failed = [r for r in results if r["status"] == "error"]
 
-print(f"Successful: {len(successful)}")
-print(f"Failed: {len(failed)}")
+print(f"\nResults: {len(successful)} success, {len(failed)} failed")
 
 # Review failures
-for failure in failed:
-    print(f"Failed: {failure['file']} - {failure.get('error', 'Unknown error')}")
-```
-
-### Output Files Not Created
-
-**Problem**: Batch processing completes but no output files
-
-**Solutions**:
-```python
-from pathlib import Path
-
-# Check output directory
-output_dir = Path("./output/")
-if not output_dir.exists():
-    output_dir.mkdir(parents=True)
-
-# Check permissions
-try:
-    test_file = output_dir / "test.txt"
-    test_file.write_text("test")
-    test_file.unlink()
-    print("Output directory is writable")
-except PermissionError:
-    print("Permission denied - check output directory permissions")
-
-# Verify file creation
-results = processor.process_files(files, output_dir=output_dir)
-for result in results:
-    if result["status"] == "success":
-        expected_file = output_dir / f"{Path(result['file']).stem}.parquet"
-        if expected_file.exists():
-            print(f"✓ Created: {expected_file}")
-        else:
-            print(f"✗ Missing: {expected_file}")
+for failure in failed[:5]:  # Show first 5 failures
+    print(f"Failed: {Path(failure['file']).name}")
+    print(f"  Error: {failure.get('error', 'Unknown')}")
 ```
 
 ## Command Line Issues
 
-### CLI Command Not Found
+### CLI Not Working
 
-**Problem**: `python -m pyngb` fails
-
-**Solutions**:
-```bash
-# Check if pyngb is properly installed
-python -c "import pyngb; print(pyngb.__version__)"
-
-# Try explicit python path
-python -m pyngb sample.ngb-ss3
-
-# Check if __main__.py exists
-python -c "import pyngb.__main__; print('CLI module found')"
-
-# Use direct function call if CLI fails
-python -c "from pyngb import read_ngb; print(read_ngb('sample.ngb-ss3').num_rows)"
-```
-
-### CLI Arguments Not Working
-
-**Problem**: CLI arguments are ignored or cause errors
+**Problem**: `python -m pyngb` command fails
 
 **Solutions**:
 ```bash
-# Check CLI help
-python -m pyngb --help
+# Verify pyngb installation
+python -c "import pyngb; print(f'pyngb {pyngb.__version__} installed')"
 
-# Use supported flags
-python -m pyngb sample.ngb-ss3 -f parquet -o ./output/
+# Check CLI module
+python -c "import pyngb.__main__; print('CLI module available')"
 
-# Quote paths with spaces
-python -m pyngb "file with spaces.ngb-ss3" -f csv
+# Use full module path if needed
+python -m pyngb.api.loaders sample.ngb-ss3
+
+# Alternative: use function directly
+python -c "
+from pyngb import read_ngb
+import pyarrow.parquet as pq
+table = read_ngb('sample.ngb-ss3')
+pq.write_table(table, 'output.parquet')
+print('File converted successfully')
+"
 ```
 
-## Integration Issues
+### Permission Errors
 
-### Polars/Pandas Conversion Problems
-
-**Problem**: Issues converting between data formats
+**Problem**: Cannot write output files
 
 **Solutions**:
-```python
-import polars as pl
-import pandas as pd
+```bash
+# Check output directory permissions
+ls -la ./output/
 
-table = read_ngb("sample.ngb-ss3")
+# Create output directory if needed
+mkdir -p ./output/
+chmod 755 ./output/
 
-# Safe conversion to Polars
-try:
-    df_polars = pl.from_arrow(table)
-    print("Polars conversion successful")
-except Exception as e:
-    print(f"Polars conversion failed: {e}")
-    # Try column by column
-    for col_name in table.column_names:
-        try:
-            col_data = table[col_name].to_pylist()
-            print(f"Column '{col_name}': {len(col_data)} values")
-        except Exception as col_e:
-            print(f"Issue with column '{col_name}': {col_e}")
+# Use different output location
+python -m pyngb sample.ngb-ss3 -o ~/Documents/ngb_output/
 
-# Safe conversion to Pandas
-try:
-    df_pandas = df_polars.to_pandas()
-    print("Pandas conversion successful")
-except Exception as e:
-    print(f"Pandas conversion failed: {e}")
-```
-
-### Plotting Issues
-
-**Problem**: Cannot plot data with matplotlib/seaborn
-
-**Solutions**:
-```python
-import matplotlib.pyplot as plt
-import polars as pl
-
-table = read_ngb("sample.ngb-ss3")
-df = pl.from_arrow(table)
-
-# Check data types
-print("Column types:")
-for col, dtype in zip(df.columns, df.dtypes):
-    print(f"{col}: {dtype}")
-
-# Handle plotting issues
-try:
-    if "time" in df.columns and "sample_temperature" in df.columns:
-        time_data = df["time"].to_numpy()
-        temp_data = df["sample_temperature"].to_numpy()
-
-        plt.figure(figsize=(10, 6))
-        plt.plot(time_data, temp_data)
-        plt.xlabel("Time")
-        plt.ylabel("Temperature")
-        plt.show()
-except Exception as e:
-    print(f"Plotting failed: {e}")
-
-    # Debug data
-    print(f"Time data type: {type(time_data)}")
-    print(f"Time data shape: {time_data.shape if hasattr(time_data, 'shape') else 'No shape'}")
-    print(f"Temperature data type: {type(temp_data)}")
+# Check disk space
+df -h .
 ```
 
 ## Getting Help
 
-### Reporting Issues
+### Debug Information
 
-When reporting issues, please include:
-
-1. **System Information**:
-   ```python
-   import sys
-   import pyngb
-   print(f"Python: {sys.version}")
-   print(f"pyngb: {pyngb.__version__}")
-   print(f"Platform: {sys.platform}")
-   ```
-
-2. **Error Details**:
-   - Full error message and traceback
-   - Minimal code example that reproduces the issue
-   - Sample file (if possible) or file characteristics
-
-3. **Expected vs Actual Behavior**:
-   - What you expected to happen
-   - What actually happened
-
-### Debug Information Collection
+When reporting issues, collect this information:
 
 ```python
-def collect_debug_info(file_path):
-    """Collect debug information for troubleshooting."""
+import sys
+import platform
+from pathlib import Path
+
+def debug_info():
+    try:
+        import pyngb
+        version = pyngb.__version__
+    except:
+        version = "not installed"
+
+    print(f"Python: {sys.version}")
+    print(f"Platform: {platform.platform()}")
+    print(f"pyngb: {version}")
+
+    # Check dependencies
+    deps = ['polars', 'pyarrow', 'numpy']
+    for dep in deps:
+        try:
+            mod = __import__(dep)
+            print(f"{dep}: {getattr(mod, '__version__', 'unknown')}")
+        except ImportError:
+            print(f"{dep}: not installed")
+
+debug_info()
+```
+
+### File-Specific Debug
+
+For file-specific issues:
+
+```python
+def debug_file(filepath):
     from pathlib import Path
     import zipfile
-    import sys
-    import pyngb
 
-    info = {
-        "system": {
-            "python_version": sys.version,
-            "pyngb_version": pyngb.__version__,
-            "platform": sys.platform
-        },
-        "file": {
-            "path": str(file_path),
-            "exists": Path(file_path).exists(),
-            "size": Path(file_path).stat().st_size if Path(file_path).exists() else None
-        }
-    }
+    path = Path(filepath)
 
-    # Check ZIP structure
-    try:
-        with zipfile.ZipFile(file_path, "r") as z:
-            info["zip"] = {
-                "valid": True,
-                "files": z.namelist(),
-                "file_sizes": {name: z.getinfo(name).file_size for name in z.namelist()}
-            }
-    except Exception as e:
-        info["zip"] = {"valid": False, "error": str(e)}
+    print(f"File: {path.name}")
+    print(f"Exists: {path.exists()}")
 
-    # Try parsing
-    try:
-        table = read_ngb(file_path)
-        info["parsing"] = {
-            "success": True,
-            "rows": table.num_rows,
-            "columns": table.num_columns,
-            "column_names": table.column_names
-        }
-    except Exception as e:
-        info["parsing"] = {"success": False, "error": str(e)}
+    if path.exists():
+        print(f"Size: {path.stat().st_size:,} bytes")
 
-    return info
+        try:
+            with zipfile.ZipFile(path, 'r') as z:
+                print(f"ZIP contents: {len(z.namelist())} files")
+                for name in z.namelist()[:10]:  # First 10 files
+                    size = z.getinfo(name).file_size
+                    print(f"  {name}: {size:,} bytes")
+        except:
+            print("Not a valid ZIP file")
 
-# Use it like this:
-debug_info = collect_debug_info("problematic_file.ngb-ss3")
-print(json.dumps(debug_info, indent=2))
+debug_file("problematic_file.ngb-ss3")
 ```
 
-### Community Resources
+### Community Support
 
-- **GitHub Issues**: [Report bugs and request features](https://github.com/GraysonBellamy/pyngb/issues)
-- **GitHub Discussions**: [Ask questions and share ideas](https://github.com/GraysonBellamy/pyngb/discussions)
-- **Documentation**: [Complete user guide](https://graysonbellamy.github.io/pyngb/)
+- **GitHub Issues**: [Report bugs](https://github.com/GraysonBellamy/pyngb/issues)
+- **GitHub Discussions**: [Ask questions](https://github.com/GraysonBellamy/pyngb/discussions)
 
-### Getting Quick Help
+When reporting issues, include:
+1. Complete error message and traceback
+2. Debug information from above
+3. Sample file (if possible) or file characteristics
+4. Expected vs actual behavior
 
-For quick help with common issues:
-
-```python
-# Enable debug logging
-import logging
-logging.basicConfig(level=logging.DEBUG)
-
-# Use verbose mode in batch processing
-processor = BatchProcessor(verbose=True)
-
-# Check validation details
-result = checker.full_validation()
-print(result.report())
-```
-
-Remember: Most issues can be resolved by checking file formats, verifying installations, and using the comprehensive error messages provided by pyngb.
+Most issues can be resolved by verifying file formats, checking installations, and using the error messages provided by pyngb.
