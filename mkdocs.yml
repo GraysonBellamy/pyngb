@@ -9,7 +9,6 @@ edit_uri: edit/main/docs/
 
 theme:
   name: material
-  custom_dir: docs/overrides
   palette:
     - scheme: default
       primary: green
@@ -97,7 +96,6 @@ markdown_extensions:
   - pymdownx.tilde
 
 nav:
-  - Home: ../README.md
   - Getting Started: getting-started.md
   - User Guide: user-guide.md
   - API Reference: api-reference.md
