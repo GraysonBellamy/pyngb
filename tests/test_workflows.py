@@ -186,7 +186,7 @@ class TestEndToEndWorkflows:
     def test_metadata_extraction_workflow(self, sample_ngb_file):
         """Test metadata extraction workflow."""
         # Read NGB file with metadata
-        metadata, data = read_ngb(sample_ngb_file, return_metadata=True)
+        metadata, _data = read_ngb(sample_ngb_file, return_metadata=True)
 
         # Extract metadata
         # Verify metadata structure
@@ -204,7 +204,7 @@ class TestEndToEndWorkflows:
     def test_file_integrity_workflow(self, sample_ngb_file):
         """Test file integrity verification workflow."""
         # Read NGB file with metadata
-        metadata, data = read_ngb(sample_ngb_file, return_metadata=True)
+        metadata, _data = read_ngb(sample_ngb_file, return_metadata=True)
 
         # Verify file integrity
         if "file_hash" in metadata:

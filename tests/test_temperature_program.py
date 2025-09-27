@@ -144,7 +144,7 @@ class TestTemperatureProgramExtraction:
 
         for test_file in test_files:
             try:
-                metadata, data = parser.parse(str(test_file))
+                metadata, _data = parser.parse(str(test_file))
 
                 if "temperature_program" in metadata:
                     temp_prog = metadata["temperature_program"]
@@ -339,7 +339,7 @@ class TestTemperatureProgramSpecificFiles:
 
         # Use NGBParser (full pipeline test)
         parser = NGBParser()
-        metadata, data = parser.parse(str(test_file))
+        metadata, _data = parser.parse(str(test_file))
 
         # Should have temperature program
         assert "temperature_program" in metadata, (

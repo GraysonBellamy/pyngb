@@ -166,7 +166,9 @@ class TestDTGCustom:
 
     def test_invalid_window_size(self):
         """Test error handling for invalid window size."""
-        with pytest.raises(ValueError, match="window .* must be less than data length"):
+        with pytest.raises(
+            ValueError, match=r"window .* must be less than data length"
+        ):
             dtg_custom(self.time, self.mass, window=len(self.time))
 
         with pytest.raises(ValueError, match="window must be odd"):
@@ -174,7 +176,7 @@ class TestDTGCustom:
 
     def test_invalid_polyorder(self):
         """Test error handling for invalid polynomial order."""
-        with pytest.raises(ValueError, match="polyorder .* must be less than window"):
+        with pytest.raises(ValueError, match=r"polyorder .* must be less than window"):
             dtg_custom(
                 self.time, self.mass, window=7, polyorder=7
             )  # polyorder >= window

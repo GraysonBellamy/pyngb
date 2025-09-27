@@ -93,7 +93,7 @@ class TestReadNGBData:
         """Test read_ngb metadata structure."""
         temp_file = cleanup_temp_files(sample_ngb_file)
 
-        metadata, data = read_ngb(temp_file, return_metadata=True)
+        metadata, _data = read_ngb(temp_file, return_metadata=True)
 
         # Should have at least some metadata fields
         assert isinstance(metadata, dict)
@@ -306,7 +306,7 @@ class TestIntegrationWithMockNGB:
         assert isinstance(df, pl.DataFrame)
 
         # Test conversion from separate mode
-        metadata, data = read_ngb(temp_file, return_metadata=True)
+        _metadata, data = read_ngb(temp_file, return_metadata=True)
         df2 = pl.from_arrow(data)
         assert isinstance(df2, pl.DataFrame)
 

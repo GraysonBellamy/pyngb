@@ -152,13 +152,13 @@ class TestStressConditions:
                     _ = read_ngb(str(test_file))
                     operations_completed += 1
                 elif i % 3 == 1:
-                    metadata, data = read_ngb(str(test_file), return_metadata=True)
+                    _metadata, _data = read_ngb(str(test_file), return_metadata=True)
                     operations_completed += 1
                 else:
                     from pyngb.core.parser import NGBParser
 
                     parser = NGBParser()
-                    metadata, data = parser.parse(str(test_file))
+                    _metadata, _data = parser.parse(str(test_file))
                     operations_completed += 1
 
             except Exception:

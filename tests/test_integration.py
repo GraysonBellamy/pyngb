@@ -534,7 +534,7 @@ class TestDataIntegrityValidation:
         try:
             # This will likely fail due to incomplete mock data, but tests the workflow
             with pytest.raises(Exception):
-                metadata, data = read_ngb(temp_file_path, return_metadata=True)
+                _metadata, _data = read_ngb(temp_file_path, return_metadata=True)
 
         finally:
             Path(temp_file_path).unlink(missing_ok=True)

@@ -42,7 +42,7 @@ def benchmark_parsing(ngb_file: str, runs: int = 5) -> dict[str, Any]:
 
         # Measure memory
         memory_after = process.memory_info().rss
-        current, peak = tracemalloc.get_traced_memory()
+        _current, peak = tracemalloc.get_traced_memory()
         tracemalloc.stop()
 
         parse_time = end_time - start_time
@@ -76,7 +76,7 @@ def benchmark_memory_efficiency(ngb_file: str) -> dict[str, Any]:
     table = read_ngb(ngb_file)
 
     # Peak memory
-    current, peak = tracemalloc.get_traced_memory()
+    _current, _peak = tracemalloc.get_traced_memory()
     loaded_memory = process.memory_info().rss
 
     # Calculate efficiency metrics
