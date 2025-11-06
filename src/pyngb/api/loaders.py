@@ -18,7 +18,7 @@ __all__ = ["main", "read_ngb"]
 
 @overload
 def read_ngb(
-    path: str,
+    path: Union[str, Path],
     *,
     return_metadata: Literal[False] = False,
     baseline_file: None = None,
@@ -28,7 +28,7 @@ def read_ngb(
 
 @overload
 def read_ngb(
-    path: str,
+    path: Union[str, Path],
     *,
     return_metadata: Literal[True],
     baseline_file: None = None,
@@ -38,29 +38,29 @@ def read_ngb(
 
 @overload
 def read_ngb(
-    path: str,
+    path: Union[str, Path],
     *,
     return_metadata: Literal[False] = False,
-    baseline_file: str,
+    baseline_file: Union[str, Path],
     dynamic_axis: str = "time",
 ) -> pa.Table: ...
 
 
 @overload
 def read_ngb(
-    path: str,
+    path: Union[str, Path],
     *,
     return_metadata: Literal[True],
-    baseline_file: str,
+    baseline_file: Union[str, Path],
     dynamic_axis: str = "time",
 ) -> tuple[FileMetadata, pa.Table]: ...
 
 
 def read_ngb(
-    path: str,
+    path: Union[str, Path],
     *,
     return_metadata: bool = False,
-    baseline_file: str | None = None,
+    baseline_file: Union[str, Path, None] = None,
     dynamic_axis: str = "sample_temperature",
 ) -> Union[pa.Table, tuple[FileMetadata, pa.Table]]:
     """
@@ -72,13 +72,13 @@ def read_ngb(
 
     Parameters
     ----------
-    path : str
+    path : str or Path
         Path to the NGB file (.ngb-ss3 or similar extension).
-        Supports absolute and relative paths.
+        Supports absolute and relative paths, as strings or Path objects.
     return_metadata : bool, default False
         If False (default), return PyArrow table with embedded metadata.
         If True, return (metadata, data) tuple.
-    baseline_file : str or None, default None
+    baseline_file : str, Path, or None, default None
         Path to baseline file (.ngb-bs3) for baseline subtraction.
         If provided, performs automatic baseline subtraction. The baseline file
         must have an identical temperature program to the sample file.

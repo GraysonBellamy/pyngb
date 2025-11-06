@@ -8,7 +8,8 @@ handling both isothermal and dynamic segments appropriately.
 from __future__ import annotations
 
 import logging
-from typing import Literal
+from pathlib import Path
+from typing import Literal, Union
 
 import numpy as np
 import polars as pl
@@ -336,8 +337,8 @@ class BaselineSubtractor:
 
 
 def subtract_baseline(
-    sample_file: str,
-    baseline_file: str,
+    sample_file: Union[str, Path],
+    baseline_file: Union[str, Path],
     dynamic_axis: Literal[
         "time", "sample_temperature", "furnace_temperature"
     ] = "sample_temperature",
@@ -356,9 +357,9 @@ def subtract_baseline(
 
     Parameters
     ----------
-    sample_file : str
+    sample_file : str or Path
         Path to the sample file (.ngb-ss3)
-    baseline_file : str
+    baseline_file : str or Path
         Path to the baseline file (.ngb-bs3). Must have identical temperature
         program to the sample file.
     dynamic_axis : str, default="sample_temperature"

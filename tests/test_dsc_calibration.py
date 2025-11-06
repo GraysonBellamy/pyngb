@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+import polars as pl
 import pyarrow as pa
 import pytest
 
@@ -63,9 +64,9 @@ class TestDSCCalibration:
         # Apply calibration
         calibrated_table = apply_dsc_calibration(table)
 
-        # Extract calibrated values
-        df = calibrated_table.to_pandas()
-        calibrated_values = df["dsc_signal"].values
+        # Extract calibrated values using Polars
+        df = pl.from_arrow(calibrated_table)
+        calibrated_values = df["dsc_signal"].to_numpy()
 
         # Verify that values have changed and are reasonable
         assert not np.array_equal(test_data["dsc_signal"], calibrated_values)
@@ -275,7 +276,9 @@ class TestDSCCalibration:
         history = get_processing_history(calibrated_table, "dsc_signal")
         assert "calibration_applied" in history
 
-        # Verify data has changed
-        original_data = table.to_pandas()["dsc_signal"].values
-        calibrated_data = calibrated_table.to_pandas()["dsc_signal"].values
+        # Verify data has changed using Polars
+        original_df = pl.from_arrow(table)
+        calibrated_df = pl.from_arrow(calibrated_table)
+        original_data = original_df["dsc_signal"].to_numpy()
+        calibrated_data = calibrated_df["dsc_signal"].to_numpy()
         assert not np.array_equal(original_data, calibrated_data)

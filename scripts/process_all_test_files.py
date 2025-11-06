@@ -15,19 +15,19 @@ import polars as pl
 from pyngb.batch import BatchProcessor
 
 
-def discover_test_files(base: Path) -> list[str]:
+def discover_test_files(base: Path) -> list[Path]:
     files = [
-        *(str(p) for p in base.glob("*.ngb-ss3")),
-        *(str(p) for p in base.glob("*.ngb-bs3")),
+        *base.glob("*.ngb-ss3"),
+        *base.glob("*.ngb-bs3"),
     ]
     return sorted(files)
 
 
-def process_files(files: Sequence[str], output_dir: Path, workers: int = 4) -> Path:
+def process_files(files: Sequence[Path], output_dir: Path, workers: int = 4) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     bp = BatchProcessor(max_workers=workers, verbose=True)
     results = bp.process_files(
-        list(files), output_format="both", output_dir=str(output_dir), skip_errors=True
+        list(files), output_format="both", output_dir=output_dir, skip_errors=True
     )
     summary = pl.DataFrame(results)
     summary_path = output_dir / "processing_summary.csv"

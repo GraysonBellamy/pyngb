@@ -7,6 +7,7 @@ from __future__ import annotations
 import logging
 import zipfile
 from pathlib import Path
+from typing import Union
 
 import polars as pl
 import pyarrow as pa
@@ -94,7 +95,7 @@ class NGBParser:
 
         return available_streams
 
-    def parse(self, path: str) -> tuple[FileMetadata, pa.Table]:
+    def parse(self, path: Union[str, Path]) -> tuple[FileMetadata, pa.Table]:
         """Parse NGB file and return metadata and Arrow table.
 
         Opens an NGB file, extracts all metadata and measurement data,
@@ -123,8 +124,8 @@ class NGBParser:
             Columns: ['time', 'sample_temperature', 'mass', 'dsc_signal', 'purge_flow']
             Temperature range: 25.0 to 800.0
         """
-        path_obj = Path(path)
-        if not path_obj.exists():
+        path = Path(path)
+        if not path.exists():
             raise FileNotFoundError(f"File not found: {path}")
 
         metadata: FileMetadata = {}

@@ -26,7 +26,7 @@ import polars as pl
 from pyngb import BatchProcessor, NGBDataset, process_directory
 
 
-def demonstrate_batch_processor(files: Sequence[Union[str, Path]], output_dir: str):
+def demonstrate_batch_processor(files: Sequence[Union[str, Path]], output_dir: Union[str, Path]):
     """Demonstrate BatchProcessor class usage."""
 
     print("\n🔧 Method 1: BatchProcessor Class")
@@ -93,7 +93,7 @@ def demonstrate_batch_processor(files: Sequence[Union[str, Path]], output_dir: s
     return results
 
 
-def demonstrate_convenience_function(input_dir: str, _output_dir: str):
+def demonstrate_convenience_function(input_dir: Union[str, Path], _output_dir: Union[str, Path]):
     """Demonstrate process_directory convenience function."""
 
     print("\n⚡ Method 2: Convenience Function")
@@ -166,7 +166,7 @@ def demonstrate_dataset_management(files: Sequence[Union[str, Path]], out_dir: P
     # Export metadata
     try:
         metadata_file = out_dir / "dataset_metadata.csv"
-        dataset.export_metadata(str(metadata_file), format="csv")
+        dataset.export_metadata(metadata_file, format="csv")
 
         if metadata_file.exists():
             print(f"  📁 Metadata exported to: {metadata_file}")
@@ -181,7 +181,7 @@ def demonstrate_dataset_management(files: Sequence[Union[str, Path]], out_dir: P
         print(f"  ⚠️  Could not export metadata: {e}")
 
 
-def create_processing_summary(results: list[dict], output_dir: str):
+def create_processing_summary(results: list[dict], output_dir: Union[str, Path]):
     """Create a summary report of batch processing results."""
 
     print("\n📋 Creating Processing Summary")
@@ -325,18 +325,18 @@ def main():
     all_results = []
 
     # Method 1: BatchProcessor class
-    results1 = demonstrate_batch_processor(files_to_process, str(output_dir))
+    results1 = demonstrate_batch_processor(files_to_process, output_dir)
     all_results.extend(results1)
 
     # Method 2: Convenience function (if input directory provided)
     if args.input_dir:
-        _ = demonstrate_convenience_function(args.input_dir, str(output_dir))
+        _ = demonstrate_convenience_function(args.input_dir, output_dir)
 
     # Method 3: Dataset management
     demonstrate_dataset_management(files_to_process, output_dir)
 
     # Create processing summary
-    create_processing_summary(all_results, str(output_dir))
+    create_processing_summary(all_results, output_dir)
 
     print("\n✅ Batch processing demonstration completed!")
     print("\n💡 What you learned:")

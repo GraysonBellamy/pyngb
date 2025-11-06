@@ -24,9 +24,9 @@ logger = logging.getLogger(__name__)
 
 
 def _process_single_file_worker(
-    file_path: str,
+    file_path: Union[str, Path],
     output_format: str,
-    output_dir: str,
+    output_dir: Union[str, Path],
     skip_errors: bool,
 ) -> dict[str, str | float | None]:
     """Top-level worker function to process a single file (multiprocessing-safe).
@@ -38,11 +38,11 @@ def _process_single_file_worker(
 
     start_time = time.perf_counter()
     file_p = Path(file_path)
+    out_dir = Path(output_dir)
 
     try:
-        metadata, data = read_ngb(str(file_p), return_metadata=True)
+        metadata, data = read_ngb(file_p, return_metadata=True)
         base_name = file_p.stem
-        out_dir = Path(output_dir)
 
         if output_format in ("parquet", "both"):
             # Attach metadata to Arrow table and write parquet
@@ -63,7 +63,7 @@ def _process_single_file_worker(
 
             # Also save metadata JSON alongside
             metadata_path = out_dir / f"{base_name}_metadata.json"
-            with open(metadata_path, "w") as f:
+            with metadata_path.open("w") as f:
                 json.dump(metadata, f, indent=2, default=str)
 
         processing_time = time.perf_counter() - start_time
@@ -221,7 +221,7 @@ class BatchProcessor:
             # Sequential processing for debugging
             for file_path in files:
                 result = _process_single_file_worker(
-                    str(file_path), output_format, str(output_dir), skip_errors
+                    file_path, output_format, output_dir, skip_errors
                 )
                 results.append(result)
                 if self.verbose:
@@ -237,11 +237,11 @@ class BatchProcessor:
                 future_to_file = {
                     executor.submit(
                         _process_single_file_worker,
-                        str(file_path),
+                        file_path,
                         output_format,
-                        str(output_dir),
+                        output_dir,
                         skip_errors,
-                    ): str(file_path)
+                    ): file_path
                     for file_path in files
                 }
 
@@ -523,7 +523,7 @@ class NGBDataset:
         cache_key = str(file_path)
 
         if cache_key not in self._metadata_cache:
-            metadata, _ = read_ngb(str(file_path), return_metadata=True)
+            metadata, _ = read_ngb(file_path, return_metadata=True)
             self._metadata_cache[cache_key] = metadata
 
         return self._metadata_cache[cache_key]

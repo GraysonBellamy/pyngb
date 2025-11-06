@@ -2,9 +2,9 @@
 End-to-end workflow tests for pyngb.
 """
 
-import os
 import shutil
 import tempfile
+from pathlib import Path
 
 import polars as pl
 import pytest
@@ -138,7 +138,7 @@ class TestEndToEndWorkflows:
             with pytest.raises(Exception):  # Should raise some kind of error
                 read_ngb(tmp_file_path)
         finally:
-            os.unlink(tmp_file_path)
+            Path(tmp_file_path).unlink()
 
     def test_parallel_processing_workflow(self, sample_ngb_file, tmp_path):
         """Test parallel processing workflow."""

@@ -6,7 +6,7 @@ import hashlib
 import json
 import logging
 from pathlib import Path
-from typing import Optional, Any
+from typing import Optional, Any, Union
 
 import pyarrow as pa
 
@@ -80,7 +80,7 @@ def set_metadata(
     return tbl
 
 
-def get_hash(path: str, max_size_mb: int = 1000) -> Optional[str]:
+def get_hash(path: Union[str, Path], max_size_mb: int = 1000) -> Optional[str]:
     """Generate file hash for metadata.
 
     Args:
@@ -94,6 +94,7 @@ def get_hash(path: str, max_size_mb: int = 1000) -> Optional[str]:
         OSError: If there are file system related errors
         PermissionError: If file access is denied
     """
+    path = Path(path)
     try:
         # Pre-flight: ensure blake2b constructor is callable. If a hashing backend
         # failure occurs (e.g., during unit tests that patch blake2b to raise),
@@ -104,7 +105,7 @@ def get_hash(path: str, max_size_mb: int = 1000) -> Optional[str]:
             logger.error(f"Unexpected error while generating hash for file {path}: {e}")
             return None
         # Check file size before hashing
-        file_size = Path(path).stat().st_size
+        file_size = path.stat().st_size
         max_size_bytes = max_size_mb * 1024 * 1024
 
         if file_size > max_size_bytes:
@@ -113,7 +114,7 @@ def get_hash(path: str, max_size_mb: int = 1000) -> Optional[str]:
             )
             return None
 
-        with open(path, "rb") as file:
+        with path.open("rb") as file:
             return hashlib.blake2b(file.read()).hexdigest()
     except FileNotFoundError:
         logger.warning(f"File not found while generating hash: {path}")
