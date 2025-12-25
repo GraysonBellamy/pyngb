@@ -5,6 +5,7 @@ Tests for CLI command execution and file generation.
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 import pyarrow.parquet as pq
 import pytest
@@ -14,7 +15,7 @@ import pytest
 class TestCLIExecution:
     """Test actual CLI command execution and file generation."""
 
-    def test_cli_command_execution_basic(self, tmp_path):
+    def test_cli_command_execution_basic(self, tmp_path: Any) -> None:
         """Test basic CLI command execution."""
         test_file = Path("tests/test_files/Red_Oak_STA_10K_250731_R7.ngb-ss3")
         if not test_file.exists():
@@ -51,7 +52,7 @@ class TestCLIExecution:
         assert data.schema.metadata is not None
         assert b"file_metadata" in data.schema.metadata
 
-    def test_cli_command_execution_verbose(self, tmp_path):
+    def test_cli_command_execution_verbose(self, tmp_path: Any) -> None:
         """Test CLI command execution with verbose output."""
         test_file = Path("tests/test_files/RO_FILED_STA_N2_10K_250129_R29.ngb-ss3")
         if not test_file.exists():
@@ -90,7 +91,7 @@ class TestCLIExecution:
         expected_file = output_dir / "RO_FILED_STA_N2_10K_250129_R29.parquet"
         assert expected_file.exists()
 
-    def test_cli_command_execution_csv_format(self, tmp_path):
+    def test_cli_command_execution_csv_format(self, tmp_path: Any) -> None:
         """Test CLI command execution with CSV output format."""
         test_file = Path("tests/test_files/DF_FILED_STA_21O2_10K_220222_R1.ngb-ss3")
         if not test_file.exists():
@@ -125,7 +126,7 @@ class TestCLIExecution:
         assert len(csv_content) > 0
         assert "time," in csv_content  # Should have header
 
-    def test_cli_command_execution_both_formats(self, tmp_path):
+    def test_cli_command_execution_both_formats(self, tmp_path: Any) -> None:
         """Test CLI command execution with both CSV and Parquet output."""
         test_file = Path("tests/test_files/Red_Oak_STA_10K_250731_R7.ngb-ss3")
         if not test_file.exists():
@@ -163,7 +164,7 @@ class TestCLIExecution:
         assert data.schema.metadata is not None
         assert b"file_metadata" in data.schema.metadata
 
-    def test_cli_command_execution_invalid_file(self, tmp_path):
+    def test_cli_command_execution_invalid_file(self, tmp_path: Any) -> None:
         """Test CLI command execution with invalid input file."""
         # Run CLI command with non-existent file
         output_dir = tmp_path / "cli_error_output"
@@ -186,7 +187,7 @@ class TestCLIExecution:
         assert result.returncode != 0, "CLI should fail with invalid file"
         assert "does not exist" in result.stderr or "FileNotFoundError" in result.stderr
 
-    def test_cli_command_execution_invalid_output_dir(self, tmp_path):
+    def test_cli_command_execution_invalid_output_dir(self, tmp_path: Any) -> None:
         """Test CLI command execution with invalid output directory."""
         test_file = Path("tests/test_files/Red_Oak_STA_10K_250731_R7.ngb-ss3")
         if not test_file.exists():
@@ -215,7 +216,7 @@ class TestCLIExecution:
         expected_file = invalid_output / "Red_Oak_STA_10K_250731_R7.parquet"
         assert expected_file.exists()
 
-    def test_cli_command_execution_help(self):
+    def test_cli_command_execution_help(self) -> None:
         """Test CLI help command."""
         cmd = [sys.executable, "-m", "pyngb", "--help"]
 
@@ -232,7 +233,7 @@ class TestCLIExecution:
         assert "parquet" in help_text
         assert "csv" in help_text
 
-    def test_cli_command_execution_file_extension_validation(self, tmp_path):
+    def test_cli_command_execution_file_extension_validation(self, tmp_path: Any) -> None:
         """Test CLI command execution with different file extensions."""
         test_file = Path("tests/test_files/Red_Oak_STA_10K_250731_R7.ngb-ss3")
         if not test_file.exists():
@@ -266,7 +267,7 @@ class TestCLIExecution:
         expected_file = output_dir / "test_file.parquet"
         assert expected_file.exists()
 
-    def test_cli_command_execution_large_file_handling(self, tmp_path):
+    def test_cli_command_execution_large_file_handling(self, tmp_path: Any) -> None:
         """Test CLI command execution with larger files."""
         test_file = Path("tests/test_files/RO_FILED_STA_N2_10K_250129_R29.ngb-ss3")
         if not test_file.exists():

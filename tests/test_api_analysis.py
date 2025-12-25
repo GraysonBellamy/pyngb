@@ -1,6 +1,7 @@
 """Tests for the DTG API integration with PyArrow tables."""
 
 from __future__ import annotations
+from typing import Any
 
 import numpy as np
 import polars as pl
@@ -13,7 +14,7 @@ from pyngb.api.analysis import add_dtg, calculate_table_dtg, normalize_to_initia
 class TestAddDTG:
     """Test the add_dtg function."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
         """Set up test data."""
         # Create sample thermal analysis data
         time = np.linspace(0, 100, 50)
@@ -35,7 +36,7 @@ class TestAddDTG:
         schema = self.table.schema.with_metadata(metadata)
         self.table = self.table.cast(schema)
 
-    def test_add_dtg_default(self):
+    def test_add_dtg_default(self) -> None:
         """Test adding DTG column with default parameters."""
         result_table = add_dtg(self.table)
 
@@ -46,13 +47,13 @@ class TestAddDTG:
 
         # Check DTG values
         df = pl.from_arrow(result_table)
-        dtg_values = df["dtg"].to_numpy()
+        dtg_values = df["dtg"].to_numpy()  # type: ignore[index]
 
         # For linear mass loss, DTG should be approximately constant
         expected = 1.2  # Our function returns positive for mass loss
         assert abs(np.mean(dtg_values) - expected) < 0.1
 
-    def test_add_dtg_custom_parameters(self):
+    def test_add_dtg_custom_parameters(self) -> None:
         """Test adding DTG with custom parameters."""
         result_table = add_dtg(
             self.table, method="gradient", smooth="strict", column_name="mass_rate"
@@ -64,11 +65,11 @@ class TestAddDTG:
 
         # Check that it worked
         df = pl.from_arrow(result_table)
-        dtg_values = df["mass_rate"].to_numpy()
+        dtg_values = df["mass_rate"].to_numpy()  # type: ignore[index]
         assert len(dtg_values) == self.table.num_rows
         assert not np.any(np.isnan(dtg_values))
 
-    def test_metadata_preservation(self):
+    def test_metadata_preservation(self) -> None:
         """Test that metadata is preserved when adding DTG."""
         result_table = add_dtg(self.table)
 
@@ -76,21 +77,21 @@ class TestAddDTG:
         assert result_table.schema.metadata is not None
         assert result_table.schema.metadata == self.table.schema.metadata
 
-    def test_missing_time_column(self):
+    def test_missing_time_column(self) -> None:
         """Test error handling when time column is missing."""
         table_no_time = self.table.drop(["time"])
 
         with pytest.raises(ValueError, match="must contain 'time' column"):
             add_dtg(table_no_time)
 
-    def test_missing_mass_column(self):
+    def test_missing_mass_column(self) -> None:
         """Test error handling when mass column is missing."""
         table_no_mass = self.table.drop(["mass"])
 
         with pytest.raises(ValueError, match="must contain 'mass' column"):
             add_dtg(table_no_mass)
 
-    def test_different_smoothing_levels(self):
+    def test_different_smoothing_levels(self) -> None:
         """Test different smoothing levels produce different results."""
         result_strict = add_dtg(self.table, smooth="strict", column_name="dtg_strict")
         result_loose = add_dtg(self.table, smooth="loose", column_name="dtg_loose")
@@ -101,8 +102,8 @@ class TestAddDTG:
         )
         df = pl.from_arrow(combined)
 
-        strict_vals = df["dtg_strict"].to_numpy()
-        loose_vals = df["dtg_loose"].to_numpy()
+        strict_vals = df["dtg_strict"].to_numpy()  # type: ignore[index]
+        loose_vals = df["dtg_loose"].to_numpy()  # type: ignore[index]
 
         # For linear data, smoothing levels may have similar variation
         # Just check both are reasonable and different
@@ -115,7 +116,7 @@ class TestAddDTG:
 class TestCalculateTableDTG:
     """Test the calculate_table_dtg function."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
         """Set up test data."""
         time = np.linspace(0, 100, 50)
         mass = 10 - 0.03 * time
@@ -124,7 +125,7 @@ class TestCalculateTableDTG:
             {"time": time, "mass": mass, "extra_column": np.ones(len(time))}
         )
 
-    def test_calculate_table_dtg_default(self):
+    def test_calculate_table_dtg_default(self) -> None:
         """Test DTG calculation from table with defaults."""
         result = calculate_table_dtg(self.table)
 
@@ -136,7 +137,7 @@ class TestCalculateTableDTG:
         expected = 1.8  # Our function returns positive for mass loss
         assert abs(np.mean(result) - expected) < 0.1
 
-    def test_calculate_table_dtg_custom(self):
+    def test_calculate_table_dtg_custom(self) -> None:
         """Test DTG calculation with custom parameters."""
         result = calculate_table_dtg(self.table, method="gradient", smooth="loose")
 
@@ -144,7 +145,7 @@ class TestCalculateTableDTG:
         assert len(result) == self.table.num_rows
         assert not np.any(np.isnan(result))
 
-    def test_missing_required_columns(self):
+    def test_missing_required_columns(self) -> None:
         """Test error handling for missing columns."""
         # Missing time column
         table_no_time = self.table.drop(["time"])
@@ -156,7 +157,7 @@ class TestCalculateTableDTG:
         with pytest.raises(ValueError, match="must contain 'mass' column"):
             calculate_table_dtg(table_no_mass)
 
-    def test_method_comparison(self):
+    def test_method_comparison(self) -> None:
         """Test comparison between different methods."""
         result_savgol = calculate_table_dtg(self.table, method="savgol")
         result_gradient = calculate_table_dtg(self.table, method="gradient")
@@ -176,7 +177,7 @@ class TestCalculateTableDTG:
 class TestIntegration:
     """Test integration between add_dtg and calculate_table_dtg."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
         """Set up test data."""
         time = np.linspace(0, 60, 30)
         mass = 8 + 2 * np.exp(-time / 20)  # Exponential mass change
@@ -185,7 +186,7 @@ class TestIntegration:
             {"time": time, "mass": mass, "sample_temperature": 25 + 10 * time}
         )
 
-    def test_consistency_between_functions(self):
+    def test_consistency_between_functions(self) -> None:
         """Test that both functions give consistent results."""
         # Method 1: calculate DTG separately
         dtg_array = calculate_table_dtg(self.table, method="savgol", smooth="medium")
@@ -193,12 +194,12 @@ class TestIntegration:
         # Method 2: add DTG to table
         table_with_dtg = add_dtg(self.table, method="savgol", smooth="medium")
         df = pl.from_arrow(table_with_dtg)
-        dtg_from_table = df["dtg"].to_numpy()
+        dtg_from_table = df["dtg"].to_numpy()  # type: ignore[index]
 
         # Should be identical (or very close)
         np.testing.assert_allclose(dtg_array, dtg_from_table, rtol=1e-10)
 
-    def test_workflow_example(self):
+    def test_workflow_example(self) -> None:
         """Test a realistic workflow example."""
         # Step 1: Calculate DTG to check if it looks reasonable
         dtg_values = calculate_table_dtg(self.table, smooth="medium")
@@ -218,7 +219,7 @@ class TestIntegration:
 class TestErrorHandling:
     """Test error handling and edge cases."""
 
-    def test_empty_table(self):
+    def test_empty_table(self) -> None:
         """Test handling of empty tables."""
         empty_table = pa.table(
             {
@@ -230,14 +231,14 @@ class TestErrorHandling:
         with pytest.raises(ValueError):  # Should fail due to insufficient data
             add_dtg(empty_table)
 
-    def test_single_row_table(self):
+    def test_single_row_table(self) -> None:
         """Test handling of single-row tables."""
         single_row_table = pa.table({"time": [0.0], "mass": [10.0]})
 
         with pytest.raises(ValueError, match="Need at least 3 data points"):
             add_dtg(single_row_table)
 
-    def test_invalid_data_types(self):
+    def test_invalid_data_types(self) -> None:
         """Test handling of invalid data types in columns."""
         # This is more of a robustness test - PyArrow handles type conversion
         table_with_strings = pa.table(
@@ -260,7 +261,7 @@ class TestErrorHandling:
 class TestNormalizeToInitialMass:
     """Test the normalize_to_initial_mass function."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
         """Set up test data with metadata."""
         import json
 
@@ -298,13 +299,13 @@ class TestNormalizeToInitialMass:
         schema = self.table.schema.with_metadata(schema_metadata)
         self.table = self.table.cast(schema)
 
-    def test_normalize_default_columns(self):
+    def test_normalize_default_columns(self) -> None:
         """Test normalization with default columns (mass and dsc_signal) in place."""
         # Store original values for comparison
         original_df = pl.from_arrow(self.table)
-        original_mass = original_df["mass"].to_numpy()
-        original_dsc = original_df["dsc_signal"].to_numpy()
-        original_time = original_df["time"].to_numpy()
+        original_mass = original_df["mass"].to_numpy()  # type: ignore[index]
+        original_dsc = original_df["dsc_signal"].to_numpy()  # type: ignore[index]
+        original_time = original_df["time"].to_numpy()  # type: ignore[index]
 
         result_table = normalize_to_initial_mass(self.table)
 
@@ -317,8 +318,8 @@ class TestNormalizeToInitialMass:
         result_df = pl.from_arrow(result_table)
 
         # Check normalization is correct (columns updated in place)
-        normalized_mass = result_df["mass"].to_numpy()
-        normalized_dsc = result_df["dsc_signal"].to_numpy()
+        normalized_mass = result_df["mass"].to_numpy()  # type: ignore[index]
+        normalized_dsc = result_df["dsc_signal"].to_numpy()  # type: ignore[index]
 
         # Values should be divided by sample_mass (15.75)
         expected_mass = original_mass / 15.75
@@ -328,18 +329,18 @@ class TestNormalizeToInitialMass:
         np.testing.assert_allclose(normalized_dsc, expected_dsc)
 
         # Unchanged columns should remain the same
-        np.testing.assert_array_equal(original_time, result_df["time"].to_numpy())
+        np.testing.assert_array_equal(original_time, result_df["time"].to_numpy())  # type: ignore[index]
         np.testing.assert_array_equal(
-            original_df["sample_temperature"].to_numpy(),
-            result_df["sample_temperature"].to_numpy(),
+            original_df["sample_temperature"].to_numpy(),  # type: ignore[index]
+            result_df["sample_temperature"].to_numpy(),  # type: ignore[index]
         )
 
-    def test_normalize_specific_columns(self):
+    def test_normalize_specific_columns(self) -> None:
         """Test normalization with specific columns (in place)."""
         # Store original values
         original_df = pl.from_arrow(self.table)
-        original_mass = original_df["mass"].to_numpy()
-        original_dsc = original_df["dsc_signal"].to_numpy()
+        original_mass = original_df["mass"].to_numpy()  # type: ignore[index]
+        original_dsc = original_df["dsc_signal"].to_numpy()  # type: ignore[index]
 
         result_table = normalize_to_initial_mass(self.table, columns=["mass"])
 
@@ -351,21 +352,21 @@ class TestNormalizeToInitialMass:
         result_df = pl.from_arrow(result_table)
 
         # Only mass should be normalized (in place)
-        normalized_mass = result_df["mass"].to_numpy()
+        normalized_mass = result_df["mass"].to_numpy()  # type: ignore[index]
         expected_mass = original_mass / 15.75
         np.testing.assert_allclose(normalized_mass, expected_mass)
 
         # DSC signal should be unchanged (not normalized)
-        np.testing.assert_array_equal(original_dsc, result_df["dsc_signal"].to_numpy())
+        np.testing.assert_array_equal(original_dsc, result_df["dsc_signal"].to_numpy())  # type: ignore[index]
 
-    def test_metadata_preservation(self):
+    def test_metadata_preservation(self) -> None:
         """Test that metadata is preserved after normalization."""
         result_table = normalize_to_initial_mass(self.table)
 
         # Metadata should be identical
         assert result_table.schema.metadata == self.table.schema.metadata
 
-    def test_missing_metadata_error(self):
+    def test_missing_metadata_error(self) -> None:
         """Test error when table has no metadata."""
         table_no_meta = pa.table(
             {
@@ -377,7 +378,7 @@ class TestNormalizeToInitialMass:
         with pytest.raises(ValueError, match="Table metadata is missing"):
             normalize_to_initial_mass(table_no_meta)
 
-    def test_missing_file_metadata_error(self):
+    def test_missing_file_metadata_error(self) -> None:
         """Test error when file_metadata key is missing."""
         # Table with metadata but no file_metadata key
         schema_metadata = {b"other_key": b"other_value"}
@@ -398,7 +399,7 @@ class TestNormalizeToInitialMass:
         with pytest.raises(ValueError, match="No file_metadata found"):
             normalize_to_initial_mass(table)
 
-    def test_missing_sample_mass_error(self):
+    def test_missing_sample_mass_error(self) -> None:
         """Test error when sample_mass is not in metadata."""
         import json
 
@@ -419,7 +420,7 @@ class TestNormalizeToInitialMass:
         with pytest.raises(ValueError, match="sample_mass not found"):
             normalize_to_initial_mass(table)
 
-    def test_invalid_sample_mass_error(self):
+    def test_invalid_sample_mass_error(self) -> None:
         """Test error when sample_mass is invalid."""
         import json
 
@@ -448,12 +449,12 @@ class TestNormalizeToInitialMass:
         with pytest.raises(ValueError, match="Invalid sample_mass value"):
             normalize_to_initial_mass(table)
 
-    def test_missing_column_error(self):
+    def test_missing_column_error(self) -> None:
         """Test error when specified columns don't exist."""
         with pytest.raises(KeyError, match="Columns not found"):
             normalize_to_initial_mass(self.table, columns=["nonexistent_column"])
 
-    def test_non_numeric_column_error(self):
+    def test_non_numeric_column_error(self) -> None:
         """Test error when trying to normalize non-numeric columns."""
 
         # Add a string column
@@ -464,7 +465,7 @@ class TestNormalizeToInitialMass:
         with pytest.raises(ValueError, match="not numeric and cannot be normalized"):
             normalize_to_initial_mass(table_with_string, columns=["string_col"])
 
-    def test_no_default_columns_error(self):
+    def test_no_default_columns_error(self) -> None:
         """Test error when no default columns are found."""
         # Create table without mass or dsc_signal
         table_no_defaults = pa.table(
@@ -485,7 +486,7 @@ class TestNormalizeToInitialMass:
         with pytest.raises(ValueError, match="No default normalization columns found"):
             normalize_to_initial_mass(table_no_defaults)
 
-    def test_realistic_mass_normalization(self):
+    def test_realistic_mass_normalization(self) -> None:
         """Test realistic mass normalization scenario."""
         # Create realistic data: mass starts at ~0 (tared) then changes
         time = np.linspace(0, 120, 100)  # 2 hour experiment
@@ -509,7 +510,7 @@ class TestNormalizeToInitialMass:
         # Normalize (in place)
         result_table = normalize_to_initial_mass(table, columns=["mass"])
         result_df = pl.from_arrow(result_table)
-        normalized_mass = result_df["mass"].to_numpy()  # Column updated in place
+        normalized_mass = result_df["mass"].to_numpy()  # Column updated in place  # type: ignore[index]
 
         # Initial mass should be close to initial_offset / sample_mass
         expected_initial = 0.05 / 8.75  # ~0.0057

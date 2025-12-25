@@ -4,6 +4,7 @@ Unit tests for pyngb binary parser.
 
 import struct
 from unittest.mock import patch
+from typing import Any
 
 from pyngb.binary.parser import BinaryParser
 from pyngb.constants import BinaryMarkers, DataType
@@ -12,7 +13,7 @@ from pyngb.constants import BinaryMarkers, DataType
 class TestBinaryParser:
     """Test BinaryParser class."""
 
-    def test_init_default_markers(self):
+    def test_init_default_markers(self) -> None:
         """Test BinaryParser initialization with default markers."""
         parser = BinaryParser()
 
@@ -21,48 +22,48 @@ class TestBinaryParser:
         assert len(parser._compiled_patterns) > 0
         assert "table_sep" in parser._compiled_patterns
 
-    def test_init_custom_markers(self):
+    def test_init_custom_markers(self) -> None:
         """Test BinaryParser initialization with custom markers."""
         custom_markers = BinaryMarkers()
         parser = BinaryParser(custom_markers)
 
         assert parser.markers is custom_markers
 
-    def test_parse_value_int32(self):
+    def test_parse_value_int32(self) -> None:
         """Test parsing INT32 values."""
         # 42 as little-endian INT32
         value = b"\x2a\x00\x00\x00"
         result = BinaryParser.parse_value(DataType.INT32.value, value)
         assert result == 42
 
-    def test_parse_value_float32(self):
+    def test_parse_value_float32(self) -> None:
         """Test parsing FLOAT32 values."""
         # 1.0 as little-endian FLOAT32
         value = b"\x00\x00\x80\x3f"
         result = BinaryParser.parse_value(DataType.FLOAT32.value, value)
         assert abs(result - 1.0) < 1e-6
 
-    def test_parse_value_float64(self):
+    def test_parse_value_float64(self) -> None:
         """Test parsing FLOAT64 values."""
         # 1.0 as little-endian FLOAT64
         value = b"\x00\x00\x00\x00\x00\x00\xf0\x3f"
         result = BinaryParser.parse_value(DataType.FLOAT64.value, value)
         assert abs(result - 1.0) < 1e-15
 
-    def test_parse_value_string(self):
+    def test_parse_value_string(self) -> None:
         """Test parsing STRING values."""
         # String with 4-byte length prefix
         value = b"\x05\x00\x00\x00Hello\x00"
         result = BinaryParser.parse_value(DataType.STRING.value, value)
         assert result == "Hello"
 
-    def test_parse_value_string_with_nulls(self):
+    def test_parse_value_string_with_nulls(self) -> None:
         """Test parsing STRING values with embedded nulls."""
         value = b"\x07\x00\x00\x00Hel\x00lo\x00\x00"
         result = BinaryParser.parse_value(DataType.STRING.value, value)
         assert result == "Hello"  # Nulls should be stripped
 
-    def test_parse_value_string_fffeff_format(self):
+    def test_parse_value_string_fffeff_format(self) -> None:
         """Test parsing STRING values with NETZSCH fffeff format."""
         # NETZSCH format: fffeff + char_count + UTF-16LE data
         # "Hello" = 5 characters in UTF-16LE
@@ -73,7 +74,7 @@ class TestBinaryParser:
         result = BinaryParser.parse_value(DataType.STRING.value, value)
         assert result == "Hello"
 
-    def test_parse_value_string_fffeff_with_special_chars(self):
+    def test_parse_value_string_fffeff_with_special_chars(self) -> None:
         """Test fffeff format with special characters."""
         test_string = "Müller"
         char_count = len(test_string)
@@ -83,7 +84,7 @@ class TestBinaryParser:
         result = BinaryParser.parse_value(DataType.STRING.value, value)
         assert result == test_string
 
-    def test_parse_value_string_fffeff_with_nulls(self):
+    def test_parse_value_string_fffeff_with_nulls(self) -> None:
         """Test fffeff format with null padding."""
         test_string = "Test"
         char_count = len(test_string)
@@ -93,7 +94,7 @@ class TestBinaryParser:
         result = BinaryParser.parse_value(DataType.STRING.value, value)
         assert result == test_string
 
-    def test_parse_value_string_fffeff_invalid(self):
+    def test_parse_value_string_fffeff_invalid(self) -> None:
         """Test fffeff format with invalid data."""
         # Too short for claimed character count
         value = b"\xff\xfe\xff\x10" + b"short"  # Claims 16 chars but only has 5 bytes
@@ -102,7 +103,7 @@ class TestBinaryParser:
         # Should fall back to standard parsing or return None
         assert result is None or isinstance(result, str)
 
-    def test_parse_value_string_standard_format(self):
+    def test_parse_value_string_standard_format(self) -> None:
         """Test standard format still works after enhancement."""
         # Standard 4-byte length prefix + UTF-8
         test_string = "Standard"
@@ -112,7 +113,7 @@ class TestBinaryParser:
         result = BinaryParser.parse_value(DataType.STRING.value, value)
         assert result == test_string
 
-    def test_parse_value_string_utf16le_fallback(self):
+    def test_parse_value_string_utf16le_fallback(self) -> None:
         """Test UTF-16LE fallback in standard format."""
         # Standard format with UTF-16LE data
         test_string = "UTF16Test"
@@ -123,20 +124,20 @@ class TestBinaryParser:
         result = BinaryParser.parse_value(DataType.STRING.value, value)
         assert result == test_string
 
-    def test_parse_value_unknown_type(self):
+    def test_parse_value_unknown_type(self) -> None:
         """Test parsing unknown data type returns the raw value."""
         value = b"\x42\x43\x44"
         result = BinaryParser.parse_value(b"\x99", value)
         assert result == value
 
-    def test_parse_value_error_handling(self):
+    def test_parse_value_error_handling(self) -> None:
         """Test parse_value handles errors gracefully."""
         # Too short for INT32
         value = b"\x42"
         result = BinaryParser.parse_value(DataType.INT32.value, value)
         assert result is None
 
-    def test_split_tables_no_separator(self):
+    def test_split_tables_no_separator(self) -> None:
         """Test split_tables with no separator returns single table."""
         parser = BinaryParser()
         data = b"single_table_data"
@@ -145,7 +146,7 @@ class TestBinaryParser:
         assert len(result) == 1
         assert result[0] == data
 
-    def test_split_tables_with_separators(self):
+    def test_split_tables_with_separators(self) -> None:
         """Test split_tables with table separators."""
         parser = BinaryParser()
         separator = parser.markers.TABLE_SEPARATOR
@@ -161,7 +162,7 @@ class TestBinaryParser:
         combined = b"".join(result)
         assert b"table1" in combined or b"table2" in combined
 
-    def test_extract_data_array_no_start_marker(self):
+    def test_extract_data_array_no_start_marker(self) -> None:
         """Test extract_data_array with no START_DATA marker."""
         parser = BinaryParser()
         table = b"no_start_marker_here"
@@ -169,7 +170,7 @@ class TestBinaryParser:
         result = parser.extract_data_array(table, DataType.FLOAT64.value)
         assert result == []
 
-    def test_extract_data_array_no_end_marker(self):
+    def test_extract_data_array_no_end_marker(self) -> None:
         """Test extract_data_array with no END_DATA marker."""
         parser = BinaryParser()
         markers = parser.markers
@@ -178,7 +179,7 @@ class TestBinaryParser:
         result = parser.extract_data_array(table, DataType.FLOAT64.value)
         assert result == []
 
-    def test_extract_data_array_valid_data(self):
+    def test_extract_data_array_valid_data(self) -> None:
         """Test extract_data_array with valid data structure."""
         parser = BinaryParser()
         markers = parser.markers
@@ -196,7 +197,7 @@ class TestBinaryParser:
         # Let's just verify it returns a list
         assert isinstance(result, list)
 
-    def test_extract_data_array_unknown_data_type(self):
+    def test_extract_data_array_unknown_data_type(self) -> None:
         """Test extract_data_array with unknown data type."""
         parser = BinaryParser()
         markers = parser.markers
@@ -208,7 +209,7 @@ class TestBinaryParser:
         result = parser.extract_data_array(table, b"\x99")
         assert result == []
 
-    def test_get_compiled_pattern_caching(self):
+    def test_get_compiled_pattern_caching(self) -> None:
         """Test that compiled patterns are cached."""
         parser = BinaryParser()
 
@@ -223,7 +224,7 @@ class TestBinaryParser:
         assert pattern1 is pattern2  # Same object reference
         assert "test" in parser._compiled_patterns
 
-    def test_get_compiled_pattern_different_keys(self):
+    def test_get_compiled_pattern_different_keys(self) -> None:
         """Test that different keys create different pattern entries."""
         parser = BinaryParser()
 
@@ -238,7 +239,7 @@ class TestBinaryParser:
         # but they should both work correctly
         assert pattern1.pattern == pattern2.pattern
 
-    def test_memory_view_optimization(self):
+    def test_memory_view_optimization(self) -> None:
         """Test that extract_data_array uses memory views efficiently."""
         parser = BinaryParser()
         markers = parser.markers
@@ -261,7 +262,7 @@ class TestBinaryParser:
         assert isinstance(result, list)
 
     @patch("pyngb.binary.parser.logger")
-    def test_logging_debug_messages(self, mock_logger):
+    def test_logging_debug_messages(self, mock_logger: Any) -> None:
         """Test that debug messages are logged appropriately."""
         parser = BinaryParser()
 

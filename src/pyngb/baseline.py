@@ -5,11 +5,9 @@ This module provides functionality to subtract baseline measurements from sample
 handling both isothermal and dynamic segments appropriately.
 """
 
-from __future__ import annotations
-
 import logging
 from pathlib import Path
-from typing import Literal, Union
+from typing import Literal
 
 import numpy as np
 import polars as pl
@@ -337,8 +335,8 @@ class BaselineSubtractor:
 
 
 def subtract_baseline(
-    sample_file: Union[str, Path],
-    baseline_file: Union[str, Path],
+    sample_file: str | Path,
+    baseline_file: str | Path,
     dynamic_axis: Literal[
         "time", "sample_temperature", "furnace_temperature"
     ] = "sample_temperature",

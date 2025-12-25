@@ -2,9 +2,8 @@
 Data type handlers and registry for binary data parsing.
 """
 
-from __future__ import annotations
-
 import logging
+import struct
 from typing import Protocol
 
 import numpy as np
@@ -168,7 +167,9 @@ class DataTypeRegistry:
             if handler.can_handle(data_type):
                 try:
                     return handler.parse_data(data)
-                except Exception as e:
+                except (ValueError, struct.error, IndexError) as e:
+                    # Handler claimed it could handle this type but parsing failed
+                    # This could indicate corrupted data or wrong handler
                     logger.warning(
                         f"Handler {handler.__class__.__name__} failed to parse data: {e}"
                     )

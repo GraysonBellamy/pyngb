@@ -99,6 +99,9 @@ nav:
   - Getting Started: getting-started.md
   - User Guide: user-guide.md
   - API Reference: api-reference.md
+  - Developer Guide:
+    - Architecture: architecture.md
+    - Binary Format: binary-format.md
   - Troubleshooting: troubleshooting.md
   - Contributing: contributing.md
 

@@ -5,8 +5,6 @@ This extractor handles the complex logic for distinguishing between sample and
 reference crucible masses using structural binary signatures.
 """
 
-from __future__ import annotations
-
 import re
 from typing import Any
 

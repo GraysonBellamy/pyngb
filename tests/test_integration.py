@@ -6,6 +6,7 @@ import json
 import tempfile
 import zipfile
 from pathlib import Path
+from typing import Any
 
 import polars as pl
 import pyarrow.parquet as pq
@@ -27,7 +28,7 @@ class TestRealFileIntegration:
     """Integration tests using real NGB test files."""
 
     @pytest.fixture
-    def real_test_files(self):
+    def real_test_files(self) -> Any:
         """Get paths to real test files."""
         test_dir = Path(__file__).parent / "test_files"
         files = list(test_dir.glob("*.ngb-ss3"))
@@ -35,7 +36,7 @@ class TestRealFileIntegration:
             pytest.skip("No real test files available")
         return files
 
-    def test_all_real_files_parsing(self, real_test_files):
+    def test_all_real_files_parsing(self, real_test_files: Any) -> None:
         """Test that all real test files can be parsed successfully."""
         results = []
 
@@ -85,7 +86,7 @@ class TestRealFileIntegration:
                 f"sample='{result['sample_name']}', instrument='{result['instrument']}'"
             )
 
-    def test_cross_file_consistency(self, real_test_files):
+    def test_cross_file_consistency(self, real_test_files: Any) -> None:
         """Test consistency across different real files."""
         if len(real_test_files) < 2:
             pytest.skip("Need at least 2 files for consistency testing")
@@ -113,7 +114,7 @@ class TestRealFileIntegration:
                 f"File {fd['path'].name} missing basic metadata"
             )
 
-    def test_data_export_roundtrip(self, real_test_files):
+    def test_data_export_roundtrip(self, real_test_files: Any) -> None:
         """Test exporting data and ensuring roundtrip integrity."""
         if not real_test_files:
             pytest.skip("No real test files available")
@@ -143,14 +144,14 @@ class TestRealFileIntegration:
             # Test CSV export via Polars
             df = pl.from_arrow(original_table)
             csv_file = temp_path / "test_export.csv"
-            df.write_csv(csv_file)
+            df.write_csv(csv_file)  # type: ignore[arg-type]
 
             # Read back CSV and verify basic structure
             imported_df = pl.read_csv(csv_file)
-            assert imported_df.height == df.height
-            assert imported_df.width == df.width
+            assert imported_df.height == df.height  # type: ignore[arg-type]
+            assert imported_df.width == df.width  # type: ignore[arg-type]
 
-    def test_validation_on_real_data(self, real_test_files):
+    def test_validation_on_real_data(self, real_test_files: Any) -> None:
         """Test data validation on real files."""
         if not real_test_files:
             pytest.skip("No real test files available")
@@ -183,7 +184,7 @@ class TestBatchProcessingIntegration:
     """Integration tests for batch processing with real scenarios."""
 
     @pytest.fixture
-    def real_test_files(self):
+    def real_test_files(self) -> Any:
         """Get paths to real test files."""
         test_dir = Path(__file__).parent / "test_files"
         files = list(test_dir.glob("*.ngb-ss3"))
@@ -191,7 +192,7 @@ class TestBatchProcessingIntegration:
             pytest.skip("No real test files available")
         return files
 
-    def test_batch_processing_real_files(self, real_test_files):
+    def test_batch_processing_real_files(self, real_test_files: Any) -> None:
         """Test batch processing on real files."""
         if not real_test_files:
             pytest.skip("No test files available")
@@ -213,7 +214,7 @@ class TestBatchProcessingIntegration:
 
             # Verify output files exist
             for result in successful:
-                input_path = Path(result["file"])
+                input_path = Path(result["file"])  # type: ignore[arg-type]
                 parquet_path = _output_dir / f"{input_path.stem}.parquet"
                 assert parquet_path.exists(), f"Missing output file: {parquet_path}"
 
@@ -222,7 +223,7 @@ class TestBatchProcessingIntegration:
                 assert output_table.num_rows > 0
                 assert output_table.num_rows == result["rows"]
 
-    def test_ngb_dataset_real_files(self, real_test_files):
+    def test_ngb_dataset_real_files(self, real_test_files: Any) -> None:
         """Test NGBDataset with real files."""
         if not real_test_files:
             pytest.skip("No real test files available")
@@ -235,7 +236,7 @@ class TestBatchProcessingIntegration:
         # Test summary
         summary = dataset.summary()
         assert summary["file_count"] == len(real_test_files)
-        assert summary["loadable_files"] > 0
+        assert summary["loadable_files"] > 0  # type: ignore[type-arg]
         assert "unique_instruments" in summary
 
         # Test metadata export
@@ -251,7 +252,7 @@ class TestBatchProcessingIntegration:
             assert "file_path" in metadata_df.columns
             assert "file_name" in metadata_df.columns
 
-    def test_directory_processing_integration(self, real_test_files):
+    def test_directory_processing_integration(self, real_test_files: Any) -> None:
         """Test directory processing functionality."""
         if not real_test_files:
             pytest.skip("No real test files available")
@@ -287,7 +288,7 @@ class TestBatchProcessingIntegration:
 class TestAdvancedUseCases:
     """Integration tests for advanced usage scenarios."""
 
-    def test_custom_parser_configuration(self):
+    def test_custom_parser_configuration(self) -> None:
         """Test using custom parser configuration."""
         # Create custom configuration
         custom_config = PatternConfig()
@@ -303,7 +304,7 @@ class TestAdvancedUseCases:
         assert parser.config.column_map["custom_id"] == "custom_column"
         assert "custom_field" in parser.config.metadata_patterns
 
-    def test_parser_component_integration(self):
+    def test_parser_component_integration(self) -> None:
         """Test direct interaction with parser components."""
         from pyngb.binary import BinaryParser
         from pyngb.extractors import DataStreamProcessor
@@ -325,7 +326,7 @@ class TestAdvancedUseCases:
         tables = binary_parser.split_tables(test_data)
         assert isinstance(tables, list)
 
-    def test_memory_management_integration(self):
+    def test_memory_management_integration(self) -> None:
         """Test memory management across parsing operations."""
         import gc
 
@@ -358,7 +359,7 @@ class TestAdvancedUseCases:
         finally:
             Path(temp_file_path).unlink(missing_ok=True)
 
-    def test_concurrent_processing_safety(self):
+    def test_concurrent_processing_safety(self) -> None:
         """Test thread safety and concurrent processing."""
         import concurrent.futures
 
@@ -374,7 +375,7 @@ class TestAdvancedUseCases:
 
         try:
 
-            def parse_file(file_path):
+            def parse_file(file_path) -> Any:
                 try:
                     # This will likely fail with mock data, but tests concurrency
                     return read_ngb(file_path)
@@ -398,7 +399,7 @@ class TestAdvancedUseCases:
 class TestErrorRecoveryIntegration:
     """Integration tests for error handling and recovery."""
 
-    def test_partial_batch_failure_recovery(self):
+    def test_partial_batch_failure_recovery(self) -> None:
         """Test batch processing recovery from partial failures."""
         # Create mix of valid and invalid files
         test_files = []
@@ -427,7 +428,7 @@ class TestErrorRecoveryIntegration:
             # Test batch processing with skip_errors=True
             processor = BatchProcessor(max_workers=1, verbose=False)
             results = processor.process_files(
-                test_files, skip_errors=True, output_dir=temp_path
+                test_files, skip_errors=True, output_dir=temp_path  # type: ignore[arg-type]
             )
 
             # Should have results for all files
@@ -441,9 +442,9 @@ class TestErrorRecoveryIntegration:
             error_results = [r for r in results if r["status"] == "error"]
             for error_result in error_results:
                 assert error_result["error"] is not None
-                assert len(error_result["error"]) > 0
+                assert len(error_result["error"]) > 0  # type: ignore[arg-type]
 
-    def test_validation_error_handling(self):
+    def test_validation_error_handling(self) -> None:
         """Test validation with problematic data."""
         # Create problematic data with proper types
         problematic_data = pl.DataFrame(
@@ -472,7 +473,7 @@ class TestErrorRecoveryIntegration:
         assert result is not None
         assert not result.is_valid  # Should be marked as invalid
 
-    def test_corrupted_file_handling(self):
+    def test_corrupted_file_handling(self) -> None:
         """Test handling of various corrupted file scenarios."""
         corruption_scenarios = [
             ("truncated_zip", b"PK\x03\x04"),  # Truncated ZIP header
@@ -501,7 +502,7 @@ class TestErrorRecoveryIntegration:
 class TestDataIntegrityValidation:
     """Integration tests for data integrity and validation."""
 
-    def test_metadata_data_consistency(self):
+    def test_metadata_data_consistency(self) -> None:
         """Test consistency between metadata and actual data."""
         # This test would be better with real files, but we'll create a realistic mock
         with tempfile.NamedTemporaryFile(suffix=".ngb-ss3", delete=False) as temp_file:
@@ -539,7 +540,7 @@ class TestDataIntegrityValidation:
         finally:
             Path(temp_file_path).unlink(missing_ok=True)
 
-    def test_cross_api_consistency(self):
+    def test_cross_api_consistency(self) -> None:
         """Test consistency between different API endpoints."""
         # Test that different ways of accessing the same data yield consistent results
 
@@ -577,7 +578,7 @@ class TestPerformanceIntegration:
     """Integration tests for performance characteristics."""
 
     @pytest.mark.slow
-    def test_large_dataset_processing(self):
+    def test_large_dataset_processing(self) -> None:
         """Test processing of larger datasets."""
         test_dir = Path(__file__).parent / "test_files"
         real_files = list(test_dir.glob("*.ngb-ss3"))
@@ -617,7 +618,7 @@ class TestPerformanceIntegration:
                     f"(avg {avg_time:.2f}s per file)"
                 )
 
-    def test_memory_usage_validation(self):
+    def test_memory_usage_validation(self) -> None:
         """Test memory usage remains reasonable."""
         test_dir = Path(__file__).parent / "test_files"
         real_files = list(test_dir.glob("*.ngb-ss3"))
@@ -658,7 +659,7 @@ class TestPerformanceIntegration:
 class TestRegressionProtection:
     """Integration tests to prevent regressions."""
 
-    def test_api_stability(self):
+    def test_api_stability(self) -> None:
         """Test that public API remains stable."""
         # Test that all expected public functions are available
         import pyngb
@@ -676,7 +677,7 @@ class TestRegressionProtection:
             assert hasattr(pyngb, func_name), f"Missing public API: {func_name}"
             assert callable(getattr(pyngb, func_name)), f"Not callable: {func_name}"
 
-    def test_import_structure_stability(self):
+    def test_import_structure_stability(self) -> None:
         """Test that import structure remains stable."""
         # These imports should continue to work
         from pyngb import read_ngb
@@ -703,7 +704,7 @@ class TestRegressionProtection:
         assert config is not None
         assert markers is not None
 
-    def test_backwards_compatibility_scenarios(self):
+    def test_backwards_compatibility_scenarios(self) -> None:
         """Test scenarios that should remain backwards compatible."""
         # Test old-style usage patterns
 

@@ -11,6 +11,7 @@ import threading
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Any
 
 import polars as pl
 import pytest
@@ -24,7 +25,7 @@ class TestStressConditions:
     """Test package behavior under stress conditions."""
 
     @pytest.fixture
-    def real_test_files(self):
+    def real_test_files(self) -> Any:
         """Get available real test files."""
         test_dir = Path(__file__).parent / "test_files"
         files = list(test_dir.glob("*.ngb-ss3"))
@@ -33,7 +34,7 @@ class TestStressConditions:
         return files
 
     @pytest.mark.slow
-    def test_concurrent_file_access(self, real_test_files):
+    def test_concurrent_file_access(self, real_test_files: Any) -> None:
         """Test concurrent access to the same files."""
         if not real_test_files:
             pytest.skip("No test files available")
@@ -42,7 +43,7 @@ class TestStressConditions:
         results = []
         errors = []
 
-        def parse_file():
+        def parse_file() -> Any:
             try:
                 table = read_ngb(str(test_file))
                 results.append(table.num_rows)
@@ -69,7 +70,7 @@ class TestStressConditions:
             print(f"⚠ Inconsistent results in concurrent access: {set(results)}")
 
     @pytest.mark.slow
-    def test_memory_stress_repeated_parsing(self, real_test_files):
+    def test_memory_stress_repeated_parsing(self, real_test_files: Any) -> None:
         """Test memory usage with repeated parsing."""
         if not real_test_files:
             pytest.skip("No test files available")
@@ -107,7 +108,7 @@ class TestStressConditions:
 
         print(f"✓ Memory stress test: {memory_mb:.1f} MB increase after 20 parses")
 
-    def test_large_batch_processing(self, real_test_files):
+    def test_large_batch_processing(self, real_test_files: Any) -> None:
         """Test processing a large number of files."""
         if not real_test_files:
             pytest.skip("No test files available")
@@ -135,7 +136,7 @@ class TestStressConditions:
                 f"✓ Large batch test: {len(results)} files, statuses: {unique_statuses}"
             )
 
-    def test_rapid_successive_operations(self, real_test_files):
+    def test_rapid_successive_operations(self, real_test_files: Any) -> None:
         """Test rapid successive operations on the same data."""
         if not real_test_files:
             pytest.skip("No test files available")
@@ -179,7 +180,7 @@ class TestStressConditions:
 class TestEdgeCaseFiles:
     """Test with edge case file scenarios."""
 
-    def create_edge_case_file(self, scenario):
+    def create_edge_case_file(self, scenario) -> Any:
         """Create files with specific edge case scenarios."""
         with tempfile.NamedTemporaryFile(suffix=".ngb-ss3", delete=False) as temp_file:
             if scenario == "minimal_zip":
@@ -217,9 +218,9 @@ class TestEdgeCaseFiles:
 
         return name
 
-    def test_minimal_file_handling(self):
+    def test_minimal_file_handling(self) -> None:
         """Test handling of minimal valid files."""
-        test_file = self.create_edge_case_file("minimal_zip")
+        test_file = self.create_edge_case_file("minimal_zip")  # type: ignore[no-untyped-call]
 
         try:
             # Should handle gracefully (may raise exception but shouldn't crash)
@@ -228,9 +229,9 @@ class TestEdgeCaseFiles:
         finally:
             Path(test_file).unlink(missing_ok=True)
 
-    def test_large_metadata_handling(self):
+    def test_large_metadata_handling(self) -> None:
         """Test handling of files with very large metadata."""
-        test_file = self.create_edge_case_file("large_metadata")
+        test_file = self.create_edge_case_file("large_metadata")  # type: ignore[no-untyped-call]
 
         try:
             # Should handle large metadata without memory issues
@@ -239,9 +240,9 @@ class TestEdgeCaseFiles:
         finally:
             Path(test_file).unlink(missing_ok=True)
 
-    def test_many_streams_handling(self):
+    def test_many_streams_handling(self) -> None:
         """Test handling of files with many stream files."""
-        test_file = self.create_edge_case_file("many_streams")
+        test_file = self.create_edge_case_file("many_streams")  # type: ignore[no-untyped-call]
 
         try:
             # Should handle files with many streams
@@ -250,9 +251,9 @@ class TestEdgeCaseFiles:
         finally:
             Path(test_file).unlink(missing_ok=True)
 
-    def test_empty_streams_handling(self):
+    def test_empty_streams_handling(self) -> None:
         """Test handling of files with empty streams."""
-        test_file = self.create_edge_case_file("empty_streams")
+        test_file = self.create_edge_case_file("empty_streams")  # type: ignore[no-untyped-call]
 
         try:
             # Should handle empty streams gracefully
@@ -261,9 +262,9 @@ class TestEdgeCaseFiles:
         finally:
             Path(test_file).unlink(missing_ok=True)
 
-    def test_corrupted_file_handling(self):
+    def test_corrupted_file_handling(self) -> None:
         """Test handling of corrupted files."""
-        test_file = self.create_edge_case_file("corrupted_zip")
+        test_file = self.create_edge_case_file("corrupted_zip")  # type: ignore[no-untyped-call]
 
         try:
             # Should handle corruption gracefully
@@ -276,7 +277,7 @@ class TestEdgeCaseFiles:
 class TestExtremeDataScenarios:
     """Test with extreme data scenarios."""
 
-    def test_extreme_validation_scenarios(self):
+    def test_extreme_validation_scenarios(self) -> None:
         """Test validation with extreme data scenarios."""
 
         # Scenario 1: All NaN data
@@ -316,12 +317,12 @@ class TestExtremeDataScenarios:
         )
 
         checker = QualityChecker(large_data)
-        result = checker.quick_check()
+        result = checker.quick_check()  # type: ignore[type-arg]
         # May or may not be valid depending on validation rules
 
         print("✓ Extreme data validation scenarios completed")
 
-    def test_edge_case_batch_scenarios(self):
+    def test_edge_case_batch_scenarios(self) -> None:
         """Test batch processing with edge case scenarios."""
 
         # Create various problematic files
@@ -349,7 +350,7 @@ class TestExtremeDataScenarios:
             # Test batch processing
             processor = BatchProcessor(max_workers=1, verbose=False)
             results = processor.process_files(
-                problematic_files, skip_errors=True, output_dir=temp_path
+                problematic_files, skip_errors=True, output_dir=temp_path  # type: ignore[arg-type]
             )
 
             # Should handle all problematic files gracefully
@@ -365,7 +366,7 @@ class TestExtremeDataScenarios:
                 f"✓ Edge case batch processing: {failed_count} files failed as expected"
             )
 
-    def test_resource_exhaustion_scenarios(self):
+    def test_resource_exhaustion_scenarios(self) -> None:
         """Test scenarios that might exhaust system resources."""
 
         # Test 1: Many simultaneous parser instances
@@ -414,7 +415,7 @@ class TestConcurrencyEdgeCases:
     """Test edge cases related to concurrency."""
 
     @pytest.fixture
-    def real_test_files(self):
+    def real_test_files(self) -> Any:
         """Get available real test files."""
         test_dir = Path(__file__).parent / "test_files"
         files = list(test_dir.glob("*.ngb-ss3"))
@@ -422,7 +423,7 @@ class TestConcurrencyEdgeCases:
             pytest.skip("No real test files available")
         return files
 
-    def test_thread_safety_batch_processing(self, real_test_files):
+    def test_thread_safety_batch_processing(self, real_test_files: Any) -> None:
         """Test thread safety of batch processing components."""
         if not real_test_files:
             pytest.skip("No test files available")
@@ -430,7 +431,7 @@ class TestConcurrencyEdgeCases:
         results = []
         errors = []
 
-        def batch_process():
+        def batch_process() -> Any:
             try:
                 processor = BatchProcessor(max_workers=1, verbose=False)
                 with tempfile.TemporaryDirectory() as temp_dir:
@@ -460,7 +461,7 @@ class TestConcurrencyEdgeCases:
             f"✓ Thread safety test: {len(results)}/5 concurrent batch processes succeeded"
         )
 
-    def test_parser_state_isolation(self, real_test_files):
+    def test_parser_state_isolation(self, real_test_files: Any) -> None:
         """Test that parser instances don't share state inappropriately."""
         if not real_test_files:
             pytest.skip("No test files available")
@@ -490,7 +491,7 @@ class TestConcurrencyEdgeCases:
 
         print("✓ Parser state isolation verified")
 
-    def test_concurrent_validation(self):
+    def test_concurrent_validation(self) -> None:
         """Test concurrent validation operations."""
 
         # Create test data
@@ -504,7 +505,7 @@ class TestConcurrencyEdgeCases:
 
         validation_results = []
 
-        def validate_data():
+        def validate_data() -> Any:
             try:
                 checker = QualityChecker(test_data)
                 result = checker.full_validation()
@@ -535,7 +536,7 @@ class TestConcurrencyEdgeCases:
 class TestBoundaryConditions:
     """Test boundary conditions and limits."""
 
-    def test_empty_data_handling(self):
+    def test_empty_data_handling(self) -> None:
         """Test handling of completely empty data."""
 
         # Empty DataFrame
@@ -561,7 +562,7 @@ class TestBoundaryConditions:
 
         print("✓ Empty data handling verified")
 
-    def test_single_point_data(self):
+    def test_single_point_data(self) -> None:
         """Test handling of single data point scenarios."""
 
         single_point = pl.DataFrame(
@@ -581,7 +582,7 @@ class TestBoundaryConditions:
 
         print("✓ Single point data handling verified")
 
-    def test_extreme_file_sizes(self):
+    def test_extreme_file_sizes(self) -> None:
         """Test handling of extremely small and large file scenarios."""
 
         # Test with extremely small ZIP
@@ -597,7 +598,7 @@ class TestBoundaryConditions:
 
         print("✓ Extreme file size handling verified")
 
-    def test_unicode_edge_cases(self):
+    def test_unicode_edge_cases(self) -> None:
         """Test handling of various Unicode scenarios."""
 
         # Test with Unicode in mock metadata

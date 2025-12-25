@@ -2,14 +2,12 @@
 Data stream processing for NGB measurement data.
 """
 
-from __future__ import annotations
-
 import logging
 from itertools import tee, zip_longest
 
 import polars as pl
 
-from polars.exceptions import ShapeError  # type: ignore[import-untyped]
+from polars.exceptions import ShapeError
 
 from ..binary import BinaryParser
 from ..constants import BinaryProcessing, PatternConfig, StreamMarkers

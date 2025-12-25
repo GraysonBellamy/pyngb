@@ -10,6 +10,7 @@ import json
 import logging
 import zipfile
 from pathlib import Path
+from typing import Any
 
 import pyarrow.parquet as pq
 import pytest
@@ -27,19 +28,19 @@ class TestTemperatureProgramExtraction:
     """Test temperature program extraction in various scenarios."""
 
     @pytest.fixture
-    def test_files(self):
+    def test_files(self) -> None:
         """Get available test files."""
         test_dir = Path(__file__).parent / "test_files"
-        return list(test_dir.glob("*.ngb-ss3"))
+        return list(test_dir.glob("*.ngb-ss3"))  # type: ignore[type-arg]
 
     @pytest.fixture
-    def metadata_extractor(self):
+    def metadata_extractor(self) -> Any:
         """Create metadata extractor for testing."""
         config = PatternConfig()
         parser = BinaryParser()
         return MetadataExtractor(config, parser)
 
-    def test_direct_temperature_program_extraction(
+    def test_direct_temperature_program_extraction(  # type: ignore[no-untyped-def]
         self, metadata_extractor, test_files
     ):
         """Test direct temperature program extraction on stream data."""
@@ -93,7 +94,7 @@ class TestTemperatureProgramExtraction:
                             f"Stage {stage_key} field {field} not numeric in {test_file.name}"
                         )
 
-    def test_extract_metadata_method_completeness(self, metadata_extractor, test_files):
+    def test_extract_metadata_method_completeness(self, metadata_extractor: Any, test_files: Any) -> None:
         """Test that extract_metadata method returns complete temperature programs."""
         if not test_files:
             pytest.skip("No test files available")
@@ -135,7 +136,7 @@ class TestTemperatureProgramExtraction:
                         f"Missing stage {stage_key} in extract_metadata for {test_file.name}"
                     )
 
-    def test_ngb_parser_temperature_program(self, test_files):
+    def test_ngb_parser_temperature_program(self, test_files: Any) -> None:
         """Test that NGBParser returns complete temperature programs."""
         if not test_files:
             pytest.skip("No test files available")
@@ -173,7 +174,7 @@ class TestTemperatureProgramExtraction:
             except Exception as e:
                 pytest.fail(f"NGBParser failed on {test_file.name}: {e}")
 
-    def test_batch_processing_temperature_program(self, test_files, tmp_path):
+    def test_batch_processing_temperature_program(self, test_files: Any, tmp_path: Any) -> None:
         """Test that batch processing preserves complete temperature programs in parquet files."""
         if not test_files:
             pytest.skip("No test files available")
@@ -195,7 +196,7 @@ class TestTemperatureProgramExtraction:
 
         # Check parquet files contain complete temperature programs
         for result in results:
-            test_file_name = Path(result["file"]).stem
+            test_file_name = Path(result["file"]).stem  # type: ignore[arg-type]
             parquet_file = tmp_path / f"{test_file_name}.parquet"
 
             assert parquet_file.exists(), (
@@ -231,7 +232,7 @@ class TestTemperatureProgramExtraction:
                         f"Stage not dict in {parquet_file.name}"
                     )
 
-    def test_temperature_program_pattern_matching(self, metadata_extractor, test_files):
+    def test_temperature_program_pattern_matching(self, metadata_extractor: Any, test_files: Any) -> None:
         """Test that temperature program patterns find the expected number of matches."""
         if not test_files:
             pytest.skip("No test files available")
@@ -270,7 +271,7 @@ class TestTemperatureProgramExtraction:
                         f"Stage {stage_key} should be a dict"
                     )
 
-    def test_temperature_program_regression(self, test_files):
+    def test_temperature_program_regression(self, test_files: Any) -> None:
         """Regression test for the specific issue of extract_metadata returning fewer stages than direct extraction."""
         if not test_files:
             pytest.skip("No test files available")
@@ -325,7 +326,7 @@ class TestTemperatureProgramSpecificFiles:
             ("RO_FILED_STA_N2_10K_250129_R29.ngb-ss3", 3),
         ],
     )
-    def test_specific_file_temperature_programs(
+    def test_specific_file_temperature_programs(  # type: ignore[no-untyped-def]
         self, file_pattern, expected_min_stages
     ):
         """Test temperature program extraction on specific files with known expected results."""

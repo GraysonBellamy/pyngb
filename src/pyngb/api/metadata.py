@@ -5,9 +5,7 @@ This module provides convenient functions for setting, getting, and managing
 column-level metadata in PyArrow tables for thermal analysis data.
 """
 
-from __future__ import annotations
-
-from typing import Any, Union, Optional
+from typing import Any
 
 import pyarrow as pa
 
@@ -64,7 +62,7 @@ def set_column_units(table: pa.Table, column: str, units: str) -> pa.Table:
     return update_column_metadata(table, column, {"units": units})
 
 
-def get_column_units(table: pa.Table, column: str) -> Optional[str]:  # noqa: UP045
+def get_column_units(table: pa.Table, column: str) -> str | None:
     """Get the units for a column.
 
     Parameters
@@ -93,9 +91,7 @@ def get_column_units(table: pa.Table, column: str) -> Optional[str]:  # noqa: UP
     return result if isinstance(result, str) else None
 
 
-def mark_baseline_corrected(
-    table: pa.Table, columns: Union[list[str], str]
-) -> pa.Table:
+def mark_baseline_corrected(table: pa.Table, columns: list[str] | str) -> pa.Table:
     """Mark columns as baseline corrected.
 
     Only applies to columns that support baseline correction (mass, dsc_signal).
@@ -204,7 +200,7 @@ def add_column_processing_step(table: pa.Table, column: str, step: str) -> pa.Ta
     return add_processing_step(table, column, step)
 
 
-def get_column_source(table: pa.Table, column: str) -> Optional[str]:  # noqa: UP045
+def get_column_source(table: pa.Table, column: str) -> str | None:
     """Get the source type for a column.
 
     Parameters
@@ -276,7 +272,7 @@ def is_column_baseline_correctable(column_name: str) -> bool:
     return is_baseline_correctable(column_name)
 
 
-def get_column_baseline_status(table: pa.Table, column: str) -> Optional[bool]:  # noqa: UP045
+def get_column_baseline_status(table: pa.Table, column: str) -> bool | None:
     """Get baseline correction status for a column.
 
     Parameters

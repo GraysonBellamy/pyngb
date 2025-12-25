@@ -2,8 +2,6 @@
 Constants, enums, and configuration classes for NGB parsing.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, TypedDict
@@ -18,6 +16,7 @@ __all__ = [  # noqa: RUF022 - order chosen for logical grouping
     "DataType",
     "DataTypeSizes",
     "FileMetadata",
+    "FileMetadataRequired",
     "PatternConfig",
     "PatternOffsets",
     "REF_CRUCIBLE_SIG_FRAGMENT",
@@ -27,12 +26,29 @@ __all__ = [  # noqa: RUF022 - order chosen for logical grouping
 ]
 
 
+class FileMetadataRequired(TypedDict):
+    """Required metadata fields always present after parsing.
+
+    These fields are guaranteed to be populated by the parser
+    and can be relied upon in downstream processing.
+    """
+
+    # No fields are strictly required - the NGB format allows for sparse metadata
+    # All fields are technically optional based on file contents
+
+
 class FileMetadata(TypedDict, total=False):
     """Type definition for file metadata dictionary.
 
     Mass-related fields grouped together after core identifying fields. Reference masses
     are structurally derived; crucible_mass pattern also matches reference_crucible_mass and
     is disambiguated using signature fragments (see SAMPLE_CRUCIBLE_SIG_FRAGMENT / REF_CRUCIBLE_SIG_FRAGMENT).
+
+    Note:
+        All fields are optional (total=False) as the NGB binary format does not
+        guarantee the presence of any particular metadata field. Files from different
+        instruments, software versions, or with different configurations may have
+        different subsets of metadata available.
     """
 
     instrument: str
@@ -186,7 +202,7 @@ class DataType(Enum):
     STRING = b"\x1f"  # Enhanced string parsing: supports both standard (4-byte length + UTF-8) and NETZSCH (fffeff + char_count + UTF-16LE) formats
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BinaryMarkers:
     """Binary markers for parsing NGB files.
 
@@ -342,7 +358,7 @@ APP_LICENSE_FIELD = b"\x18\xfc"
 STRING_DATA_TYPE = b"\x1f"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class StreamMarkers:
     """Binary markers specific to NGB stream processing."""
 
@@ -360,7 +376,7 @@ class StreamMarkers:
     DATA_MARKER_POS: int = 1  # table[1:2]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BinaryProcessing:
     """Constants for binary data processing."""
 
@@ -373,7 +389,7 @@ class BinaryProcessing:
     LARGE_FILE_THRESHOLD_MB: int = 100
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DataTypeSizes:
     """Expected byte sizes for different data types."""
 
@@ -383,7 +399,7 @@ class DataTypeSizes:
     STRING_MIN_BYTES: int = 4  # Length prefix minimum
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PatternOffsets:
     """Byte offsets and window sizes for pattern matching."""
 

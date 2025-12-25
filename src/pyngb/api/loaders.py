@@ -2,10 +2,8 @@
 High-level API functions for loading NGB data.
 """
 
-from __future__ import annotations
-
 from pathlib import Path
-from typing import Literal, Union, overload
+from typing import Literal, overload
 
 import pyarrow as pa
 
@@ -18,7 +16,7 @@ __all__ = ["main", "read_ngb"]
 
 @overload
 def read_ngb(
-    path: Union[str, Path],
+    path: str | Path,
     *,
     return_metadata: Literal[False] = False,
     baseline_file: None = None,
@@ -28,7 +26,7 @@ def read_ngb(
 
 @overload
 def read_ngb(
-    path: Union[str, Path],
+    path: str | Path,
     *,
     return_metadata: Literal[True],
     baseline_file: None = None,
@@ -38,31 +36,31 @@ def read_ngb(
 
 @overload
 def read_ngb(
-    path: Union[str, Path],
+    path: str | Path,
     *,
     return_metadata: Literal[False] = False,
-    baseline_file: Union[str, Path],
+    baseline_file: str | Path,
     dynamic_axis: str = "time",
 ) -> pa.Table: ...
 
 
 @overload
 def read_ngb(
-    path: Union[str, Path],
+    path: str | Path,
     *,
     return_metadata: Literal[True],
-    baseline_file: Union[str, Path],
+    baseline_file: str | Path,
     dynamic_axis: str = "time",
 ) -> tuple[FileMetadata, pa.Table]: ...
 
 
 def read_ngb(
-    path: Union[str, Path],
+    path: str | Path,
     *,
     return_metadata: bool = False,
-    baseline_file: Union[str, Path, None] = None,
+    baseline_file: str | Path | None = None,
     dynamic_axis: str = "sample_temperature",
-) -> Union[pa.Table, tuple[FileMetadata, pa.Table]]:
+) -> pa.Table | tuple[FileMetadata, pa.Table]:
     """
     Read NETZSCH NGB file data with optional baseline subtraction.
 
@@ -227,153 +225,16 @@ def read_ngb(
 def main() -> int:
     """Command-line interface for the NGB parser.
 
+    .. deprecated:: 0.2.0
+        This function has been moved to pyngb.api.cli.main().
+        This wrapper is maintained for backward compatibility.
+
     Provides a command-line tool for parsing NGB files and converting
     them to various output formats including Parquet and CSV.
 
-    Usage:
-    python -m pyngb input.ngb-ss3 [options]
-
-    Examples:
-        # Parse to Parquet (default)
-    python -m pyngb sample.ngb-ss3
-
-        # Parse to CSV with verbose logging
-    python -m pyngb sample.ngb-ss3 -f csv -v
-
-        # Parse to both formats in custom directory
-    python -m pyngb sample.ngb-ss3 -f all -o /output/dir
-
     Returns:
-        int: Exit code (0 for success, 1 for error)
+        Exit code (0 for success, non-zero for error)
     """
-    import argparse
-    import logging
+    from .cli import main as cli_main
 
-    # Import these here to avoid circular imports
-    import polars as pl
-    import pyarrow.parquet as pq
-
-    parser_cli = argparse.ArgumentParser(description="Parse NETZSCH STA NGB files")
-    parser_cli.add_argument("input", help="Input NGB file path")
-    parser_cli.add_argument("-o", "--output", help="Output directory", default=".")
-    parser_cli.add_argument(
-        "-f",
-        "--format",
-        choices=["parquet", "csv", "all"],
-        default="parquet",
-        help="Output format",
-    )
-    parser_cli.add_argument(
-        "-v", "--verbose", action="store_true", help="Enable verbose logging"
-    )
-    parser_cli.add_argument(
-        "-b", "--baseline", help="Baseline file path for baseline subtraction"
-    )
-    parser_cli.add_argument(
-        "--dynamic-axis",
-        choices=["time", "sample_temperature", "furnace_temperature"],
-        default="sample_temperature",
-        help="Axis for dynamic segment alignment during baseline subtraction (default: sample_temperature)",
-    )
-
-    args = parser_cli.parse_args()
-
-    logging.basicConfig(level=(logging.DEBUG if args.verbose else logging.INFO))
-    logger = logging.getLogger(__name__)
-
-    # Validate input file
-    input_path = Path(args.input)
-    if not input_path.exists():
-        logger.error(f"Input file does not exist: {args.input}")
-        return 1
-
-    if not input_path.is_file():
-        logger.error(f"Input path is not a file: {args.input}")
-        return 1
-
-    # Check if it's a valid NGB file extension
-    valid_extensions = {".ngb-ss3", ".ngb-bs3"}
-    if input_path.suffix.lower() not in valid_extensions:
-        logger.warning(
-            f"File extension '{input_path.suffix}' may not be a standard NGB format. Proceeding anyway."
-        )
-
-    try:
-        # Validate baseline file if provided
-        if args.baseline:
-            baseline_path = Path(args.baseline)
-            if not baseline_path.exists():
-                logger.error(f"Baseline file does not exist: {args.baseline}")
-                return 1
-            if not baseline_path.is_file():
-                logger.error(f"Baseline path is not a file: {args.baseline}")
-                return 1
-            if baseline_path.suffix.lower() not in valid_extensions:
-                logger.warning(
-                    f"Baseline file extension '{baseline_path.suffix}' may not be a standard NGB format. Proceeding anyway."
-                )
-
-        # Load data with optional baseline subtraction
-        if args.baseline:
-            logger.info(
-                f"Loading data with baseline subtraction (dynamic_axis={args.dynamic_axis})"
-            )
-            data = read_ngb(
-                args.input, baseline_file=args.baseline, dynamic_axis=args.dynamic_axis
-            )
-        else:
-            data = read_ngb(args.input)
-
-        output_path = Path(args.output)
-
-        # Validate output directory
-        try:
-            output_path.mkdir(parents=True, exist_ok=True)
-            # Test write permissions by creating a temporary file
-            test_file = output_path / ".write_test"
-            test_file.touch()
-            test_file.unlink()
-        except (PermissionError, OSError) as e:
-            logger.error(f"Cannot write to output directory {args.output}: {e}")
-            return 1
-
-        base_name = Path(args.input).stem
-        # Add suffix to indicate baseline subtraction was performed
-        if args.baseline:
-            base_name += "_baseline_subtracted"
-
-        if args.format in ("parquet", "all"):
-            pq.write_table(
-                data, output_path / f"{base_name}.parquet", compression="snappy"
-            )
-        if args.format in ("csv", "all"):
-            # Optimize: Only convert to Polars when needed for CSV output
-            df = pl.from_arrow(data)
-            # Ensure we have a DataFrame for CSV writing
-            if isinstance(df, pl.DataFrame):
-                df.write_csv(output_path / f"{base_name}.csv")
-
-        if args.baseline:
-            logger.info(
-                f"Successfully parsed {args.input} with baseline subtraction from {args.baseline}"
-            )
-        else:
-            logger.info(f"Successfully parsed {args.input}")
-        return 0
-    except FileNotFoundError:
-        logger.error(f"Input file not found: {args.input}")
-        return 1
-    except PermissionError:
-        logger.error(
-            f"Permission denied accessing file or output directory: {args.input}"
-        )
-        return 1
-    except OSError as e:
-        logger.error(f"OS error while processing file {args.input}: {e}")
-        return 1
-    except ImportError as e:
-        logger.error(f"Required dependency not available: {e}")
-        return 1
-    except Exception as e:
-        logger.error(f"Unexpected error while parsing file {args.input}: {e}")
-        return 1
+    return cli_main()

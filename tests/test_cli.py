@@ -3,6 +3,7 @@ CLI tests for the package entry point (__main__) and forwarding to api.loaders.
 """
 
 from unittest.mock import patch
+from typing import Any
 
 
 class TestMainModule:
@@ -10,7 +11,7 @@ class TestMainModule:
 
     @patch("sys.exit")
     @patch("pyngb.api.loaders.main")
-    def test_main_module_forwards_to_loaders_main(self, mock_main, mock_exit):
+    def test_main_module_forwards_to_loaders_main(self, mock_main: Any, mock_exit: Any) -> None:
         """Test that __main__ module forwards to api.loaders.main."""
 
         mock_main.return_value = 0
@@ -22,7 +23,7 @@ class TestMainModule:
         assert hasattr(pyngb.__main__, "main")
         assert pyngb.__main__.main is mock_main
 
-    def test_main_module_exit_code_propagation(self):
+    def test_main_module_exit_code_propagation(self) -> None:
         """Test that __main__ module propagates exit codes."""
         # This is covered by pragma: no cover in the actual code
         # Just test that the main guard exists
@@ -34,7 +35,7 @@ class TestMainModule:
         assert 'if __name__ == "__main__"' in source
         assert "sys.exit(main())" in source
 
-    def test_main_module_imports(self):
+    def test_main_module_imports(self) -> None:
         """Test that __main__ module imports are correct."""
         import pyngb.__main__
 
@@ -45,13 +46,13 @@ class TestMainModule:
         assert hasattr(pyngb.__main__, "main")
 
         # main should be callable
-        assert callable(pyngb.__main__.main)
+        assert callable(pyngb.__main__.main)  # type: ignore[type-arg]
 
 
 class TestMainModuleStructure:
     """Test the structure of the __main__ module."""
 
-    def test_main_module_structure(self):
+    def test_main_module_structure(self) -> None:
         import pyngb.__main__
 
         # Should have docstring
@@ -66,7 +67,7 @@ class TestMainModuleStructure:
 class TestErrorHandlingMainModule:
     """Test error handling signal through __main__ (import-level only)."""
 
-    def test_main_guard_present(self):
+    def test_main_guard_present(self) -> None:
         import inspect
 
         import pyngb.__main__
@@ -79,7 +80,7 @@ class TestErrorHandlingMainModule:
 class TestBackwardsCompatibility:
     """Test backwards compatibility aspects for __main__ only (cli removed)."""
 
-    def test_main_module_interface_unchanged(self):
+    def test_main_module_interface_unchanged(self) -> None:
         """Test that __main__ module interface remains unchanged."""
         import pyngb.__main__
 
@@ -93,7 +94,7 @@ class TestBackwardsCompatibility:
 class TestDocumentation:
     """Test documentation and help text."""
 
-    def test_main_module_docstring(self):
+    def test_main_module_docstring(self) -> None:
         """Test that __main__ module has appropriate docstring."""
         import pyngb.__main__
 

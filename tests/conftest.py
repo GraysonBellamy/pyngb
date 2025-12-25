@@ -4,7 +4,9 @@ Test configuration and fixtures for pyngb tests.
 
 import tempfile
 import zipfile
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -12,7 +14,7 @@ from pyngb.constants import BinaryMarkers, PatternConfig
 
 
 @pytest.fixture()
-def sample_binary_data():
+def sample_binary_data() -> bytes:
     """Create sample binary data for testing."""
     # Create a simple binary sequence with markers
     markers = BinaryMarkers()
@@ -28,7 +30,7 @@ def sample_binary_data():
 
 
 @pytest.fixture()
-def sample_metadata_patterns():
+def sample_metadata_patterns() -> dict[str, tuple[bytes, bytes]]:
     """Create sample metadata patterns for testing."""
     return {
         "test_field": (b"\x75\x17", b"\x59\x10"),
@@ -37,7 +39,7 @@ def sample_metadata_patterns():
 
 
 @pytest.fixture()
-def sample_pattern_config():
+def sample_pattern_config() -> PatternConfig:
     """Create a sample PatternConfig for testing."""
     config = PatternConfig()
     # Override with minimal test patterns
@@ -53,7 +55,7 @@ def sample_pattern_config():
 
 
 @pytest.fixture()
-def sample_ngb_file():
+def sample_ngb_file() -> str:
     """Create a sample NGB file for integration tests."""
     with tempfile.NamedTemporaryFile(suffix=".ngb-ss3", delete=False) as temp_file:
         with zipfile.ZipFile(temp_file.name, "w") as z:
@@ -92,7 +94,7 @@ def sample_ngb_file():
 
 
 @pytest.fixture()
-def sample_metadata():
+def sample_metadata() -> dict[str, Any]:
     """Create sample metadata dictionary."""
     return {
         "instrument": "Test Instrument",
@@ -104,11 +106,11 @@ def sample_metadata():
 
 
 @pytest.fixture()
-def cleanup_temp_files():
+def cleanup_temp_files() -> Iterator[Any]:
     """Fixture to clean up temporary files after tests."""
-    temp_files = []
+    temp_files: list[str] = []
 
-    def _add_temp_file(filepath):
+    def _add_temp_file(filepath: str) -> str:
         temp_files.append(filepath)
         return filepath
 
@@ -123,7 +125,7 @@ def cleanup_temp_files():
 
 
 @pytest.fixture(autouse=True)
-def cleanup_generated_files():
+def cleanup_generated_files() -> Iterator[None]:
     """Automatically clean up generated tmp*.parquet files after each test."""
     yield
 
@@ -137,7 +139,7 @@ def cleanup_generated_files():
 
 
 @pytest.fixture()
-def real_test_files():
+def real_test_files() -> list[Path]:
     """Provide real test files if available, otherwise skip."""
     test_files_dir = Path(__file__).parent / "test_files"
     if not test_files_dir.exists():

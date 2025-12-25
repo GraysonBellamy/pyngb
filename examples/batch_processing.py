@@ -18,7 +18,6 @@ import argparse
 import sys
 import tempfile
 from collections.abc import Sequence
-from typing import Union
 from pathlib import Path
 
 import polars as pl
@@ -26,7 +25,7 @@ import polars as pl
 from pyngb import BatchProcessor, NGBDataset, process_directory
 
 
-def demonstrate_batch_processor(files: Sequence[Union[str, Path]], output_dir: Union[str, Path]):
+def demonstrate_batch_processor(files: Sequence[str | Path], output_dir: str | Path):
     """Demonstrate BatchProcessor class usage."""
 
     print("\n🔧 Method 1: BatchProcessor Class")
@@ -93,7 +92,7 @@ def demonstrate_batch_processor(files: Sequence[Union[str, Path]], output_dir: U
     return results
 
 
-def demonstrate_convenience_function(input_dir: Union[str, Path], _output_dir: Union[str, Path]):
+def demonstrate_convenience_function(input_dir: str | Path, _output_dir: str | Path):
     """Demonstrate process_directory convenience function."""
 
     print("\n⚡ Method 2: Convenience Function")
@@ -122,7 +121,7 @@ def demonstrate_convenience_function(input_dir: Union[str, Path], _output_dir: U
     return results
 
 
-def demonstrate_dataset_management(files: Sequence[Union[str, Path]], out_dir: Path):
+def demonstrate_dataset_management(files: Sequence[str | Path], out_dir: Path):
     """Demonstrate NGBDataset for dataset management."""
 
     print("\n📚 Method 3: Dataset Management")
@@ -181,7 +180,7 @@ def demonstrate_dataset_management(files: Sequence[Union[str, Path]], out_dir: P
         print(f"  ⚠️  Could not export metadata: {e}")
 
 
-def create_processing_summary(results: list[dict], output_dir: Union[str, Path]):
+def create_processing_summary(results: list[dict], output_dir: str | Path):
     """Create a summary report of batch processing results."""
 
     print("\n📋 Creating Processing Summary")

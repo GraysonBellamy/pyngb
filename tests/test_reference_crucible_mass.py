@@ -1,9 +1,10 @@
 from pathlib import Path
+from typing import Any
 
 from pyngb.core.parser import NGBParser
 
 
-def test_crucible_and_reference_crucible_mass_extraction():
+def test_crucible_and_reference_crucible_mass_extraction() -> Any:
     sample_file = Path("tests/test_files/Red_Oak_STA_10K_250731_R7.ngb-ss3")
     parser = NGBParser()
     metadata, _ = parser.parse(str(sample_file))

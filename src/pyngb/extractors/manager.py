@@ -5,8 +5,6 @@ This module provides the main MetadataExtractor that orchestrates a collection
 of focused extractors, improving maintainability and extensibility.
 """
 
-from __future__ import annotations
-
 import logging
 
 from ..binary import BinaryParser
@@ -114,7 +112,7 @@ class MetadataExtractor(BaseMetadataExtractor):
         extracted_metadata = self.manager.extract_all(tables)
 
         # Update the provided metadata dictionary
-        metadata.update(extracted_metadata)  # type: ignore
+        metadata.update(extracted_metadata)
 
     def extract_metadata(self, tables: list[bytes]) -> FileMetadata:
         """Extract all metadata from tables.

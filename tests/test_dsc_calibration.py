@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import polars as pl
@@ -17,7 +18,7 @@ from pyngb.util import set_column_metadata, get_column_metadata
 class TestDSCCalibration:
     """Test DSC calibration functionality."""
 
-    def test_calibration_formula_correctness(self):
+    def test_calibration_formula_correctness(self) -> None:
         """Test that the calibration formula is implemented correctly."""
         # Create test data
         test_data = {
@@ -66,7 +67,7 @@ class TestDSCCalibration:
 
         # Extract calibrated values using Polars
         df = pl.from_arrow(calibrated_table)
-        calibrated_values = df["dsc_signal"].to_numpy()
+        calibrated_values = df["dsc_signal"].to_numpy()  # type: ignore[index]
 
         # Verify that values have changed and are reasonable
         assert not np.array_equal(test_data["dsc_signal"], calibrated_values)
@@ -83,7 +84,7 @@ class TestDSCCalibration:
         metadata = get_column_metadata(calibrated_table, "dsc_signal")
         assert metadata["calibration_applied"] is True
 
-    def test_missing_calibration_constants(self):
+    def test_missing_calibration_constants(self) -> None:
         """Test error handling when calibration constants are missing."""
         test_data = {"sample_temperature": [100.0, 200.0], "dsc_signal": [1.0, 2.0]}
         table = pa.table(test_data)
@@ -110,7 +111,7 @@ class TestDSCCalibration:
         with pytest.raises(KeyError, match="Missing calibration constants"):
             apply_dsc_calibration(table)
 
-    def test_missing_required_columns(self):
+    def test_missing_required_columns(self) -> None:
         """Test error handling when required columns are missing."""
         # Table without temperature
         table_no_temp = pa.table({"dsc_signal": [1.0, 2.0]})
@@ -122,7 +123,7 @@ class TestDSCCalibration:
         with pytest.raises(ValueError, match="must contain 'dsc_signal'"):
             apply_dsc_calibration(table_no_dsc)
 
-    def test_double_calibration_prevention(self):
+    def test_double_calibration_prevention(self) -> None:
         """Test that calibration cannot be applied twice."""
         test_data = {"sample_temperature": [100.0, 200.0], "dsc_signal": [1.0, 2.0]}
         table = pa.table(test_data)
@@ -156,7 +157,7 @@ class TestDSCCalibration:
         with pytest.raises(ValueError, match="Calibration has already been applied"):
             apply_dsc_calibration(calibrated_table)
 
-    def test_custom_column_names(self):
+    def test_custom_column_names(self) -> None:
         """Test calibration with custom column names."""
         test_data = {"furnace_temperature": [100.0, 200.0], "heat_flow": [1.0, 2.0]}
         table = pa.table(test_data)
@@ -189,7 +190,7 @@ class TestDSCCalibration:
 
         assert get_column_units(calibrated_table, "heat_flow") == "mW"
 
-    def test_calibration_with_normalization_order_independence(self):
+    def test_calibration_with_normalization_order_independence(self) -> None:
         """Test that calibration and normalization work in any order."""
         # Create test data
         test_data = {
@@ -249,7 +250,7 @@ class TestDSCCalibration:
         not Path("tests/test_files/Red_Oak_STA_10K_250731_R7.ngb-ss3").exists(),
         reason="Test file not available",
     )
-    def test_calibration_with_real_file(self):
+    def test_calibration_with_real_file(self) -> None:
         """Test calibration with a real NGB file."""
         test_file = Path("tests/test_files/Red_Oak_STA_10K_250731_R7.ngb-ss3")
 
@@ -279,6 +280,6 @@ class TestDSCCalibration:
         # Verify data has changed using Polars
         original_df = pl.from_arrow(table)
         calibrated_df = pl.from_arrow(calibrated_table)
-        original_data = original_df["dsc_signal"].to_numpy()
-        calibrated_data = calibrated_df["dsc_signal"].to_numpy()
+        original_data = original_df["dsc_signal"].to_numpy()  # type: ignore[index]
+        calibrated_data = calibrated_df["dsc_signal"].to_numpy()  # type: ignore[index]
         assert not np.array_equal(original_data, calibrated_data)

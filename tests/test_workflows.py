@@ -5,6 +5,7 @@ End-to-end workflow tests for pyngb.
 import shutil
 import tempfile
 from pathlib import Path
+from typing import Any
 
 import polars as pl
 import pytest
@@ -18,7 +19,7 @@ from pyngb.validation import QualityChecker
 class TestEndToEndWorkflows:
     """Test complete end-to-end workflows."""
 
-    def test_basic_data_extraction_workflow(self, sample_ngb_file):
+    def test_basic_data_extraction_workflow(self, sample_ngb_file: Any) -> None:
         """Test basic data extraction workflow from NGB file."""
         # Read NGB file
         result = read_ngb(sample_ngb_file)
@@ -32,7 +33,7 @@ class TestEndToEndWorkflows:
         assert result.num_rows >= 0  # Allow empty tables
         assert result.num_columns >= 0  # Allow empty tables
 
-    def test_metadata_embedding_workflow(self, sample_ngb_file, tmp_path):
+    def test_metadata_embedding_workflow(self, sample_ngb_file: Any, tmp_path: Any) -> None:
         """Test metadata embedding workflow."""
         # Read NGB file with metadata
         metadata, data = read_ngb(sample_ngb_file, return_metadata=True)
@@ -58,7 +59,7 @@ class TestEndToEndWorkflows:
         embedded_metadata = get_hash(str(output_file))
         assert embedded_metadata is not None
 
-    def test_batch_processing_workflow(self, sample_ngb_file, tmp_path):
+    def test_batch_processing_workflow(self, sample_ngb_file: Any, tmp_path: Any) -> None:
         """Test batch processing workflow."""
         # Create test directory
         test_dir = tmp_path / "batch_workflow"
@@ -83,7 +84,7 @@ class TestEndToEndWorkflows:
         summary = dataset.summary()
         assert summary["file_count"] == 3
 
-    def test_data_validation_workflow(self, sample_ngb_file):
+    def test_data_validation_workflow(self, sample_ngb_file: Any) -> None:
         """Test data validation workflow."""
         # Read NGB file
         result = read_ngb(sample_ngb_file)
@@ -96,7 +97,7 @@ class TestEndToEndWorkflows:
         assert hasattr(validation_result, "errors")
         assert hasattr(validation_result, "warnings")
 
-    def test_data_export_workflow(self, sample_ngb_file, tmp_path):
+    def test_data_export_workflow(self, sample_ngb_file: Any, tmp_path: Any) -> None:
         """Test data export workflow to various formats."""
         # Read NGB file
         result = read_ngb(sample_ngb_file)
@@ -122,7 +123,7 @@ class TestEndToEndWorkflows:
             df.write_json(str(json_file))
             assert json_file.exists()
 
-    def test_error_handling_workflow(self):
+    def test_error_handling_workflow(self) -> None:
         """Test error handling workflow with invalid files."""
         # Try to read non-existent file
         with pytest.raises(FileNotFoundError):
@@ -140,7 +141,7 @@ class TestEndToEndWorkflows:
         finally:
             Path(tmp_file_path).unlink()
 
-    def test_parallel_processing_workflow(self, sample_ngb_file, tmp_path):
+    def test_parallel_processing_workflow(self, sample_ngb_file: Any, tmp_path: Any) -> None:
         """Test parallel processing workflow."""
         # Create test directory with many files
         test_dir = tmp_path / "parallel_workflow"
@@ -160,7 +161,7 @@ class TestEndToEndWorkflows:
         for result in results:
             assert result["status"] == "success"
 
-    def test_data_analysis_workflow(self, sample_ngb_file):
+    def test_data_analysis_workflow(self, sample_ngb_file: Any) -> None:
         """Test data analysis workflow."""
         # Read NGB file
         result = read_ngb(sample_ngb_file)
@@ -183,7 +184,7 @@ class TestEndToEndWorkflows:
             # missing_counts is a DataFrame, check it has the expected structure
             assert hasattr(missing_counts, "shape")
 
-    def test_metadata_extraction_workflow(self, sample_ngb_file):
+    def test_metadata_extraction_workflow(self, sample_ngb_file: Any) -> None:
         """Test metadata extraction workflow."""
         # Read NGB file with metadata
         metadata, _data = read_ngb(sample_ngb_file, return_metadata=True)
@@ -201,7 +202,7 @@ class TestEndToEndWorkflows:
             if field in metadata_dict:
                 assert metadata_dict[field] is not None
 
-    def test_file_integrity_workflow(self, sample_ngb_file):
+    def test_file_integrity_workflow(self, sample_ngb_file: Any) -> None:
         """Test file integrity verification workflow."""
         # Read NGB file with metadata
         metadata, _data = read_ngb(sample_ngb_file, return_metadata=True)
@@ -218,7 +219,7 @@ class TestEndToEndWorkflows:
             elif hasattr(file_hash, "__str__"):
                 assert current_hash == str(file_hash)
 
-    def test_data_transformation_workflow(self, sample_ngb_file):
+    def test_data_transformation_workflow(self, sample_ngb_file: Any) -> None:
         """Test data transformation workflow."""
         # Read NGB file
         result = read_ngb(sample_ngb_file)
@@ -238,7 +239,7 @@ class TestEndToEndWorkflows:
                     filtered_data = df.slice(0, result.num_rows // 2)
                     assert len(filtered_data) <= result.num_rows
 
-    def test_quality_assessment_workflow(self, sample_ngb_file):
+    def test_quality_assessment_workflow(self, sample_ngb_file: Any) -> None:
         """Test quality assessment workflow."""
         # Read NGB file
         result = read_ngb(sample_ngb_file)
@@ -255,7 +256,7 @@ class TestEndToEndWorkflows:
         # Check that validation result has expected structure
         assert isinstance(quality_result.is_valid, bool)
 
-    def test_data_comparison_workflow(self, sample_ngb_file, tmp_path):
+    def test_data_comparison_workflow(self, sample_ngb_file: Any, tmp_path: Any) -> None:
         """Test data comparison workflow."""
         # Read original NGB file with metadata
         original_metadata, original_data = read_ngb(
@@ -290,7 +291,7 @@ class TestEndToEndWorkflows:
         assert original_data.num_columns == copy_data.num_columns
         assert set(original_data.column_names) == set(copy_data.column_names)
 
-    def test_backup_and_restore_workflow(self, sample_ngb_file, tmp_path):
+    def test_backup_and_restore_workflow(self, sample_ngb_file: Any, tmp_path: Any) -> None:
         """Test backup and restore workflow."""
         # Create backup directory
         backup_dir = tmp_path / "backup"
@@ -313,7 +314,7 @@ class TestEndToEndWorkflows:
         assert original_result.num_rows == backup_result.num_rows
         assert original_result.num_columns == backup_result.num_columns
 
-    def test_data_archiving_workflow(self, sample_ngb_file, tmp_path):
+    def test_data_archiving_workflow(self, sample_ngb_file: Any, tmp_path: Any) -> None:
         """Test data archiving workflow."""
         # Create archive directory
         archive_dir = tmp_path / "archive"
@@ -334,7 +335,7 @@ class TestEndToEndWorkflows:
         assert archived_result.num_rows >= 0  # Allow empty tables
         assert archived_result.num_columns >= 0  # Allow empty tables
 
-    def test_data_cleaning_workflow(self, sample_ngb_file):
+    def test_data_cleaning_workflow(self, sample_ngb_file: Any) -> None:
         """Test data cleaning workflow."""
         # Read NGB file
         result = read_ngb(sample_ngb_file)
@@ -381,7 +382,7 @@ class TestEndToEndWorkflows:
                     # After filling nulls, there should be no nulls
                     assert not has_nulls
 
-    def test_data_aggregation_workflow(self, sample_ngb_file):
+    def test_data_aggregation_workflow(self, sample_ngb_file: Any) -> None:
         """Test data aggregation workflow."""
         # Read NGB file
         result = read_ngb(sample_ngb_file)
@@ -414,7 +415,7 @@ class TestEndToEndWorkflows:
                             mean_val = col_data.mean()
                             assert mean_val is not None
 
-    def test_data_export_import_workflow(self, sample_ngb_file, tmp_path):
+    def test_data_export_import_workflow(self, sample_ngb_file: Any, tmp_path: Any) -> None:
         """Test data export and import workflow."""
         # Read NGB file
         original_result = read_ngb(sample_ngb_file)
@@ -435,7 +436,7 @@ class TestEndToEndWorkflows:
         )
         assert set(imported_data.columns) == set(original_result.column_names)
 
-    def test_error_recovery_workflow(self, sample_ngb_file, tmp_path):
+    def test_error_recovery_workflow(self, sample_ngb_file: Any, tmp_path: Any) -> None:
         """Test error recovery workflow."""
         # Create test directory with mixed files
         test_dir = tmp_path / "error_recovery"
@@ -458,7 +459,7 @@ class TestEndToEndWorkflows:
         # Should handle invalid files gracefully
         assert len(results) >= 1
 
-    def test_performance_monitoring_workflow(self, sample_ngb_file):
+    def test_performance_monitoring_workflow(self, sample_ngb_file: Any) -> None:
         """Test performance monitoring workflow."""
         # Read NGB file
         result = read_ngb(sample_ngb_file)
@@ -472,7 +473,7 @@ class TestEndToEndWorkflows:
         assert result.num_rows < 1000000  # Less than 1M rows
         assert result.num_columns < 100  # Less than 100 columns
 
-    def test_data_validation_workflow_comprehensive(self, sample_ngb_file):
+    def test_data_validation_workflow_comprehensive(self, sample_ngb_file: Any) -> None:
         """Test comprehensive data validation workflow."""
         # Read NGB file
         result = read_ngb(sample_ngb_file)
@@ -489,7 +490,7 @@ class TestEndToEndWorkflows:
         # Check validation logic
         assert isinstance(validation_result.is_valid, bool)
 
-    def test_batch_analysis_workflow(self, sample_ngb_file, tmp_path):
+    def test_batch_analysis_workflow(self, sample_ngb_file: Any, tmp_path: Any) -> None:
         """Test batch analysis workflow."""
         # Create test directory
         test_dir = tmp_path / "batch_analysis"
@@ -506,7 +507,7 @@ class TestEndToEndWorkflows:
         assert len(results) == 3
         assert all(r["status"] == "success" for r in results)
 
-    def test_export_import_pipeline(self, sample_ngb_file, tmp_path):
+    def test_export_import_pipeline(self, sample_ngb_file: Any, tmp_path: Any) -> None:
         """Test export-import pipeline workflow."""
         # Read NGB file
         result = read_ngb(sample_ngb_file)

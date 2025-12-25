@@ -15,14 +15,13 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Physics",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Operating System :: OS Independent",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "polars>=0.20.0",
     "pyarrow>=10.0.0",
@@ -36,12 +35,14 @@ test = [
     "pytest-cov>=4.0.0",
     "pytest-mock>=3.10.0",
     "pytest-benchmark>=4.0.0",
+    "hypothesis>=6.0.0",
 ]
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
     "pytest-mock>=3.10.0",
     "pytest-benchmark>=4.0.0",
+    "hypothesis>=6.0.0",
     "ruff>=0.1.0",
     "mypy>=1.5.0",
     "pre-commit>=3.0.0",
@@ -74,7 +75,7 @@ Issues = "https://github.com/GraysonBellamy/pyngb/issues"
 Changelog = "https://github.com/GraysonBellamy/pyngb/blob/main/CHANGELOG.md"
 
 [project.scripts]
-pyngb = "pyngb.api.loaders:main"
+pyngb = "pyngb.api.cli:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -94,6 +95,7 @@ addopts = [
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests",
+    "benchmark: marks tests as performance benchmarks",
 ]
 filterwarnings = [
     "ignore::RuntimeWarning:numpy",
@@ -122,7 +124,7 @@ exclude_lines = [
 ]
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 line-length = 88
 exclude = [
     ".bzr",
@@ -170,7 +172,6 @@ ignore = [
     "B008",   # Do not perform function calls in argument defaults
     "C901",   # Too complex (let's not worry about complexity for now)
     "B905",   # `zip()` without an explicit `strict=` parameter
-    "UP007",  # Use `X | Y` for type annotations (not ready for this yet)
     "T201",   # Print statements (allow for debugging/CLI tools)
     "TID252", # Relative imports from parent modules (common in packages)
     "B006",   # Mutable default arguments (common pattern, can be addressed later)
@@ -203,7 +204,7 @@ line-ending = "auto"
 max-complexity = 10
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false  # Start lenient, can be stricter later
@@ -272,6 +273,7 @@ dev = [
     "pytest>=8.4.1",
     "pytest-cov>=6.2.1",
     "ruff>=0.12.8",
+    "scipy-stubs>=1.15.3.0",
 ]
 build = [
     "build>=1.3.0",

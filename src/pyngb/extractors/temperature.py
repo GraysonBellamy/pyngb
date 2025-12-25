@@ -5,8 +5,6 @@ This extractor handles the temperature program stages extraction including
 stage types, temperatures, heating rates, acquisition rates, and times.
 """
 
-from __future__ import annotations
-
 import re
 import struct
 from typing import Any
@@ -106,7 +104,7 @@ class TemperatureProgramExtractor(BaseMetadataExtractor):
         temp_prog = self._extract_temperature_program(combined_data)
 
         if temp_prog:
-            metadata["temperature_program"] = temp_prog  # type: ignore
+            metadata["temperature_program"] = temp_prog
             stage_count = len(temp_prog)
             self.log_extraction_success(stage_count)
             self.logger.debug(

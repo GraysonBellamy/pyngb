@@ -1,6 +1,7 @@
 """Tests for the simplified DTG analysis module."""
 
 from __future__ import annotations
+from typing import Any
 
 import numpy as np
 import pytest
@@ -11,7 +12,7 @@ from pyngb.analysis import dtg, dtg_custom
 class TestDTG:
     """Test the main dtg function."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
         """Set up test data."""
         # Simple linear mass loss
         self.time = np.linspace(0, 100, 100)
@@ -20,7 +21,7 @@ class TestDTG:
         # Exponential decay
         self.mass_exp = 10 * np.exp(-self.time / 50)
 
-    def test_basic_dtg_savgol(self):
+    def test_basic_dtg_savgol(self) -> None:
         """Test basic DTG calculation with Savitzky-Golay."""
         result = dtg(self.time, self.mass_linear)
 
@@ -34,7 +35,7 @@ class TestDTG:
         expected = 3.0
         assert abs(np.mean(result) - expected) < 0.1
 
-    def test_basic_dtg_gradient(self):
+    def test_basic_dtg_gradient(self) -> None:
         """Test basic DTG calculation with gradient method."""
         result = dtg(self.time, self.mass_linear, method="gradient")
 
@@ -45,7 +46,7 @@ class TestDTG:
         expected = 3.0  # Our function returns positive for mass loss
         assert abs(np.mean(result) - expected) < 0.1
 
-    def test_smoothing_levels(self):
+    def test_smoothing_levels(self) -> None:
         """Test different smoothing levels."""
         strict = dtg(self.time, self.mass_exp, smooth="strict")
         medium = dtg(self.time, self.mass_exp, smooth="medium")
@@ -62,7 +63,7 @@ class TestDTG:
         # The smoothing effect may vary with exponential data, so just check they're different
         assert not np.array_equal(strict, loose)
 
-    def test_method_comparison(self):
+    def test_method_comparison(self) -> None:
         """Test that different methods give reasonable results."""
         sg_result = dtg(self.time, self.mass_linear, method="savgol")
         grad_result = dtg(self.time, self.mass_linear, method="gradient")
@@ -74,22 +75,22 @@ class TestDTG:
         assert abs(np.mean(sg_result) - 3.0) < 0.5  # Both should be close to expected
         assert abs(np.mean(grad_result) - 3.0) < 0.5
 
-    def test_invalid_method(self):
+    def test_invalid_method(self) -> None:
         """Test error handling for invalid method."""
         with pytest.raises(ValueError, match="Unknown method"):
             dtg(self.time, self.mass_linear, method="invalid")
 
-    def test_invalid_smooth(self):
+    def test_invalid_smooth(self) -> None:
         """Test error handling for invalid smooth level."""
         with pytest.raises(ValueError, match="Unknown smooth level"):
             dtg(self.time, self.mass_linear, smooth="invalid")
 
-    def test_mismatched_arrays(self):
+    def test_mismatched_arrays(self) -> None:
         """Test error handling for mismatched array lengths."""
         with pytest.raises(ValueError, match="must have the same length"):
             dtg(self.time, self.mass_linear[:-1])
 
-    def test_insufficient_data(self):
+    def test_insufficient_data(self) -> None:
         """Test error handling for insufficient data points."""
         short_time = np.array([0, 1])
         short_mass = np.array([10, 9])
@@ -97,7 +98,7 @@ class TestDTG:
         with pytest.raises(ValueError, match="Need at least 3 data points"):
             dtg(short_time, short_mass)
 
-    def test_small_dataset_adaptation(self):
+    def test_small_dataset_adaptation(self) -> None:
         """Test that smoothing parameters adapt for small datasets."""
         # Small dataset
         small_time = np.linspace(0, 10, 20)
@@ -110,7 +111,7 @@ class TestDTG:
         # Should work without errors (window size adapted automatically)
         assert not np.any(np.isnan(result))
 
-    def test_mass_loss_convention(self):
+    def test_mass_loss_convention(self) -> None:
         """Test that mass loss gives positive DTG values (our convention)."""
         # Decreasing mass should give positive DTG (our function returns -(-derivative) = positive)
         result = dtg(self.time, self.mass_linear)
@@ -125,12 +126,12 @@ class TestDTG:
 class TestDTGCustom:
     """Test the dtg_custom function for advanced users."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
         """Set up test data."""
         self.time = np.linspace(0, 100, 50)
         self.mass = 10 - 0.03 * self.time
 
-    def test_custom_savgol_params(self):
+    def test_custom_savgol_params(self) -> None:
         """Test custom Savitzky-Golay parameters."""
         result = dtg_custom(
             self.time, self.mass, method="savgol", window=9, polyorder=2
@@ -140,7 +141,7 @@ class TestDTGCustom:
         assert len(result) == len(self.time)
         assert not np.any(np.isnan(result))
 
-    def test_custom_gradient_smoothing(self):
+    def test_custom_gradient_smoothing(self) -> None:
         """Test gradient method with post-smoothing."""
         result = dtg_custom(
             self.time, self.mass, method="gradient", window=7, polyorder=1
@@ -149,7 +150,7 @@ class TestDTGCustom:
         assert isinstance(result, np.ndarray)
         assert len(result) == len(self.time)
 
-    def test_default_parameters(self):
+    def test_default_parameters(self) -> None:
         """Test that defaults work when parameters not specified."""
         result = dtg_custom(self.time, self.mass)  # All defaults
 
@@ -164,7 +165,7 @@ class TestDTGCustom:
         # They should have similar magnitudes
         assert abs(np.mean(result) - np.mean(regular_result)) < 0.5
 
-    def test_invalid_window_size(self):
+    def test_invalid_window_size(self) -> None:
         """Test error handling for invalid window size."""
         with pytest.raises(
             ValueError, match=r"window .* must be less than data length"
@@ -174,14 +175,14 @@ class TestDTGCustom:
         with pytest.raises(ValueError, match="window must be odd"):
             dtg_custom(self.time, self.mass, window=8)  # Even number
 
-    def test_invalid_polyorder(self):
+    def test_invalid_polyorder(self) -> None:
         """Test error handling for invalid polynomial order."""
         with pytest.raises(ValueError, match=r"polyorder .* must be less than window"):
             dtg_custom(
                 self.time, self.mass, window=7, polyorder=7
             )  # polyorder >= window
 
-    def test_mismatched_arrays(self):
+    def test_mismatched_arrays(self) -> None:
         """Test error handling for mismatched arrays."""
         with pytest.raises(ValueError, match="must have the same length"):
             dtg_custom(self.time, self.mass[:-5])
@@ -190,7 +191,7 @@ class TestDTGCustom:
 class TestEdgeCases:
     """Test edge cases and boundary conditions."""
 
-    def test_constant_mass(self):
+    def test_constant_mass(self) -> None:
         """Test DTG calculation for constant mass (no change)."""
         time = np.linspace(0, 100, 50)
         mass = np.ones_like(time) * 10  # Constant mass
@@ -200,7 +201,7 @@ class TestEdgeCases:
         # DTG should be close to zero for constant mass
         assert np.abs(np.mean(result)) < 0.01
 
-    def test_noisy_data(self):
+    def test_noisy_data(self) -> None:
         """Test DTG with noisy data."""
         time = np.linspace(0, 100, 100)
         mass_clean = 10 - 0.02 * time
@@ -215,7 +216,7 @@ class TestEdgeCases:
         assert np.all(np.isfinite(result_noisy))
         # Loose smoothing should generally be smoother, but this depends on the specific data
 
-    def test_non_uniform_time_spacing(self):
+    def test_non_uniform_time_spacing(self) -> None:
         """Test with non-uniform time spacing."""
         # Quadratic time spacing
         time = np.array([0, 1, 4, 9, 16, 25, 36, 49, 64, 81, 100])
@@ -231,7 +232,7 @@ class TestEdgeCases:
 class TestIntegration:
     """Test integration with the analysis API."""
 
-    def test_dtg_vs_dtg_custom_consistency(self):
+    def test_dtg_vs_dtg_custom_consistency(self) -> None:
         """Test that dtg() and dtg_custom() give consistent results."""
         time = np.linspace(0, 100, 100)
         mass = 10 * np.exp(-time / 50)
@@ -248,19 +249,19 @@ class TestIntegration:
         # Check they're in similar ranges
         assert abs(np.mean(result1) - np.mean(result2)) < 1.0
 
-    def test_different_data_types(self):
+    def test_different_data_types(self) -> None:
         """Test with different input data types."""
         # Use longer arrays to avoid window size issues
         time_list = list(range(20))  # 20 points
         mass_list = [10 - 0.1 * i for i in range(20)]  # Linear decrease
 
         # Should handle lists and convert to numpy arrays
-        result = dtg(time_list, mass_list)
+        result = dtg(time_list, mass_list)  # type: ignore[arg-type]
         assert isinstance(result, np.ndarray)
         assert len(result) == len(time_list)
 
     @pytest.mark.skip(reason="Requires scipy")
-    def test_without_scipy(self):
+    def test_without_scipy(self) -> None:
         """Test behavior when scipy is not available."""
         # This would need to be tested in an environment without scipy
         # For now, just ensure the import error is properly handled

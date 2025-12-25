@@ -2,19 +2,16 @@
 Main NGB parser classes.
 """
 
-from __future__ import annotations
-
 import logging
 import zipfile
 from pathlib import Path
-from typing import Union
 
 import polars as pl
 import pyarrow as pa
 
 from ..binary import BinaryParser
 from ..constants import BinaryMarkers, FileMetadata, PatternConfig
-from ..exceptions import NGBStreamNotFoundError
+from ..exceptions import NGBParseError, NGBStreamNotFoundError
 from ..extractors import DataStreamProcessor, MetadataExtractor
 
 __all__ = ["NGBParser"]
@@ -95,7 +92,7 @@ class NGBParser:
 
         return available_streams
 
-    def parse(self, path: Union[str, Path]) -> tuple[FileMetadata, pa.Table]:
+    def parse(self, path: str | Path) -> tuple[FileMetadata, pa.Table]:
         """Parse NGB file and return metadata and Arrow table.
 
         Opens an NGB file, extracts all metadata and measurement data,
@@ -162,9 +159,14 @@ class NGBParser:
         except NGBStreamNotFoundError:
             # Re-raise our custom exceptions as-is
             raise
-        except Exception as e:
+        except (KeyError, ValueError) as e:
+            # Common exceptions during parsing: missing keys, invalid values
             logger.error(f"Failed to parse NGB file: {e}")
-            raise
+            raise NGBParseError(f"Parsing failed: {e}") from e
+        except OSError as e:
+            # File I/O errors (IOError is an alias for OSError in Python 3)
+            logger.error(f"I/O error while parsing NGB file: {e}")
+            raise NGBParseError(f"I/O error: {e}") from e
 
         # Convert to PyArrow at API boundary for cross-language compatibility
         # and metadata embedding. This is the single conversion point from

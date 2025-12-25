@@ -7,6 +7,7 @@ import json
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+from typing import Any
 
 import pyarrow as pa
 
@@ -16,7 +17,7 @@ from pyngb.util import get_hash, set_metadata
 class TestSetMetadata:
     """Test set_metadata function for PyArrow table metadata handling."""
 
-    def create_sample_table(self):
+    def create_sample_table(self) -> Any:
         """Create a sample PyArrow table for testing."""
         data = {
             "time": [0.0, 1.0, 2.0],
@@ -25,7 +26,7 @@ class TestSetMetadata:
         }
         return pa.table(data)
 
-    def test_set_metadata_empty_args(self):
+    def test_set_metadata_empty_args(self) -> None:
         """Test set_metadata with no metadata arguments."""
         table = self.create_sample_table()
         result = set_metadata(table)
@@ -35,7 +36,7 @@ class TestSetMetadata:
         assert result.num_rows == table.num_rows
         assert result.column_names == table.column_names
 
-    def test_set_metadata_table_level_only(self):
+    def test_set_metadata_table_level_only(self) -> None:
         """Test setting only table-level metadata."""
         table = self.create_sample_table()
         tbl_meta = {"experiment": "test_exp", "version": "1.0", "data_type": "STA"}
@@ -53,7 +54,7 @@ class TestSetMetadata:
         assert result.schema.metadata[b"version"] == b"1.0"
         assert result.schema.metadata[b"data_type"] == b"STA"
 
-    def test_set_metadata_column_level_only(self):
+    def test_set_metadata_column_level_only(self) -> None:
         """Test setting only column-level metadata."""
         table = self.create_sample_table()
         col_meta = {
@@ -83,7 +84,7 @@ class TestSetMetadata:
         mass_field = result.field("mass")
         assert mass_field.metadata is None or len(mass_field.metadata) == 0
 
-    def test_set_metadata_both_levels(self):
+    def test_set_metadata_both_levels(self) -> None:
         """Test setting both table and column level metadata."""
         table = self.create_sample_table()
         tbl_meta = {"experiment": "combined_test"}
@@ -98,7 +99,7 @@ class TestSetMetadata:
         time_field = result.field("time")
         assert time_field.metadata[b"unit"] == b"s"
 
-    def test_set_metadata_dict_serialization(self):
+    def test_set_metadata_dict_serialization(self) -> None:
         """Test that dictionaries are JSON serialized."""
         table = self.create_sample_table()
         complex_meta = {
@@ -119,7 +120,7 @@ class TestSetMetadata:
         bool_meta = json.loads(result.schema.metadata[b"boolean"].decode())
         assert bool_meta is True
 
-    def test_set_metadata_bytes_handling(self):
+    def test_set_metadata_bytes_handling(self) -> None:
         """Test handling of bytes metadata values."""
         table = self.create_sample_table()
         tbl_meta = {
@@ -134,7 +135,7 @@ class TestSetMetadata:
         # Strings should be encoded
         assert result.schema.metadata[b"text_data"] == b"some text content"
 
-    def test_set_metadata_string_encoding(self):
+    def test_set_metadata_string_encoding(self) -> None:
         """Test that strings are properly UTF-8 encoded."""
         table = self.create_sample_table()
         tbl_meta = {"unicode_text": "héllo wørld 🌍"}
@@ -145,7 +146,7 @@ class TestSetMetadata:
         stored_text = result.schema.metadata[b"unicode_text"].decode("utf-8")
         assert stored_text == "héllo wørld 🌍"
 
-    def test_set_metadata_existing_metadata_preservation(self):
+    def test_set_metadata_existing_metadata_preservation(self) -> None:
         """Test that existing metadata is preserved and extended."""
         # Create table with existing metadata
         schema = pa.schema(
@@ -177,7 +178,7 @@ class TestSetMetadata:
         assert result.schema.metadata[b"table_existing"] == b"table_value"
         assert result.schema.metadata[b"new_table_key"] == b"new_table_value"
 
-    def test_set_metadata_nonexistent_column(self):
+    def test_set_metadata_nonexistent_column(self) -> None:
         """Test that metadata for nonexistent columns is ignored."""
         table = self.create_sample_table()
         col_meta = {"nonexistent_column": {"unit": "unknown"}}
@@ -188,7 +189,7 @@ class TestSetMetadata:
         assert result.num_rows == table.num_rows
         assert result.column_names == table.column_names
 
-    def test_set_metadata_data_preservation(self):
+    def test_set_metadata_data_preservation(self) -> None:
         """Test that actual data is preserved during metadata operations."""
         table = self.create_sample_table()
         original_data = table.to_pydict()
@@ -200,7 +201,7 @@ class TestSetMetadata:
         assert result.num_rows == table.num_rows
         assert result.num_columns == table.num_columns
 
-    def test_set_metadata_empty_dicts(self):
+    def test_set_metadata_empty_dicts(self) -> None:
         """Test set_metadata with empty metadata dictionaries."""
         table = self.create_sample_table()
 
@@ -209,7 +210,7 @@ class TestSetMetadata:
         # Should return equivalent table
         assert result.equals(table)
 
-    def test_set_metadata_column_type_preservation(self):
+    def test_set_metadata_column_type_preservation(self) -> None:
         """Test that column types are preserved during metadata operations."""
         table = self.create_sample_table()
         original_schema = table.schema
@@ -224,7 +225,7 @@ class TestSetMetadata:
 class TestGetHash:
     """Test get_hash function for file hashing."""
 
-    def test_get_hash_valid_file(self):
+    def test_get_hash_valid_file(self) -> None:
         """Test get_hash with a valid file."""
         # Create a temporary file with known content
         with tempfile.NamedTemporaryFile(delete=False) as temp_file:
@@ -244,7 +245,7 @@ class TestGetHash:
         # Cleanup
         Path(temp_file_path).unlink()
 
-    def test_get_hash_empty_file(self):
+    def test_get_hash_empty_file(self) -> None:
         """Test get_hash with an empty file."""
         with tempfile.NamedTemporaryFile(delete=False) as temp_file:
             # Empty file
@@ -259,7 +260,7 @@ class TestGetHash:
         # Cleanup
         Path(temp_file_path).unlink()
 
-    def test_get_hash_large_file(self):
+    def test_get_hash_large_file(self) -> None:
         """Test get_hash with a larger file."""
         with tempfile.NamedTemporaryFile(delete=False) as temp_file:
             # Create larger content
@@ -276,7 +277,7 @@ class TestGetHash:
         # Cleanup
         Path(temp_file_path).unlink()
 
-    def test_get_hash_binary_file(self):
+    def test_get_hash_binary_file(self) -> None:
         """Test get_hash with binary content."""
         with tempfile.NamedTemporaryFile(delete=False) as temp_file:
             # Binary content with null bytes
@@ -293,7 +294,7 @@ class TestGetHash:
         # Cleanup
         Path(temp_file_path).unlink()
 
-    def test_get_hash_unicode_content(self):
+    def test_get_hash_unicode_content(self) -> None:
         """Test get_hash with Unicode content."""
         with tempfile.NamedTemporaryFile(delete=False) as temp_file:
             # Unicode content
@@ -311,7 +312,7 @@ class TestGetHash:
         Path(temp_file_path).unlink()
 
     @patch("pyngb.util.logger")
-    def test_get_hash_file_not_found(self, mock_logger):
+    def test_get_hash_file_not_found(self, mock_logger: Any) -> None:
         """Test get_hash with non-existent file."""
         result = get_hash("nonexistent_file.txt")
 
@@ -323,7 +324,7 @@ class TestGetHash:
     @patch("pyngb.util.logger")
     @patch("pathlib.Path.stat")
     @patch("pathlib.Path.open", side_effect=PermissionError("Permission denied"))
-    def test_get_hash_permission_error(self, mock_open, mock_stat, mock_logger):
+    def test_get_hash_permission_error(self, mock_open: Any, mock_stat: Any, mock_logger: Any) -> None:
         """Test get_hash with permission error."""
         # Mock the stat call to succeed (so we get to the open call)
         mock_stat.return_value.st_size = 1024
@@ -338,7 +339,7 @@ class TestGetHash:
     @patch("pyngb.util.logger")
     @patch("pathlib.Path.stat")
     @patch("hashlib.blake2b", side_effect=Exception("Hash error"))
-    def test_get_hash_hashing_error(self, mock_blake2b, mock_stat, mock_logger):
+    def test_get_hash_hashing_error(self, mock_blake: Any2b, mock_stat: Any, mock_logger: Any) -> None:
         """Test get_hash when hashing itself fails."""
         # Mock the stat call to succeed
         mock_stat.return_value.st_size = 1024
@@ -358,7 +359,7 @@ class TestGetHash:
 
     @patch("pyngb.util.logger")
     @patch("pathlib.Path.stat")
-    def test_get_hash_io_error(self, mock_stat, mock_logger):
+    def test_get_hash_io_error(self, mock_stat: Any, mock_logger: Any) -> None:
         """Test get_hash with I/O error during reading."""
         # Mock the stat call to succeed
         mock_stat.return_value.st_size = 1024
@@ -380,7 +381,7 @@ class TestGetHash:
             assert "test_file.txt" in logged_message
             assert "I/O error" in logged_message
 
-    def test_get_hash_deterministic(self):
+    def test_get_hash_deterministic(self) -> None:
         """Test that get_hash produces deterministic results."""
         with tempfile.NamedTemporaryFile(delete=False) as temp_file:
             content = b"deterministic test content"
@@ -400,7 +401,7 @@ class TestGetHash:
         # Cleanup
         Path(temp_file_path).unlink()
 
-    def test_get_hash_different_files_different_hashes(self):
+    def test_get_hash_different_files_different_hashes(self) -> None:
         """Test that different files produce different hashes."""
         with tempfile.NamedTemporaryFile(delete=False) as temp_file1:
             temp_file1.write(b"content 1")
@@ -423,7 +424,7 @@ class TestGetHash:
         Path(temp_file1_path).unlink()
         Path(temp_file2_path).unlink()
 
-    def test_get_hash_blake2b_algorithm(self):
+    def test_get_hash_blake2b_algorithm(self) -> None:
         """Test that get_hash uses BLAKE2b algorithm specifically."""
         with tempfile.NamedTemporaryFile(delete=False) as temp_file:
             content = b"test blake2b"
@@ -439,7 +440,7 @@ class TestGetHash:
         # Cleanup
         Path(temp_file_path).unlink()
 
-    def test_get_hash_file_size_limit(self):
+    def test_get_hash_file_size_limit(self) -> None:
         """Test that get_hash respects the file size limit."""
         with tempfile.NamedTemporaryFile(delete=False) as temp_file:
             # Create a file that's just over 1MB
@@ -463,7 +464,7 @@ class TestGetHash:
 class TestUtilIntegration:
     """Test integration between util functions."""
 
-    def test_metadata_with_file_hash(self):
+    def test_metadata_with_file_hash(self) -> None:
         """Test combining set_metadata with get_hash for complete workflow."""
         # Create sample file
         with tempfile.NamedTemporaryFile(delete=False) as temp_file:
@@ -501,7 +502,7 @@ class TestUtilIntegration:
         # Cleanup
         Path(temp_file_path).unlink()
 
-    def test_round_trip_metadata(self):
+    def test_round_trip_metadata(self) -> None:
         """Test round-trip serialization/deserialization of metadata."""
         table = pa.table({"values": [1.0, 2.0, 3.0]})
 
@@ -532,7 +533,7 @@ class TestUtilIntegration:
 class TestEdgeCases:
     """Test edge cases and error conditions."""
 
-    def test_set_metadata_very_large_metadata(self):
+    def test_set_metadata_very_large_metadata(self) -> None:
         """Test set_metadata with very large metadata."""
         table = pa.table({"data": [1]})
 
@@ -547,7 +548,7 @@ class TestEdgeCases:
         stored_value = result.schema.metadata[b"large_field"].decode()
         assert stored_value == large_value
 
-    def test_set_metadata_special_characters(self):
+    def test_set_metadata_special_characters(self) -> None:
         """Test set_metadata with special characters in keys and values."""
         table = pa.table({"data": [1]})
 
@@ -566,7 +567,7 @@ class TestEdgeCases:
             assert key_bytes in result.schema.metadata
             assert result.schema.metadata[key_bytes].decode("utf-8") == expected_value
 
-    def test_get_hash_path_edge_cases(self):
+    def test_get_hash_path_edge_cases(self) -> None:
         """Test get_hash with various path formats."""
         with patch("pyngb.util.logger") as mock_logger:
             # Test with empty path (Path("") resolves to current directory, so it will try to read directory)
@@ -585,7 +586,7 @@ class TestEdgeCases:
             # The first one (empty path) may result in an error since it tries to read a directory
             assert mock_logger.warning.call_count >= 2
 
-    def test_metadata_type_edge_cases(self):
+    def test_metadata_type_edge_cases(self) -> None:
         """Test metadata handling with edge case data types."""
         table = pa.table({"data": [1]})
 

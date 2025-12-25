@@ -2,8 +2,6 @@
 Low-level binary parsing operations for NGB files.
 """
 
-from __future__ import annotations
-
 import logging
 import re
 import struct

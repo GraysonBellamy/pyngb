@@ -4,6 +4,7 @@ Tests for CLI interface and metadata embedding functionality.
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pyarrow.parquet as pq
 import pytest
@@ -15,7 +16,7 @@ from pyngb.api.loaders import read_ngb
 class TestCLIMetadataEmbedding:
     """Test that CLI interface properly embeds metadata in parquet files."""
 
-    def test_cli_metadata_embedding_basic(self, tmp_path):
+    def test_cli_metadata_embedding_basic(self, tmp_path: Any) -> None:
         """Test basic metadata embedding through the high-level API."""
         # Use a real test file
         test_file = Path("tests/test_files/Red_Oak_STA_10K_250731_R7.ngb-ss3")
@@ -40,7 +41,7 @@ class TestCLIMetadataEmbedding:
         # Verify type is at table level
         assert data.schema.metadata[b"type"] == b"STA"
 
-    def test_cli_metadata_embedding_all_fields(self, tmp_path):
+    def test_cli_metadata_embedding_all_fields(self, tmp_path: Any) -> None:
         """Test that all metadata fields are properly embedded."""
         test_file = Path("tests/test_files/RO_FILED_STA_N2_10K_250129_R29.ngb-ss3")
         if not test_file.exists():
@@ -73,7 +74,7 @@ class TestCLIMetadataEmbedding:
         assert "p0" in cal_constants
         assert "p1" in cal_constants
 
-    def test_cli_metadata_embedding_parquet_write(self, tmp_path):
+    def test_cli_metadata_embedding_parquet_write(self, tmp_path: Any) -> None:
         """Test that metadata is preserved when writing to parquet."""
         test_file = Path("tests/test_files/DF_FILED_STA_21O2_10K_220222_R1.ngb-ss3")
         if not test_file.exists():
@@ -105,7 +106,7 @@ class TestCLIMetadataEmbedding:
         assert original_meta["instrument"] == read_meta["instrument"]
         assert original_meta["sample_name"] == read_meta["sample_name"]
 
-    def test_cli_metadata_embedding_data_integrity(self, tmp_path):
+    def test_cli_metadata_embedding_data_integrity(self, tmp_path: Any) -> None:
         """Test that data integrity is maintained with metadata embedding."""
         test_file = Path("tests/test_files/Red_Oak_STA_10K_250731_R7.ngb-ss3")
         if not test_file.exists():
@@ -139,7 +140,7 @@ class TestCLIMetadataEmbedding:
                 if original_first[col] and read_first[col]:
                     assert abs(original_first[col][0] - read_first[col][0]) < 1e-10
 
-    def test_cli_metadata_embedding_file_hash(self, tmp_path):
+    def test_cli_metadata_embedding_file_hash(self, tmp_path: Any) -> None:
         """Test that file hash is included in metadata."""
         test_file = Path("tests/test_files/Red_Oak_STA_10K_250731_R7.ngb-ss3")
         if not test_file.exists():
@@ -164,7 +165,7 @@ class TestCLIMetadataEmbedding:
         # Verify hash length (BLAKE2b produces 128 character hex string)
         assert len(file_hash_info["hash"]) == 128
 
-    def test_cli_metadata_embedding_temperature_program(self, tmp_path):
+    def test_cli_metadata_embedding_temperature_program(self, tmp_path: Any) -> None:
         """Test that temperature program metadata is properly embedded."""
         test_file = Path("tests/test_files/Red_Oak_STA_10K_250731_R7.ngb-ss3")
         if not test_file.exists():
@@ -192,7 +193,7 @@ class TestCLIMetadataEmbedding:
         assert "acquisition_rate" in stage_1
         assert "time" in stage_1
 
-    def test_cli_metadata_embedding_calibration_constants(self, tmp_path):
+    def test_cli_metadata_embedding_calibration_constants(self, tmp_path: Any) -> None:
         """Test that calibration constants are properly embedded."""
         test_file = Path("tests/test_files/Red_Oak_STA_10K_250731_R7.ngb-ss3")
         if not test_file.exists():
@@ -215,7 +216,7 @@ class TestCLIMetadataEmbedding:
             assert param in cal_constants
             assert isinstance(cal_constants[param], (int, float))
 
-    def test_cli_metadata_embedding_multiple_files(self, tmp_path):
+    def test_cli_metadata_embedding_multiple_files(self, tmp_path: Any) -> None:
         """Test metadata embedding across multiple test files."""
         test_files = [
             "tests/test_files/Red_Oak_STA_10K_250731_R7.ngb-ss3",
@@ -269,7 +270,7 @@ class TestCLIMetadataEmbedding:
             assert result["data_rows"] > 0, f"No data rows in {result['file']}"
             assert result["data_cols"] > 0, f"No data columns in {result['file']}"
 
-    def test_cli_metadata_embedding_roundtrip(self, tmp_path):
+    def test_cli_metadata_embedding_roundtrip(self, tmp_path: Any) -> None:
         """Roundtrip is covered in integration tests; smoke here."""
         assert tmp_path is not None
 

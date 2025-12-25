@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any
 
 from pyngb.core.parser import NGBParser
 
@@ -6,7 +7,7 @@ from pyngb.core.parser import NGBParser
 # We simulate by parsing normally and asserting crucible_mass present (baseline behavior already covers fallback path indirectly).
 
 
-def test_crucible_mass_always_present():
+def test_crucible_mass_always_present() -> Any:
     sample_file = Path("tests/test_files/Red_Oak_STA_10K_250731_R7.ngb-ss3")
     parser = NGBParser()
     metadata, _ = parser.parse(str(sample_file))

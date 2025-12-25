@@ -6,7 +6,7 @@ This guide will help you install pyngb and parse your first NGB file.
 
 ### Requirements
 
-- Python 3.9 or higher
+- Python 3.10 or higher
 - Operating System: Windows, macOS, or Linux
 
 ### Install from PyPI

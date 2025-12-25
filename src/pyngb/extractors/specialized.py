@@ -5,8 +5,6 @@ This module contains extractors for MFC (Mass Flow Controller) metadata,
 PID control parameters, calibration constants, and application/license information.
 """
 
-from __future__ import annotations
-
 import re
 import struct
 from typing import Any, ClassVar
@@ -452,7 +450,7 @@ class CalibrationExtractor(BaseMetadataExtractor):
                     continue
 
             if cal_constants:
-                metadata["calibration_constants"] = cal_constants  # type: ignore
+                metadata["calibration_constants"] = cal_constants
                 break  # Take first table with calibration constants
 
         if extracted_count > 0:

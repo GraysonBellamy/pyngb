@@ -1,6 +1,7 @@
 """Tests for column metadata functionality."""
 
 from __future__ import annotations
+from typing import Any
 
 import numpy as np
 import pyarrow as pa
@@ -33,7 +34,7 @@ from pyngb.util import (
 class TestUtilityFunctions:
     """Test utility functions for column metadata."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
         """Set up test data."""
         self.table = pa.table(
             {
@@ -45,7 +46,7 @@ class TestUtilityFunctions:
             }
         )
 
-    def test_set_get_column_metadata(self):
+    def test_set_get_column_metadata(self) -> None:
         """Test setting and getting column metadata."""
         metadata = {
             "units": "mg",
@@ -69,7 +70,7 @@ class TestUtilityFunctions:
         missing = get_column_metadata(updated_table, "mass", "nonexistent")
         assert missing is None
 
-    def test_update_column_metadata(self):
+    def test_update_column_metadata(self) -> None:
         """Test updating specific fields in column metadata."""
         # Set initial metadata
         initial_metadata = {"units": "mg", "source": "measurement"}
@@ -92,7 +93,7 @@ class TestUtilityFunctions:
         ]  # New field added
         assert final_metadata["baseline_subtracted"] is False  # New field added
 
-    def test_add_processing_step(self):
+    def test_add_processing_step(self) -> None:
         """Test adding processing steps to history."""
         # Set initial metadata with processing history
         initial_metadata = {"processing_history": ["raw"]}
@@ -110,7 +111,7 @@ class TestUtilityFunctions:
         history2 = get_column_metadata(updated_table2, "mass", "processing_history")
         assert history2 == ["raw", "smoothed"]  # No duplicate
 
-    def test_baseline_status_functions(self):
+    def test_baseline_status_functions(self) -> None:
         """Test baseline status checking functions."""
         # Test is_baseline_correctable
         assert is_baseline_correctable("mass") is True
@@ -130,7 +131,7 @@ class TestUtilityFunctions:
         status_time = get_baseline_status(table_with_meta, "time")
         assert status_time is None  # Not applicable
 
-    def test_set_default_column_metadata(self):
+    def test_set_default_column_metadata(self) -> None:
         """Test setting default metadata for known column types."""
         # Test known column type
         updated_table = set_default_column_metadata(self.table, "mass")
@@ -155,7 +156,7 @@ class TestUtilityFunctions:
             "baseline_subtracted" not in metadata2
         )  # Not applicable for unknown columns
 
-    def test_initialize_table_column_metadata(self):
+    def test_initialize_table_column_metadata(self) -> None:
         """Test initializing metadata for all columns in a table."""
         updated_table = initialize_table_column_metadata(self.table)
 
@@ -173,7 +174,7 @@ class TestUtilityFunctions:
             else:
                 assert "baseline_subtracted" not in metadata
 
-    def test_error_handling(self):
+    def test_error_handling(self) -> None:
         """Test error handling for invalid inputs."""
         # Test non-existent column
         with pytest.raises(ValueError, match="Column 'nonexistent' not found"):
@@ -189,7 +190,7 @@ class TestUtilityFunctions:
 class TestAPIFunctions:
     """Test high-level API functions for column metadata."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
         """Set up test data with some metadata."""
         self.table = pa.table(
             {
@@ -203,7 +204,7 @@ class TestAPIFunctions:
         # Initialize with default metadata
         self.table = initialize_table_column_metadata(self.table)
 
-    def test_units_functions(self):
+    def test_units_functions(self) -> None:
         """Test units setting and getting functions."""
         # Get default units
         units = get_column_units(self.table, "mass")
@@ -214,7 +215,7 @@ class TestAPIFunctions:
         new_units = get_column_units(updated_table, "mass")
         assert new_units == "g"
 
-    def test_baseline_functions(self):
+    def test_baseline_functions(self) -> None:
         """Test baseline correction functions."""
         # Check initial status
         status = get_column_baseline_status(self.table, "mass")
@@ -241,7 +242,7 @@ class TestAPIFunctions:
         time_status = get_column_baseline_status(updated_table3, "time")
         assert time_status is None  # Still None, not applicable
 
-    def test_processing_history_functions(self):
+    def test_processing_history_functions(self) -> None:
         """Test processing history functions."""
         # Get initial history
         history = get_processing_history(self.table, "mass")
@@ -252,7 +253,7 @@ class TestAPIFunctions:
         new_history = get_processing_history(updated_table, "mass")
         assert new_history == ["raw", "smoothed"]
 
-    def test_source_functions(self):
+    def test_source_functions(self) -> None:
         """Test source setting and getting functions."""
         # Get default source
         source = get_column_source(self.table, "mass")
@@ -263,7 +264,7 @@ class TestAPIFunctions:
         new_source = get_column_source(updated_table, "mass")
         assert new_source == "calculated"
 
-    def test_inspection_function(self):
+    def test_inspection_function(self) -> None:
         """Test metadata inspection function."""
         metadata = inspect_column_metadata(self.table, "mass")
 
@@ -279,7 +280,7 @@ class TestAPIFunctions:
         assert metadata["source"] == "measurement"
         assert metadata["baseline_subtracted"] is False
 
-    def test_baseline_correctable_function(self):
+    def test_baseline_correctable_function(self) -> None:
         """Test baseline correctability checking function."""
         assert is_column_baseline_correctable("mass") is True
         assert is_column_baseline_correctable("dsc_signal") is True
@@ -290,7 +291,7 @@ class TestAPIFunctions:
 class TestIntegrationWithAnalysis:
     """Test integration with existing analysis functions."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
         """Set up test data."""
         time = np.linspace(0, 100, 50)
         mass = 10 - 0.02 * time
@@ -307,7 +308,7 @@ class TestIntegrationWithAnalysis:
         # Initialize metadata
         self.table = initialize_table_column_metadata(self.table)
 
-    def test_add_dtg_with_metadata(self):
+    def test_add_dtg_with_metadata(self) -> None:
         """Test that add_dtg sets appropriate metadata."""
         from pyngb.api.analysis import add_dtg
 
@@ -323,7 +324,7 @@ class TestIntegrationWithAnalysis:
             "baseline_subtracted" not in dtg_metadata
         )  # DTG doesn't support baseline correction
 
-    def test_normalize_with_metadata(self):
+    def test_normalize_with_metadata(self) -> None:
         """Test that normalize_to_initial_mass preserves and updates metadata."""
         from pyngb.api.analysis import normalize_to_initial_mass
         import json
@@ -360,7 +361,7 @@ class TestIntegrationWithAnalysis:
 class TestEdgeCases:
     """Test edge cases and error conditions."""
 
-    def test_empty_metadata(self):
+    def test_empty_metadata(self) -> None:
         """Test handling of columns with no metadata."""
         table = pa.table({"data": [1, 2, 3]})
 
@@ -376,7 +377,7 @@ class TestEdgeCases:
         status = get_baseline_status(table, "data")
         assert status is None
 
-    def test_malformed_metadata(self):
+    def test_malformed_metadata(self) -> None:
         """Test handling of malformed metadata."""
         import pyarrow as pa
 
@@ -391,7 +392,7 @@ class TestEdgeCases:
         # Should decode as string fallback or skip the malformed entry
         assert isinstance(metadata, dict)
 
-    def test_repeated_initialization(self):
+    def test_repeated_initialization(self) -> None:
         """Test that repeated initialization doesn't overwrite existing metadata."""
         table = pa.table({"mass": [1, 2, 3]})
 

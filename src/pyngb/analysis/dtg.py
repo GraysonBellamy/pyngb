@@ -4,12 +4,10 @@ Simplified DTG (Derivative Thermogravimetry) analysis.
 This module provides a clean, simple interface for DTG calculations with smart defaults.
 """
 
-from __future__ import annotations
-
 import numpy as np
 
 try:
-    from scipy.signal import savgol_filter  # type: ignore[import-untyped]
+    from scipy.signal import savgol_filter
 
     HAS_SCIPY = True
 except ImportError:
@@ -132,14 +130,14 @@ def dtg(
 
     if method == "savgol":
         # Savitzky-Golay method
-        mass_smooth = savgol_filter(mass, window, polyorder)  # type: ignore[no-any-return]
+        mass_smooth = savgol_filter(mass, window, polyorder)
         # Calculate derivative and convert to mg/min
         dtg_values = -np.gradient(mass_smooth, time) * 60
     else:
         # Gradient method with post-smoothing
         dtg_raw = -np.gradient(mass, time) * 60
         if HAS_SCIPY and len(dtg_raw) >= window:
-            dtg_values = savgol_filter(dtg_raw, window, polyorder)  # type: ignore[no-any-return]
+            dtg_values = savgol_filter(dtg_raw, window, polyorder)
         else:
             # Fallback smoothing without scipy
             dtg_values = dtg_raw
@@ -225,14 +223,14 @@ def dtg_custom(
 
     if method == "savgol":
         # Savitzky-Golay method
-        mass_smooth = savgol_filter(mass, window, polyorder)  # type: ignore[no-any-return]
+        mass_smooth = savgol_filter(mass, window, polyorder)
         # Calculate derivative and convert to mg/min
         dtg_values = -np.gradient(mass_smooth, time) * 60
     else:
         # Gradient method with post-smoothing
         dtg_raw = -np.gradient(mass, time) * 60
         if HAS_SCIPY and len(dtg_raw) >= window:
-            dtg_values = savgol_filter(dtg_raw, window, polyorder)  # type: ignore[no-any-return]
+            dtg_values = savgol_filter(dtg_raw, window, polyorder)
         else:
             # Fallback smoothing without scipy
             dtg_values = dtg_raw

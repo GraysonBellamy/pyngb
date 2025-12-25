@@ -1,7 +1,7 @@
 # pyNGB - NETZSCH STA File Parser
 
 [![PyPI version](https://badge.fury.io/py/pyngb.svg)](https://badge.fury.io/py/pyngb)
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Tests](https://github.com/GraysonBellamy/pyngb/workflows/Tests/badge.svg)](https://github.com/GraysonBellamy/pyngb/actions)
 

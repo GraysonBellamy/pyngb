@@ -6,10 +6,11 @@ from __future__ import annotations
 
 import logging
 import time
+import zipfile
 import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
-from typing import Union
+from typing import Any
 from collections.abc import Callable
 
 import polars as pl
@@ -17,6 +18,7 @@ import pyarrow.parquet as pq
 
 from .api.loaders import read_ngb
 from .constants import FileMetadata
+from .exceptions import NGBParseError
 
 __all__ = ["BatchProcessor", "NGBDataset", "process_directory", "process_files"]
 
@@ -24,9 +26,9 @@ logger = logging.getLogger(__name__)
 
 
 def _process_single_file_worker(
-    file_path: Union[str, Path],
+    file_path: str | Path,
     output_format: str,
-    output_dir: Union[str, Path],
+    output_dir: str | Path,
     skip_errors: bool,
 ) -> dict[str, str | float | None]:
     """Top-level worker function to process a single file (multiprocessing-safe).
@@ -77,7 +79,11 @@ def _process_single_file_worker(
             "error": None,
         }
 
-    except Exception as e:
+    except (NGBParseError, OSError, ValueError, zipfile.BadZipFile) as e:
+        # NGBParseError: NGB parsing failures (corrupted files, unsupported format, etc.)
+        # OSError: File I/O errors (missing files, permission denied, etc.)
+        # ValueError: Invalid parameter values or data format issues
+        # zipfile.BadZipFile: Invalid ZIP file structure
         processing_time = time.perf_counter() - start_time
         if not skip_errors:
             # Re-raise in strict mode so caller can surface the error
@@ -139,10 +145,10 @@ class BatchProcessor:
 
     def process_directory(
         self,
-        directory: Union[str, Path],
+        directory: str | Path,
         pattern: str = "*.ngb-ss3",
         output_format: str = "parquet",
-        output_dir: Union[str, Path] | None = None,
+        output_dir: str | Path | None = None,
         skip_errors: bool = True,
     ) -> list[dict[str, str | float | None]]:
         """Process all NGB files in a directory.
@@ -192,9 +198,9 @@ class BatchProcessor:
 
     def process_files(
         self,
-        files: list[Union[str, Path]],
+        files: list[str | Path],
         output_format: str = "parquet",
-        output_dir: Union[str, Path] | None = None,
+        output_dir: str | Path | None = None,
         skip_errors: bool = True,
     ) -> list[dict[str, str | float | None]]:
         """Process a list of NGB files with parallel execution.
@@ -286,7 +292,7 @@ class BatchProcessor:
                 f"- Rate: {rate:.1f} files/sec - ETA: {eta:.0f}s"
             )
 
-    def _log_summary(self, results: list[dict], start_time: float) -> None:
+    def _log_summary(self, results: list[dict[str, Any]], start_time: float) -> None:
         """Log processing summary."""
         total_time = time.perf_counter() - start_time
         successful = sum(1 for r in results if r["status"] == "success")
@@ -341,7 +347,7 @@ class NGBDataset:
 
     @classmethod
     def from_directory(
-        cls, directory: Union[str, Path], pattern: str = "*.ngb-ss3"
+        cls, directory: str | Path, pattern: str = "*.ngb-ss3"
     ) -> NGBDataset:
         """Create dataset from directory.
 
@@ -408,9 +414,7 @@ class NGBDataset:
             else None,
         }
 
-    def export_metadata(
-        self, output_path: Union[str, Path], format: str = "csv"
-    ) -> None:
+    def export_metadata(self, output_path: str | Path, format: str = "csv") -> None:
         """Export metadata for all files.
 
         Args:
@@ -531,7 +535,7 @@ class NGBDataset:
 
 # Convenience functions
 def process_directory(
-    directory: Union[str, Path],
+    directory: str | Path,
     pattern: str = "*.ngb-ss3",
     output_format: str = "parquet",
     max_workers: int | None = None,
@@ -561,7 +565,7 @@ def process_directory(
 
 
 def process_files(
-    files: list[Union[str, Path]],
+    files: list[str | Path],
     output_format: str = "parquet",
     max_workers: int | None = None,
 ) -> list[dict[str, str | float | None]]:

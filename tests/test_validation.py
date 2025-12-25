@@ -5,6 +5,7 @@ Unit tests for the validation module of pyngb.
 import numpy as np
 import polars as pl
 import pytest
+from typing import Any
 
 from pyngb.validation import (
     QualityChecker,
@@ -19,7 +20,7 @@ from pyngb.validation import (
 class TestValidationResult:
     """Test ValidationResult class."""
 
-    def test_init(self):
+    def test_init(self) -> None:
         """Test ValidationResult initialization."""
         result = ValidationResult()
         assert result.errors == []
@@ -27,35 +28,35 @@ class TestValidationResult:
         assert result.info == []
         assert result.passed_checks == []
 
-    def test_add_error(self):
+    def test_add_error(self) -> None:
         """Test adding errors."""
         result = ValidationResult()
         result.add_error("Test error")
         assert len(result.errors) == 1
         assert result.errors[0] == "Test error"
 
-    def test_add_warning(self):
+    def test_add_warning(self) -> None:
         """Test adding warnings."""
         result = ValidationResult()
         result.add_warning("Test warning")
         assert len(result.warnings) == 1
         assert result.warnings[0] == "Test warning"
 
-    def test_add_info(self):
+    def test_add_info(self) -> None:
         """Test adding info messages."""
         result = ValidationResult()
         result.add_info("Test info")
         assert len(result.info) == 1
         assert result.info[0] == "Test info"
 
-    def test_add_pass(self):
+    def test_add_pass(self) -> None:
         """Test adding passed checks."""
         result = ValidationResult()
         result.add_pass("Test check")
         assert len(result.passed_checks) == 1
         assert result.passed_checks[0] == "Test check"
 
-    def test_is_valid(self):
+    def test_is_valid(self) -> None:
         """Test validation status."""
         result = ValidationResult()
         assert result.is_valid is True
@@ -63,10 +64,10 @@ class TestValidationResult:
         result.add_error("Error")
         assert result.is_valid is False
 
-        result.add_warning("Warning")
+        result.add_warning("Warning")  # type: ignore[unreachable]
         assert result.is_valid is False  # Still invalid due to error
 
-    def test_has_warnings(self):
+    def test_has_warnings(self) -> None:
         """Test warning status."""
         result = ValidationResult()
         assert result.has_warnings is False
@@ -74,7 +75,7 @@ class TestValidationResult:
         result.add_warning("Warning")
         assert result.has_warnings is True
 
-    def test_summary(self):
+    def test_summary(self) -> None:
         """Test summary generation."""
         result = ValidationResult()
         result.add_error("Error")
@@ -89,7 +90,7 @@ class TestValidationResult:
         assert summary["checks_passed"] == 1
         assert summary["total_issues"] == 2
 
-    def test_report(self):
+    def test_report(self) -> None:
         """Test report generation."""
         result = ValidationResult()
         result.add_error("Test error")
@@ -105,7 +106,7 @@ class TestValidationResult:
 
 
 @pytest.fixture
-def sample_sta_data():
+def sample_sta_data() -> Any:
     """Create sample STA data for testing."""
     n_points = 1000
     # Seed randomness for determinism in tests
@@ -121,7 +122,7 @@ def sample_sta_data():
 
 
 @pytest.fixture
-def sample_metadata():
+def sample_metadata() -> Any:
     """Create sample metadata for testing."""
     return {
         "instrument": "STA 449 F3",
@@ -134,14 +135,14 @@ def sample_metadata():
 class TestValidateSta:
     """Test validate_sta_data function."""
 
-    def test_valid_data(self, sample_sta_data):
+    def test_valid_data(self, sample_sta_data: Any) -> None:
         """Test validation of valid data."""
         issues = validate_sta_data(sample_sta_data)
         assert isinstance(issues, list)
         # Valid data should have minimal issues
         assert len(issues) <= 2  # Allow for minor statistical variations
 
-    def test_empty_data(self):
+    def test_empty_data(self) -> None:
         """Test validation of empty data."""
         empty_data = pl.DataFrame(
             {
@@ -153,14 +154,14 @@ class TestValidateSta:
         assert len(issues) > 0
         assert any("empty" in issue.lower() for issue in issues)
 
-    def test_missing_columns(self):
+    def test_missing_columns(self) -> None:
         """Test validation with missing required columns."""
         incomplete_data = pl.DataFrame({"only_time": [1, 2, 3]})
         issues = validate_sta_data(incomplete_data)
         assert len(issues) > 0
         assert any("missing" in issue.lower() for issue in issues)
 
-    def test_null_values(self):
+    def test_null_values(self) -> None:
         """Test validation with null values."""
         data_with_nulls = pl.DataFrame(
             {
@@ -172,7 +173,7 @@ class TestValidateSta:
         assert len(issues) > 0
         assert any("null" in issue.lower() for issue in issues)
 
-    def test_constant_temperature(self):
+    def test_constant_temperature(self) -> None:
         """Test validation with constant temperature."""
         constant_temp_data = pl.DataFrame(
             {
@@ -187,7 +188,7 @@ class TestValidateSta:
             for issue in issues
         )
 
-    def test_extreme_temperatures(self):
+    def test_extreme_temperatures(self) -> None:
         """Test validation with extreme temperatures."""
         extreme_temp_data = pl.DataFrame(
             {
@@ -204,7 +205,7 @@ class TestValidateSta:
         assert len(issues) > 0
         assert any("temperature" in issue.lower() for issue in issues)
 
-    def test_pyarrow_table_input(self, sample_sta_data):
+    def test_pyarrow_table_input(self, sample_sta_data: Any) -> None:
         """Test validation with PyArrow table input."""
         arrow_table = sample_sta_data.to_arrow()
         issues = validate_sta_data(arrow_table)
@@ -214,19 +215,19 @@ class TestValidateSta:
 class TestQualityChecker:
     """Test QualityChecker class."""
 
-    def test_init_with_dataframe(self, sample_sta_data, sample_metadata):
+    def test_init_with_dataframe(self, sample_sta_data: Any, sample_metadata: Any) -> None:
         """Test initialization with DataFrame."""
         checker = QualityChecker(sample_sta_data, sample_metadata)
         assert checker.df.height == 1000
         assert checker.metadata == sample_metadata
 
-    def test_init_with_arrow_table(self, sample_sta_data):
+    def test_init_with_arrow_table(self, sample_sta_data: Any) -> None:
         """Test initialization with Arrow table."""
         arrow_table = sample_sta_data.to_arrow()
         checker = QualityChecker(arrow_table)
         assert checker.df.height == 1000
 
-    def test_quick_check_valid_data(self, sample_sta_data):
+    def test_quick_check_valid_data(self, sample_sta_data: Any) -> None:
         """Test quick check with valid data."""
         checker = QualityChecker(sample_sta_data)
         issues = checker.quick_check()
@@ -234,7 +235,7 @@ class TestQualityChecker:
         # Valid data should have few issues
         assert len(issues) <= 2
 
-    def test_quick_check_empty_data(self):
+    def test_quick_check_empty_data(self) -> None:
         """Test quick check with empty data."""
         empty_data = pl.DataFrame(
             {
@@ -247,7 +248,7 @@ class TestQualityChecker:
         assert len(issues) > 0
         assert any("empty" in issue.lower() for issue in issues)
 
-    def test_quick_check_missing_columns(self):
+    def test_quick_check_missing_columns(self) -> None:
         """Test quick check with missing columns."""
         incomplete_data = pl.DataFrame({"only_data": [1, 2, 3]})
         checker = QualityChecker(incomplete_data)
@@ -255,7 +256,7 @@ class TestQualityChecker:
         assert len(issues) > 0
         assert any("missing" in issue.lower() for issue in issues)
 
-    def test_full_validation(self, sample_sta_data, sample_metadata):
+    def test_full_validation(self, sample_sta_data: Any, sample_metadata: Any) -> None:
         """Test full validation."""
         checker = QualityChecker(sample_sta_data, sample_metadata)
         result = checker.full_validation()
@@ -263,7 +264,7 @@ class TestQualityChecker:
         assert result.is_valid  # Valid data should pass
         assert len(result.passed_checks) > 0
 
-    def test_full_validation_invalid_data(self):
+    def test_full_validation_invalid_data(self) -> None:
         """Test full validation with invalid data."""
         invalid_data = pl.DataFrame(
             {
@@ -277,52 +278,52 @@ class TestQualityChecker:
         assert not result.is_valid
         assert len(result.errors) > 0
 
-    def test_data_structure_checks(self, sample_sta_data):
+    def test_data_structure_checks(self, sample_sta_data: Any) -> None:
         """Test data structure validation."""
         checker = QualityChecker(sample_sta_data)
-        checker._check_data_structure()
+        checker._check_data_structure()  # type: ignore[arg-type]
         # Should have passed checks for valid data
         assert len(checker.result.passed_checks) > 0
 
-    def test_temperature_data_checks(self, sample_sta_data):
+    def test_temperature_data_checks(self, sample_sta_data: Any) -> None:
         """Test temperature data validation."""
         checker = QualityChecker(sample_sta_data)
-        checker._check_temperature_data()
+        checker._check_temperature_data()  # type: ignore[arg-type]
         # Valid temperature data should pass
         assert len(checker.result.passed_checks) > 0
 
-    def test_time_data_checks(self, sample_sta_data):
+    def test_time_data_checks(self, sample_sta_data: Any) -> None:
         """Test time data validation."""
         checker = QualityChecker(sample_sta_data)
-        checker._check_time_data()
+        checker._check_time_data()  # type: ignore[arg-type]
         # Valid time data should pass
         assert len(checker.result.passed_checks) > 0
 
-    def test_mass_data_checks(self, sample_sta_data):
+    def test_mass_data_checks(self, sample_sta_data: Any) -> None:
         """Test mass data validation."""
         checker = QualityChecker(sample_sta_data)
-        checker._check_mass_data()
+        checker._check_mass_data()  # type: ignore[arg-type]
         # Valid mass data should pass
         assert len(checker.result.passed_checks) > 0
 
-    def test_dsc_data_checks(self, sample_sta_data):
+    def test_dsc_data_checks(self, sample_sta_data: Any) -> None:
         """Test DSC data validation."""
         checker = QualityChecker(sample_sta_data)
-        checker._check_dsc_data()
+        checker._check_dsc_data()  # type: ignore[arg-type]
         # Valid DSC data should pass
         assert len(checker.result.passed_checks) > 0
 
-    def test_metadata_consistency_checks(self, sample_sta_data, sample_metadata):
+    def test_metadata_consistency_checks(self, sample_sta_data: Any, sample_metadata: Any) -> None:
         """Test metadata consistency validation."""
         checker = QualityChecker(sample_sta_data, sample_metadata)
-        checker._check_metadata_consistency()
+        checker._check_metadata_consistency()  # type: ignore[arg-type]
         # Valid metadata should pass
         assert len(checker.result.passed_checks) > 0
 
-    def test_statistical_checks(self, sample_sta_data):
+    def test_statistical_checks(self, sample_sta_data: Any) -> None:
         """Test statistical property validation."""
         checker = QualityChecker(sample_sta_data)
-        checker._check_statistical_properties()
+        checker._check_statistical_properties()  # type: ignore[arg-type]
         # Normal data should not have excessive outliers
         assert len([w for w in checker.result.warnings if "outlier" in w.lower()]) <= 1
 
@@ -330,7 +331,7 @@ class TestQualityChecker:
 class TestSpecificValidationFunctions:
     """Test specific validation functions."""
 
-    def test_check_temperature_profile(self, sample_sta_data):
+    def test_check_temperature_profile(self, sample_sta_data: Any) -> None:
         """Test temperature profile checking."""
         analysis = check_temperature_profile(sample_sta_data)
         assert isinstance(analysis, dict)
@@ -350,13 +351,13 @@ class TestSpecificValidationFunctions:
         assert analysis["max_temperature"] == 800
         assert analysis["is_monotonic_increasing"] is True
 
-    def test_check_temperature_profile_missing_column(self):
+    def test_check_temperature_profile_missing_column(self) -> None:
         """Test temperature profile with missing column."""
         data_no_temp = pl.DataFrame({"time": [1, 2, 3]})
         analysis = check_temperature_profile(data_no_temp)
         assert "error" in analysis
 
-    def test_check_mass_data(self, sample_sta_data):
+    def test_check_mass_data(self, sample_sta_data: Any) -> None:
         """Test mass data checking."""
         analysis = check_mass_data(sample_sta_data)
         assert isinstance(analysis, dict)
@@ -372,13 +373,13 @@ class TestSpecificValidationFunctions:
         assert analysis["mass_change"] == -2.0  # Change from mass_loss_percent
         assert analysis["has_negative_values"] is False
 
-    def test_check_mass_data_missing_column(self):
+    def test_check_mass_data_missing_column(self) -> None:
         """Test mass data with missing column."""
         data_no_mass = pl.DataFrame({"time": [1, 2, 3]})
         analysis = check_mass_data(data_no_mass)
         assert "error" in analysis
 
-    def test_check_dsc_data(self, sample_sta_data):
+    def test_check_dsc_data(self, sample_sta_data: Any) -> None:
         """Test DSC data checking."""
         analysis = check_dsc_data(sample_sta_data)
         assert isinstance(analysis, dict)
@@ -397,13 +398,13 @@ class TestSpecificValidationFunctions:
         if isinstance(s2n, (int, float)) and not isinstance(s2n, bool):
             assert s2n > 0
 
-    def test_check_dsc_data_missing_column(self):
+    def test_check_dsc_data_missing_column(self) -> None:
         """Test DSC data with missing column."""
         data_no_dsc = pl.DataFrame({"time": [1, 2, 3]})
         analysis = check_dsc_data(data_no_dsc)
         assert "error" in analysis
 
-    def test_check_dsc_data_with_peaks(self):
+    def test_check_dsc_data_with_peaks(self) -> None:
         """Test DSC data with artificial peaks."""
         # Create data with clear peaks
         x = np.linspace(0, 10, 1000)
@@ -424,7 +425,7 @@ class TestSpecificValidationFunctions:
 class TestEdgeCases:
     """Test edge cases and error conditions."""
 
-    def test_single_point_data(self):
+    def test_single_point_data(self) -> None:
         """Test validation with single data point."""
         single_point = pl.DataFrame(
             {
@@ -437,7 +438,7 @@ class TestEdgeCases:
         # Should handle single point gracefully
         assert isinstance(result, ValidationResult)
 
-    def test_two_point_data(self):
+    def test_two_point_data(self) -> None:
         """Test validation with two data points."""
         two_points = pl.DataFrame(
             {
@@ -450,7 +451,7 @@ class TestEdgeCases:
         result = checker.full_validation()
         assert isinstance(result, ValidationResult)
 
-    def test_infinite_values(self):
+    def test_infinite_values(self) -> None:
         """Test validation with infinite values."""
         data_with_inf = pl.DataFrame(
             {
@@ -464,7 +465,7 @@ class TestEdgeCases:
         # Should detect issues with infinite values
         assert len(result.warnings) > 0 or len(result.errors) > 0
 
-    def test_all_nan_column(self):
+    def test_all_nan_column(self) -> None:
         """Test validation with all NaN values in a column."""
         data_with_nan = pl.DataFrame(
             {
@@ -478,7 +479,7 @@ class TestEdgeCases:
         assert any("null" in issue.lower() for issue in issues)
 
     @pytest.mark.slow
-    def test_very_large_dataset(self):
+    def test_very_large_dataset(self) -> None:
         """Test validation with large dataset."""
         large_data = pl.DataFrame(
             {

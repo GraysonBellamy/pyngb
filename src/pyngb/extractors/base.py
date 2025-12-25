@@ -5,8 +5,6 @@ This module provides the foundational interfaces and base classes used
 by specialized metadata extractors throughout the pyngb package.
 """
 
-from __future__ import annotations
-
 import logging
 from typing import Protocol
 
@@ -17,6 +15,7 @@ from ..constants import FileMetadata
 __all__ = [
     "BaseMetadataExtractor",
     "ExtractorManager",
+    "FileMetadata",
     "MetadataExtractorProtocol",
 ]
 

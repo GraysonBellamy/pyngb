@@ -12,19 +12,19 @@ from pyngb.constants import BinaryMarkers, DataType, FileMetadata, PatternConfig
 class TestDataType:
     """Test DataType enum."""
 
-    def test_data_type_values(self):
+    def test_data_type_values(self) -> None:
         """Test that DataType enum has correct byte values."""
         assert DataType.INT32.value == b"\x03"
         assert DataType.FLOAT32.value == b"\x04"
         assert DataType.FLOAT64.value == b"\x05"
         assert DataType.STRING.value == b"\x1f"
 
-    def test_data_type_comparison(self):
+    def test_data_type_comparison(self) -> None:
         """Test DataType comparisons."""
         assert DataType.FLOAT64.value == b"\x05"
-        assert DataType.FLOAT64.value != DataType.FLOAT32.value
+        assert DataType.FLOAT64.value != DataType.FLOAT32.value  # type: ignore[comparison-overlap]
 
-    def test_data_type_membership(self):
+    def test_data_type_membership(self) -> None:
         """Test DataType membership testing."""
         byte_val = b"\x05"
         data_types = [dt.value for dt in DataType]
@@ -34,15 +34,15 @@ class TestDataType:
 class TestBinaryMarkers:
     """Test BinaryMarkers dataclass."""
 
-    def test_binary_markers_immutable(self):
+    def test_binary_markers_immutable(self) -> None:
         """Test that BinaryMarkers is frozen (immutable)."""
         markers = BinaryMarkers()
         # Should not be able to modify attributes
         with pytest.raises(AttributeError):
-            markers.START_DATA = b"different_value"
+            markers.START_DATA = b"different_value"  # type: ignore[misc]
             cast(Any, markers).START_DATA = b"different_value"
 
-    def test_binary_markers_values(self):
+    def test_binary_markers_values(self) -> None:
         """Test BinaryMarkers have correct values."""
         markers = BinaryMarkers()
 
@@ -55,7 +55,7 @@ class TestBinaryMarkers:
         assert len(markers.END_DATA) > 10
         assert isinstance(markers.END_DATA, bytes)
 
-    def test_binary_markers_uniqueness(self):
+    def test_binary_markers_uniqueness(self) -> None:
         """Test that all markers are unique."""
         markers = BinaryMarkers()
         marker_values = [
@@ -76,7 +76,7 @@ class TestBinaryMarkers:
 class TestPatternConfig:
     """Test PatternConfig dataclass."""
 
-    def test_pattern_config_defaults(self):
+    def test_pattern_config_defaults(self) -> None:
         """Test PatternConfig default values."""
         config = PatternConfig()
 
@@ -98,7 +98,7 @@ class TestPatternConfig:
         assert "p0" in config.cal_constants_patterns
         assert len(config.cal_constants_patterns) == 6  # p0 through p5
 
-    def test_pattern_config_modifiable(self):
+    def test_pattern_config_modifiable(self) -> None:
         """Test that PatternConfig can be modified."""
         config = PatternConfig()
 
@@ -110,7 +110,7 @@ class TestPatternConfig:
         config.column_map["ff"] = "custom_column"
         assert config.column_map["ff"] == "custom_column"
 
-    def test_pattern_config_pattern_structure(self):
+    def test_pattern_config_pattern_structure(self) -> None:
         """Test the structure of patterns in PatternConfig."""
         config = PatternConfig()
 
@@ -131,7 +131,7 @@ class TestPatternConfig:
             assert isinstance(pattern, bytes)
             assert len(pattern) == 2  # Should be 2 bytes each
 
-    def test_pattern_config_column_map_types(self):
+    def test_pattern_config_column_map_types(self) -> None:
         """Test column map has correct types."""
         config = PatternConfig()
 
@@ -145,7 +145,7 @@ class TestPatternConfig:
 class TestFileMetadata:
     """Test FileMetadata TypedDict."""
 
-    def test_file_metadata_usage(self):
+    def test_file_metadata_usage(self) -> None:
         """Test FileMetadata can be used as a type hint and dict."""
         # Can create as regular dict
         metadata: FileMetadata = {
@@ -161,7 +161,7 @@ class TestFileMetadata:
         metadata["operator"] = "Test User"
         assert metadata["operator"] == "Test User"
 
-    def test_file_metadata_optional_fields(self):
+    def test_file_metadata_optional_fields(self) -> None:
         """Test that FileMetadata fields are optional."""
         # Empty metadata should be valid
         metadata: FileMetadata = {}
@@ -172,7 +172,7 @@ class TestFileMetadata:
         assert metadata.get("sample_name") is None
         assert metadata.get("instrument") == "Test"
 
-    def test_file_metadata_field_types(self):
+    def test_file_metadata_field_types(self) -> None:
         """Test FileMetadata field type checking."""
         metadata: FileMetadata = {
             "instrument": "string_value",

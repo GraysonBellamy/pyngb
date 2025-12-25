@@ -5,8 +5,6 @@ This extractor handles straightforward metadata fields that follow standard
 patterns without requiring complex structural parsing logic.
 """
 
-from __future__ import annotations
-
 import re
 from datetime import datetime, timezone
 from typing import Any, ClassVar

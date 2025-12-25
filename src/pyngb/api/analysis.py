@@ -5,8 +5,6 @@ This module provides convenient functions for performing DTG analysis
 and mass normalization on PyArrow tables.
 """
 
-from __future__ import annotations
-
 import json
 import numpy as np
 import polars as pl

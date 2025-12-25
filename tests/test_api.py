@@ -7,6 +7,7 @@ This module tests the public API functions including read_ngb and CLI functional
 import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+from typing import Any
 
 import polars as pl
 import pyarrow as pa
@@ -19,7 +20,7 @@ from pyngb.exceptions import NGBStreamNotFoundError
 class TestReadNGBData:
     """Test read_ngb function."""
 
-    def test_read_ngb_basic(self, sample_ngb_file, cleanup_temp_files):
+    def test_read_ngb_basic(self, sample_ngb_file: Any, cleanup_temp_files: Any) -> None:
         """Test basic read_ngb functionality."""
         temp_file = cleanup_temp_files(sample_ngb_file)
 
@@ -30,12 +31,12 @@ class TestReadNGBData:
         assert b"file_metadata" in result.schema.metadata
         assert b"type" in result.schema.metadata
 
-    def test_read_ngb_file_not_found(self):
+    def test_read_ngb_file_not_found(self) -> None:
         """Test read_ngb with non-existent file."""
         with pytest.raises(FileNotFoundError):
             read_ngb("non_existent_file.ngb-ss3")
 
-    def test_read_ngb_adds_file_hash(self, sample_ngb_file, cleanup_temp_files):
+    def test_read_ngb_adds_file_hash(self, sample_ngb_file: Any, cleanup_temp_files: Any) -> None:
         """Test that read_ngb adds file hash to metadata."""
         temp_file = cleanup_temp_files(sample_ngb_file)
 
@@ -51,7 +52,7 @@ class TestReadNGBData:
         assert metadata["file_hash"]["method"] == "BLAKE2b"
 
     @patch("pyngb.api.loaders.get_hash")
-    def test_read_ngb_hash_failure(
+    def test_read_ngb_hash_failure(  # type: ignore[no-untyped-def]
         self, mock_get_hash, sample_ngb_file, cleanup_temp_files
     ):
         """Test read_ngb when hash generation fails."""
@@ -66,7 +67,7 @@ class TestReadNGBData:
         metadata = json.loads(metadata_bytes)
         assert "file_hash" not in metadata
 
-    def test_read_ngb_return_metadata_false(self, sample_ngb_file, cleanup_temp_files):
+    def test_read_ngb_return_metadata_false(self, sample_ngb_file: Any, cleanup_temp_files: Any) -> None:
         """Test read_ngb with return_metadata=False (default)."""
         temp_file = cleanup_temp_files(sample_ngb_file)
 
@@ -76,7 +77,7 @@ class TestReadNGBData:
         # Should have embedded metadata
         assert b"file_metadata" in result.schema.metadata
 
-    def test_read_ngb_return_metadata_true(self, sample_ngb_file, cleanup_temp_files):
+    def test_read_ngb_return_metadata_true(self, sample_ngb_file: Any, cleanup_temp_files: Any) -> None:
         """Test read_ngb with return_metadata=True."""
         temp_file = cleanup_temp_files(sample_ngb_file)
 
@@ -89,7 +90,7 @@ class TestReadNGBData:
             data.schema.metadata is None or b"file_metadata" not in data.schema.metadata
         )
 
-    def test_read_ngb_metadata_structure(self, sample_ngb_file, cleanup_temp_files):
+    def test_read_ngb_metadata_structure(self, sample_ngb_file: Any, cleanup_temp_files: Any) -> None:
         """Test read_ngb metadata structure."""
         temp_file = cleanup_temp_files(sample_ngb_file)
 
@@ -99,7 +100,7 @@ class TestReadNGBData:
         assert isinstance(metadata, dict)
         # The exact content depends on the sample file structure
 
-    def test_read_ngb_error_handling(self):
+    def test_read_ngb_error_handling(self) -> None:
         """Test read_ngb error handling."""
         # Create invalid file
         import tempfile
@@ -118,7 +119,7 @@ class TestReadNGBData:
 class TestMainCLI:
     """Test main CLI function."""
 
-    def test_main_help_argument(self):
+    def test_main_help_argument(self) -> None:
         """Covered by CLI execution tests; retain minimal smoke check only."""
         assert callable(main)
 
@@ -129,7 +130,7 @@ class TestMainCLI:
     @patch("pathlib.Path.mkdir")
     @patch("pathlib.Path.touch")
     @patch("pathlib.Path.unlink")
-    def test_main_parquet_output(
+    def test_main_parquet_output(  # type: ignore[no-untyped-def]
         self,
         mock_unlink,
         mock_touch,
@@ -171,7 +172,7 @@ class TestMainCLI:
     @patch("pathlib.Path.mkdir")
     @patch("pathlib.Path.touch")
     @patch("pathlib.Path.unlink")
-    def test_main_csv_output(
+    def test_main_csv_output(  # type: ignore[no-untyped-def]
         self,
         mock_unlink,
         mock_touch,
@@ -212,7 +213,7 @@ class TestMainCLI:
         mock_polars_df.write_csv.assert_called_once()
 
     @patch("pyngb.api.loaders.read_ngb")
-    def test_main_file_not_found(self, mock_read_ngb):
+    def test_main_file_not_found(self, mock_read_ngb: Any) -> None:
         """Test main function with non-existent file."""
         import sys
         from unittest.mock import patch
@@ -227,7 +228,7 @@ class TestMainCLI:
         assert result == 1  # Should return error code
 
     @patch("pyngb.api.loaders.read_ngb")
-    def test_main_parsing_error(self, mock_read_ngb):
+    def test_main_parsing_error(self, mock_read_ngb: Any) -> None:
         """Test main function with parsing error."""
         import sys
         from unittest.mock import patch
@@ -241,7 +242,7 @@ class TestMainCLI:
 
         assert result == 1  # Should return error code
 
-    def test_main_verbose_logging(self):
+    def test_main_verbose_logging(self) -> None:
         """Test main function with verbose logging."""
         import sys
         from unittest.mock import patch
@@ -259,7 +260,7 @@ class TestMainCLI:
 class TestIntegrationWithMockNGB:
     """Integration tests using mock NGB files."""
 
-    def test_integration_with_mock_file(self, sample_ngb_file, cleanup_temp_files):
+    def test_integration_with_mock_file(self, sample_ngb_file: Any, cleanup_temp_files: Any) -> None:
         """Test complete integration with mock NGB file."""
         temp_file = cleanup_temp_files(sample_ngb_file)
 
@@ -272,7 +273,7 @@ class TestIntegrationWithMockNGB:
         assert isinstance(metadata, dict)
         assert isinstance(data, pa.Table)
 
-    def test_consistency_between_modes(self, sample_ngb_file, cleanup_temp_files):
+    def test_consistency_between_modes(self, sample_ngb_file: Any, cleanup_temp_files: Any) -> None:
         """Test consistency between return_metadata=True/False modes."""
         temp_file = cleanup_temp_files(sample_ngb_file)
 
@@ -292,9 +293,9 @@ class TestIntegrationWithMockNGB:
         core_fields = ["instrument", "sample_name"]
         for key in core_fields:
             if key in embedded_metadata and key in metadata:
-                assert embedded_metadata[key] == metadata[key]
+                assert embedded_metadata[key] == metadata[key]  # type: ignore[type-arg]
 
-    def test_polars_integration(self, sample_ngb_file, cleanup_temp_files):
+    def test_polars_integration(self, sample_ngb_file: Any, cleanup_temp_files: Any) -> None:
         """Test integration with polars DataFrame conversion."""
         import polars as pl
 

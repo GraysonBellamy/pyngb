@@ -3,6 +3,7 @@ Unit tests for pyngb exceptions.
 """
 
 import pytest
+from typing import Any
 
 from pyngb.exceptions import (
     NGBCorruptedFileError,
@@ -16,38 +17,38 @@ from pyngb.exceptions import (
 class TestNGBExceptions:
     """Test custom exception classes."""
 
-    def test_ngb_parse_error_base(self):
+    def test_ngb_parse_error_base(self) -> None:
         """Test that NGBParseError is the base exception."""
         error = NGBParseError("Test error")
         assert str(error) == "Test error"
         assert isinstance(error, Exception)
 
-    def test_ngb_corrupted_file_error(self):
+    def test_ngb_corrupted_file_error(self) -> None:
         """Test NGBCorruptedFileError inheritance."""
         error = NGBCorruptedFileError("File is corrupted")
         assert str(error) == "File is corrupted"
         assert isinstance(error, NGBParseError)
         assert isinstance(error, Exception)
 
-    def test_ngb_unsupported_version_error(self):
+    def test_ngb_unsupported_version_error(self) -> None:
         """Test NGBUnsupportedVersionError inheritance."""
         error = NGBUnsupportedVersionError("Version not supported")
         assert str(error) == "Version not supported"
         assert isinstance(error, NGBParseError)
 
-    def test_ngb_data_type_error(self):
+    def test_ngb_data_type_error(self) -> None:
         """Test NGBDataTypeError inheritance."""
         error = NGBDataTypeError("Unknown data type")
         assert str(error) == "Unknown data type"
         assert isinstance(error, NGBParseError)
 
-    def test_ngb_stream_not_found_error(self):
+    def test_ngb_stream_not_found_error(self) -> None:
         """Test NGBStreamNotFoundError inheritance."""
         error = NGBStreamNotFoundError("Stream not found")
         assert str(error) == "Stream not found"
         assert isinstance(error, NGBParseError)
 
-    def test_exception_chaining(self):
+    def test_exception_chaining(self) -> None:
         """Test that exceptions can be chained."""
         try:
             raise ValueError("Original error")
@@ -58,7 +59,7 @@ class TestNGBExceptions:
             assert str(exc_info.value) == "Wrapped error"
             assert exc_info.value.__cause__ is e
 
-    def test_all_exceptions_importable(self):
+    def test_all_exceptions_importable(self) -> None:
         """Test that all exceptions are properly importable."""
         exceptions = [
             NGBParseError,

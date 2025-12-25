@@ -3,6 +3,7 @@ Unit tests for pyngb binary parsing handlers.
 """
 
 import pytest
+from typing import Any
 
 from pyngb.binary.handlers import DataTypeRegistry, Float32Handler, Float64Handler
 from pyngb.constants import DataType
@@ -12,7 +13,7 @@ from pyngb.exceptions import NGBDataTypeError
 class TestFloat64Handler:
     """Test Float64Handler class."""
 
-    def test_can_handle_float64(self):
+    def test_can_handle_float64(self) -> None:
         """Test that Float64Handler recognizes FLOAT64 data type."""
         handler = Float64Handler()
         assert handler.can_handle(DataType.FLOAT64.value)
@@ -20,7 +21,7 @@ class TestFloat64Handler:
         assert not handler.can_handle(DataType.INT32.value)
         assert not handler.can_handle(b"\x99")
 
-    def test_parse_single_float64(self):
+    def test_parse_single_float64(self) -> None:
         """Test parsing a single 64-bit float."""
         handler = Float64Handler()
 
@@ -31,7 +32,7 @@ class TestFloat64Handler:
         assert len(result) == 1
         assert abs(result[0] - 1.0) < 1e-15
 
-    def test_parse_multiple_float64(self):
+    def test_parse_multiple_float64(self) -> None:
         """Test parsing multiple 64-bit floats."""
         handler = Float64Handler()
 
@@ -48,7 +49,7 @@ class TestFloat64Handler:
         assert abs(result[1] - 2.0) < 1e-15
         assert abs(result[2] - 3.0) < 1e-15
 
-    def test_parse_empty_data(self):
+    def test_parse_empty_data(self) -> None:
         """Test parsing empty data."""
         handler = Float64Handler()
         result = handler.parse_data(b"")
@@ -58,7 +59,7 @@ class TestFloat64Handler:
 class TestFloat32Handler:
     """Test Float32Handler class."""
 
-    def test_can_handle_float32(self):
+    def test_can_handle_float32(self) -> None:
         """Test that Float32Handler recognizes FLOAT32 data type."""
         handler = Float32Handler()
         assert handler.can_handle(DataType.FLOAT32.value)
@@ -66,7 +67,7 @@ class TestFloat32Handler:
         assert not handler.can_handle(DataType.INT32.value)
         assert not handler.can_handle(b"\x99")
 
-    def test_parse_single_float32(self):
+    def test_parse_single_float32(self) -> None:
         """Test parsing a single 32-bit float."""
         handler = Float32Handler()
 
@@ -77,7 +78,7 @@ class TestFloat32Handler:
         assert len(result) == 1
         assert abs(result[0] - 1.0) < 1e-6
 
-    def test_parse_multiple_float32(self):
+    def test_parse_multiple_float32(self) -> None:
         """Test parsing multiple 32-bit floats."""
         handler = Float32Handler()
 
@@ -92,7 +93,7 @@ class TestFloat32Handler:
         assert abs(result[0] - 1.0) < 1e-6
         assert abs(result[1] - 2.0) < 1e-6
 
-    def test_parse_empty_data(self):
+    def test_parse_empty_data(self) -> None:
         """Test parsing empty data."""
         handler = Float32Handler()
         result = handler.parse_data(b"")
@@ -102,7 +103,7 @@ class TestFloat32Handler:
 class TestDataTypeRegistry:
     """Test DataTypeRegistry class."""
 
-    def test_default_handlers_registered(self):
+    def test_default_handlers_registered(self) -> None:
         """Test that default handlers are registered."""
         registry = DataTypeRegistry()
 
@@ -117,7 +118,7 @@ class TestDataTypeRegistry:
         assert len(result) == 1
         assert abs(result[0] - 1.0) < 1e-6
 
-    def test_register_custom_handler(self):
+    def test_register_custom_handler(self) -> None:
         """Test registering a custom handler."""
         registry = DataTypeRegistry()
 
@@ -125,17 +126,17 @@ class TestDataTypeRegistry:
             def can_handle(self, data_type: bytes) -> bool:
                 return data_type == b"\x99"
 
-            def parse_data(self, data: bytes) -> list:
+            def parse_data(self, data: bytes) -> list:  # type: ignore[type-arg]
                 return [42.0]  # Always return 42.0
 
         custom_handler = CustomHandler()
-        registry.register(custom_handler)
+        registry.register(custom_handler)  # type: ignore[arg-type]
 
         # Should use custom handler
         result = registry.parse_data(b"\x99", b"any_data")
         assert result == [42.0]
 
-    def test_unknown_data_type_error(self):
+    def test_unknown_data_type_error(self) -> None:
         """Test that unknown data type raises NGBDataTypeError."""
         registry = DataTypeRegistry()
 
@@ -144,7 +145,7 @@ class TestDataTypeRegistry:
 
         assert "No handler found for data type: 99" in str(exc_info.value)
 
-    def test_handler_precedence(self):
+    def test_handler_precedence(self) -> None:
         """Test that handlers are checked in registration order."""
         registry = DataTypeRegistry()
 
@@ -152,25 +153,25 @@ class TestDataTypeRegistry:
             def can_handle(self, data_type: bytes) -> bool:
                 return data_type == b"\x99"
 
-            def parse_data(self, data: bytes) -> list:
+            def parse_data(self, data: bytes) -> list:  # type: ignore[type-arg]
                 return [1.0]
 
         class SecondHandler:
             def can_handle(self, data_type: bytes) -> bool:
                 return data_type == b"\x99"
 
-            def parse_data(self, data: bytes) -> list:
+            def parse_data(self, data: bytes) -> list:  # type: ignore[type-arg]
                 return [2.0]
 
         # Register in order
-        registry.register(FirstHandler())
-        registry.register(SecondHandler())
+        registry.register(FirstHandler())  # type: ignore[arg-type]
+        registry.register(SecondHandler())  # type: ignore[arg-type]
 
         # Should use first handler (registered first)
         result = registry.parse_data(b"\x99", b"data")
         assert result == [1.0]
 
-    def test_empty_registry(self):
+    def test_empty_registry(self) -> None:
         """Test registry with no handlers."""
         # Create registry without default handlers
         registry = DataTypeRegistry()
@@ -183,7 +184,7 @@ class TestDataTypeRegistry:
 class TestDataTypeHandlerProtocol:
     """Test DataTypeHandler protocol compliance."""
 
-    def test_float64_handler_implements_protocol(self):
+    def test_float64_handler_implements_protocol(self) -> None:
         """Test that Float64Handler implements DataTypeHandler protocol."""
         handler = Float64Handler()
 
@@ -197,7 +198,7 @@ class TestDataTypeHandlerProtocol:
         assert isinstance(handler.can_handle(b"\x05"), bool)
         assert isinstance(handler.parse_data(b""), list)
 
-    def test_float32_handler_implements_protocol(self):
+    def test_float32_handler_implements_protocol(self) -> None:
         """Test that Float32Handler implements DataTypeHandler protocol."""
         handler = Float32Handler()
 
