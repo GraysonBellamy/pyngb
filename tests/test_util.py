@@ -339,7 +339,7 @@ class TestGetHash:
     @patch("pyngb.util.logger")
     @patch("pathlib.Path.stat")
     @patch("hashlib.blake2b", side_effect=Exception("Hash error"))
-    def test_get_hash_hashing_error(self, mock_blake: Any2b, mock_stat: Any, mock_logger: Any) -> None:
+    def test_get_hash_hashing_error(self, mock_blake2b: Any, mock_stat: Any, mock_logger: Any) -> None:
         """Test get_hash when hashing itself fails."""
         # Mock the stat call to succeed
         mock_stat.return_value.st_size = 1024
@@ -590,7 +590,7 @@ class TestEdgeCases:
         """Test metadata handling with edge case data types."""
         table = pa.table({"data": [1]})
 
-        edge_case_meta = {
+        edge_case_meta: dict[str, Any] = {
             "none_value": None,
             "zero": 0,
             "empty_string": "",
