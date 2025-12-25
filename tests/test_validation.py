@@ -215,7 +215,9 @@ class TestValidateSta:
 class TestQualityChecker:
     """Test QualityChecker class."""
 
-    def test_init_with_dataframe(self, sample_sta_data: Any, sample_metadata: Any) -> None:
+    def test_init_with_dataframe(
+        self, sample_sta_data: Any, sample_metadata: Any
+    ) -> None:
         """Test initialization with DataFrame."""
         checker = QualityChecker(sample_sta_data, sample_metadata)
         assert checker.df.height == 1000
@@ -281,28 +283,28 @@ class TestQualityChecker:
     def test_data_structure_checks(self, sample_sta_data: Any) -> None:
         """Test data structure validation."""
         checker = QualityChecker(sample_sta_data)
-        checker._check_data_structure()
+        checker._check_data_structure()  # type: ignore[attr-defined]
         # Should have passed checks for valid data
         assert len(checker.result.passed_checks) > 0
 
     def test_temperature_data_checks(self, sample_sta_data: Any) -> None:
         """Test temperature data validation."""
         checker = QualityChecker(sample_sta_data)
-        checker._check_temperature_data()
+        checker._check_temperature_data()  # type: ignore[attr-defined]
         # Valid temperature data should pass
         assert len(checker.result.passed_checks) > 0
 
     def test_time_data_checks(self, sample_sta_data: Any) -> None:
         """Test time data validation."""
         checker = QualityChecker(sample_sta_data)
-        checker._check_time_data()
+        checker._check_time_data()  # type: ignore[attr-defined]
         # Valid time data should pass
         assert len(checker.result.passed_checks) > 0
 
     def test_mass_data_checks(self, sample_sta_data: Any) -> None:
         """Test mass data validation."""
         checker = QualityChecker(sample_sta_data)
-        checker._check_mass_data()
+        checker._check_mass_data()  # type: ignore[attr-defined]
         # Valid mass data should pass
         assert len(checker.result.passed_checks) > 0
 
@@ -313,7 +315,9 @@ class TestQualityChecker:
         # Valid DSC data should pass
         assert len(checker.result.passed_checks) > 0
 
-    def test_metadata_consistency_checks(self, sample_sta_data: Any, sample_metadata: Any) -> None:
+    def test_metadata_consistency_checks(
+        self, sample_sta_data: Any, sample_metadata: Any
+    ) -> None:
         """Test metadata consistency validation."""
         checker = QualityChecker(sample_sta_data, sample_metadata)
         checker._check_metadata_consistency()

@@ -66,7 +66,9 @@ class TestBatchProcessor:
         # Second should have error status
         assert results[1]["status"] == "error"
 
-    def test_process_files_multi_worker(self, sample_ngb_file: Any, tmp_path: Any) -> None:
+    def test_process_files_multi_worker(
+        self, sample_ngb_file: Any, tmp_path: Any
+    ) -> None:
         """Process multiple files concurrently with >1 worker."""
         # Create unique copies to avoid output filename collisions
         work_dir = tmp_path / "multi_worker"
@@ -232,7 +234,9 @@ class TestProcessFunctions:
         for result in results:
             assert result is not None
 
-    def test_process_files_with_errors(self, sample_ngb_file: Any, tmp_path: Any) -> None:
+    def test_process_files_with_errors(
+        self, sample_ngb_file: Any, tmp_path: Any
+    ) -> None:
         """Test processing files with some errors."""
         files = [sample_ngb_file, "non_existent.ngb", sample_ngb_file]
 
@@ -273,7 +277,9 @@ class TestProcessFunctions:
         for result in results:
             assert result["status"] == "success"
 
-    def test_process_directory_recursive(self, sample_ngb_file: Any, tmp_path: Any) -> None:
+    def test_process_directory_recursive(
+        self, sample_ngb_file: Any, tmp_path: Any
+    ) -> None:
         """Test processing directory recursively."""
         # Create nested directory structure
         test_dir = tmp_path / "test_batch"
@@ -294,7 +300,9 @@ class TestProcessFunctions:
         assert results1[0]["status"] == "success"
         assert results2[0]["status"] == "success"
 
-    def test_process_directory_file_pattern(self, sample_ngb_file: Any, tmp_path: Any) -> None:
+    def test_process_directory_file_pattern(
+        self, sample_ngb_file: Any, tmp_path: Any
+    ) -> None:
         """Test processing directory with file pattern filter."""
         # Create directory with mixed file types
         test_dir = tmp_path / "test_batch"
@@ -315,7 +323,9 @@ class TestProcessFunctions:
         for result in results:
             assert result["status"] == "success"
 
-    def test_process_directory_multi_worker(self, sample_ngb_file: Any, tmp_path: Any) -> None:
+    def test_process_directory_multi_worker(
+        self, sample_ngb_file: Any, tmp_path: Any
+    ) -> None:
         """Ensure directory processing works with multiple workers."""
         test_dir = tmp_path / "multi_worker_dir"
         out_dir = tmp_path / "multi_worker_out"
@@ -380,7 +390,9 @@ class TestBatchProcessingIntegration:
         summary = dataset.summary()
         assert summary["file_count"] == 5
 
-    def test_batch_processing_with_quality_filtering(self, sample_ngb_file: Any, tmp_path: Any) -> None:
+    def test_batch_processing_with_quality_filtering(
+        self, sample_ngb_file: Any, tmp_path: Any
+    ) -> None:
         """Test batch processing with quality filtering."""
         # Create test directory
         test_dir = tmp_path / "quality_batch"
@@ -400,7 +412,9 @@ class TestBatchProcessingIntegration:
         for result in results:
             assert result["status"] == "success"
 
-    def test_batch_processing_performance(self, sample_ngb_file: Any, tmp_path: Any) -> None:
+    def test_batch_processing_performance(
+        self, sample_ngb_file: Any, tmp_path: Any
+    ) -> None:
         """Test batch processing performance with different worker counts."""
         # Create test directory with many files
         test_dir = tmp_path / "performance_test"
@@ -430,7 +444,9 @@ class TestBatchProcessingIntegration:
         # (though this may not always be true due to overhead)
         assert len(processing_times) == 3
 
-    def test_batch_processing_error_recovery(self, sample_ngb_file: Any, tmp_path: Any) -> None:
+    def test_batch_processing_error_recovery(
+        self, sample_ngb_file: Any, tmp_path: Any
+    ) -> None:
         """Test batch processing error recovery and reporting."""
         # Create test directory
         test_dir = tmp_path / "error_recovery"
@@ -454,7 +470,9 @@ class TestBatchProcessingIntegration:
         # Should handle corrupted file gracefully
         assert len(results) == 4  # Total files processed
 
-    def test_batch_processing_metadata_consistency(self, sample_ngb_file: Any, tmp_path: Any) -> None:
+    def test_batch_processing_metadata_consistency(
+        self, sample_ngb_file: Any, tmp_path: Any
+    ) -> None:
         """Test metadata consistency across batch processing."""
         # Create test directory
         test_dir = tmp_path / "metadata_consistency"
@@ -476,7 +494,9 @@ class TestBatchProcessingIntegration:
             assert "rows" in result
             assert "columns" in result
 
-    def test_batch_processing_data_consistency(self, sample_ngb_file: Any, tmp_path: Any) -> None:
+    def test_batch_processing_data_consistency(
+        self, sample_ngb_file: Any, tmp_path: Any
+    ) -> None:
         """Test data consistency across batch processing."""
         # Create test directory
         test_dir = tmp_path / "data_consistency"
@@ -497,7 +517,9 @@ class TestBatchProcessingIntegration:
             assert "rows" in result
             assert "columns" in result
 
-    def test_batch_processing_concurrent_access(self, sample_ngb_file: Any, tmp_path: Any) -> None:
+    def test_batch_processing_concurrent_access(
+        self, sample_ngb_file: Any, tmp_path: Any
+    ) -> None:
         """Test concurrent access to batch processing results."""
         import queue
         import threading
@@ -552,7 +574,9 @@ class TestBatchProcessingIntegration:
 class TestBatchProcessingEdgeCases:
     """Test edge cases in batch processing."""
 
-    def test_batch_processing_single_file(self, sample_ngb_file: Any, tmp_path: Any) -> None:
+    def test_batch_processing_single_file(
+        self, sample_ngb_file: Any, tmp_path: Any
+    ) -> None:
         """Test batch processing with single file."""
         # Use BatchProcessor with explicit output directory
         processor = BatchProcessor()
@@ -574,7 +598,9 @@ class TestBatchProcessingEdgeCases:
         assert len(results) == 2
         assert all(r["status"] == "error" for r in results)
 
-    def test_batch_processing_mixed_file_types(self, sample_ngb_file: Any, tmp_path: Any) -> None:
+    def test_batch_processing_mixed_file_types(
+        self, sample_ngb_file: Any, tmp_path: Any
+    ) -> None:
         """Test batch processing with mixed file types."""
         # Create test directory
         test_dir = tmp_path / "mixed_types"
@@ -594,7 +620,9 @@ class TestBatchProcessingEdgeCases:
         assert len(results) == 1
         assert results[0]["status"] == "success"
 
-    def test_batch_processing_large_chunks(self, sample_ngb_file: Any, tmp_path: Any) -> None:
+    def test_batch_processing_large_chunks(
+        self, sample_ngb_file: Any, tmp_path: Any
+    ) -> None:
         """Test batch processing with large chunk sizes."""
         # Create test directory
         test_dir = tmp_path / "large_chunks"
@@ -614,7 +642,9 @@ class TestBatchProcessingEdgeCases:
         for result in results:
             assert result["status"] == "success"
 
-    def test_batch_processing_memory_usage(self, sample_ngb_file: Any, tmp_path: Any) -> None:
+    def test_batch_processing_memory_usage(
+        self, sample_ngb_file: Any, tmp_path: Any
+    ) -> None:
         """Test batch processing memory usage with many files."""
         # Create test directory
         test_dir = tmp_path / "memory_test"
@@ -634,7 +664,9 @@ class TestBatchProcessingEdgeCases:
         for result in results:
             assert result["status"] == "success"
 
-    def test_batch_processing_cancellation(self, sample_ngb_file: Any, tmp_path: Any) -> None:
+    def test_batch_processing_cancellation(
+        self, sample_ngb_file: Any, tmp_path: Any
+    ) -> None:
         """Test batch processing cancellation behavior."""
         # Create test directory
         test_dir = tmp_path / "cancellation_test"
@@ -653,7 +685,9 @@ class TestBatchProcessingEdgeCases:
 
         assert len(results) == 5
 
-    def test_batch_processing_resource_cleanup(self, sample_ngb_file: Any, tmp_path: Any) -> None:
+    def test_batch_processing_resource_cleanup(
+        self, sample_ngb_file: Any, tmp_path: Any
+    ) -> None:
         """Test that batch processing properly cleans up resources."""
         # Create test directory
         test_dir = tmp_path / "resource_cleanup"
@@ -674,7 +708,9 @@ class TestBatchProcessingEdgeCases:
         # max_workers can be None (default) or a number
         assert processor.max_workers is None or isinstance(processor.max_workers, int)
 
-    def test_batch_processing_logging(self, sample_ngb_file: Any, tmp_path: Any, caplog: Any) -> None:
+    def test_batch_processing_logging(
+        self, sample_ngb_file: Any, tmp_path: Any, caplog: Any
+    ) -> None:
         """Test batch processing logging behavior."""
         # Create test directory
         test_dir = tmp_path / "logging_test"
@@ -696,7 +732,9 @@ class TestBatchProcessingEdgeCases:
         log_messages = [record.message for record in caplog.records]
         assert any("files to process" in msg.lower() for msg in log_messages)
 
-    def test_batch_processing_progress_tracking(self, sample_ngb_file: Any, tmp_path: Any) -> None:
+    def test_batch_processing_progress_tracking(
+        self, sample_ngb_file: Any, tmp_path: Any
+    ) -> None:
         """Test batch processing progress tracking."""
         # Create test directory
         test_dir = tmp_path / "progress_test"

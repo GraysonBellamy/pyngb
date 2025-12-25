@@ -37,7 +37,9 @@ class TestParsingPerformance:
         # Performance assertion - should complete in under 2 seconds
         assert benchmark.stats["mean"] < 2.0, "Parsing took too long"
 
-    def test_read_ngb_with_metadata_performance(self, benchmark: Any, real_ngb_file: Any) -> None:
+    def test_read_ngb_with_metadata_performance(
+        self, benchmark: Any, real_ngb_file: Any
+    ) -> None:
         """Reading NGB with metadata extraction should be fast.
 
         Baseline: < 1.5 seconds for typical files
@@ -90,7 +92,9 @@ class TestAnalysisPerformance:
 class TestValidationPerformance:
     """Performance tests for validation operations."""
 
-    def test_quick_check_performance(self, benchmark: Any, sample_sta_data: Any) -> None:
+    def test_quick_check_performance(
+        self, benchmark: Any, sample_sta_data: Any
+    ) -> None:
         """Quick validation should be very fast.
 
         Baseline: < 0.01 seconds for typical datasets
@@ -102,7 +106,9 @@ class TestValidationPerformance:
         assert isinstance(result, list)
         assert benchmark.stats["mean"] < 0.05, "Quick check took too long"
 
-    def test_full_validation_performance(self, benchmark: Any, sample_sta_data: Any) -> None:
+    def test_full_validation_performance(
+        self, benchmark: Any, sample_sta_data: Any
+    ) -> None:
         """Full validation should complete in reasonable time.
 
         Baseline: < 0.1 seconds for typical datasets
@@ -119,7 +125,9 @@ class TestValidationPerformance:
 class TestBatchProcessingPerformance:
     """Performance tests for batch processing."""
 
-    def test_batch_processor_throughput(self, benchmark: Any, sample_ngb_file: Any) -> None:
+    def test_batch_processor_throughput(
+        self, benchmark: Any, sample_ngb_file: Any
+    ) -> None:
         """Batch processing should maintain good throughput.
 
         Baseline: > 5 files/second for small files
@@ -145,7 +153,9 @@ class TestBatchProcessingPerformance:
             f"Throughput too low: {files_per_second:.2f} files/s"
         )
 
-    def test_process_files_function_performance(self, benchmark: Any, sample_ngb_file: Any) -> None:
+    def test_process_files_function_performance(
+        self, benchmark: Any, sample_ngb_file: Any
+    ) -> None:
         """process_files convenience function should be efficient.
 
         Baseline: Similar to BatchProcessor performance

@@ -233,7 +233,9 @@ class TestCLIExecution:
         assert "parquet" in help_text
         assert "csv" in help_text
 
-    def test_cli_command_execution_file_extension_validation(self, tmp_path: Any) -> None:
+    def test_cli_command_execution_file_extension_validation(
+        self, tmp_path: Any
+    ) -> None:
         """Test CLI command execution with different file extensions."""
         test_file = Path("tests/test_files/Red_Oak_STA_10K_250731_R7.ngb-ss3")
         if not test_file.exists():

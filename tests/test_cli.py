@@ -11,7 +11,9 @@ class TestMainModule:
 
     @patch("sys.exit")
     @patch("pyngb.api.loaders.main")
-    def test_main_module_forwards_to_loaders_main(self, mock_main: Any, mock_exit: Any) -> None:
+    def test_main_module_forwards_to_loaders_main(
+        self, mock_main: Any, mock_exit: Any
+    ) -> None:
         """Test that __main__ module forwards to api.loaders.main."""
 
         mock_main.return_value = 0

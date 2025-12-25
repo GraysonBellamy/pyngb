@@ -33,7 +33,9 @@ class TestEndToEndWorkflows:
         assert result.num_rows >= 0  # Allow empty tables
         assert result.num_columns >= 0  # Allow empty tables
 
-    def test_metadata_embedding_workflow(self, sample_ngb_file: Any, tmp_path: Any) -> None:
+    def test_metadata_embedding_workflow(
+        self, sample_ngb_file: Any, tmp_path: Any
+    ) -> None:
         """Test metadata embedding workflow."""
         # Read NGB file with metadata
         metadata, data = read_ngb(sample_ngb_file, return_metadata=True)
@@ -59,7 +61,9 @@ class TestEndToEndWorkflows:
         embedded_metadata = get_hash(str(output_file))
         assert embedded_metadata is not None
 
-    def test_batch_processing_workflow(self, sample_ngb_file: Any, tmp_path: Any) -> None:
+    def test_batch_processing_workflow(
+        self, sample_ngb_file: Any, tmp_path: Any
+    ) -> None:
         """Test batch processing workflow."""
         # Create test directory
         test_dir = tmp_path / "batch_workflow"
@@ -141,7 +145,9 @@ class TestEndToEndWorkflows:
         finally:
             Path(tmp_file_path).unlink()
 
-    def test_parallel_processing_workflow(self, sample_ngb_file: Any, tmp_path: Any) -> None:
+    def test_parallel_processing_workflow(
+        self, sample_ngb_file: Any, tmp_path: Any
+    ) -> None:
         """Test parallel processing workflow."""
         # Create test directory with many files
         test_dir = tmp_path / "parallel_workflow"
@@ -256,7 +262,9 @@ class TestEndToEndWorkflows:
         # Check that validation result has expected structure
         assert isinstance(quality_result.is_valid, bool)
 
-    def test_data_comparison_workflow(self, sample_ngb_file: Any, tmp_path: Any) -> None:
+    def test_data_comparison_workflow(
+        self, sample_ngb_file: Any, tmp_path: Any
+    ) -> None:
         """Test data comparison workflow."""
         # Read original NGB file with metadata
         original_metadata, original_data = read_ngb(
@@ -291,7 +299,9 @@ class TestEndToEndWorkflows:
         assert original_data.num_columns == copy_data.num_columns
         assert set(original_data.column_names) == set(copy_data.column_names)
 
-    def test_backup_and_restore_workflow(self, sample_ngb_file: Any, tmp_path: Any) -> None:
+    def test_backup_and_restore_workflow(
+        self, sample_ngb_file: Any, tmp_path: Any
+    ) -> None:
         """Test backup and restore workflow."""
         # Create backup directory
         backup_dir = tmp_path / "backup"
@@ -415,7 +425,9 @@ class TestEndToEndWorkflows:
                             mean_val = col_data.mean()
                             assert mean_val is not None
 
-    def test_data_export_import_workflow(self, sample_ngb_file: Any, tmp_path: Any) -> None:
+    def test_data_export_import_workflow(
+        self, sample_ngb_file: Any, tmp_path: Any
+    ) -> None:
         """Test data export and import workflow."""
         # Read NGB file
         original_result = read_ngb(sample_ngb_file)

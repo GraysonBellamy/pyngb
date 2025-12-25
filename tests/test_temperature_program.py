@@ -94,7 +94,9 @@ class TestTemperatureProgramExtraction:
                             f"Stage {stage_key} field {field} not numeric in {test_file.name}"
                         )
 
-    def test_extract_metadata_method_completeness(self, metadata_extractor: Any, test_files: Any) -> None:
+    def test_extract_metadata_method_completeness(
+        self, metadata_extractor: Any, test_files: Any
+    ) -> None:
         """Test that extract_metadata method returns complete temperature programs."""
         if not test_files:
             pytest.skip("No test files available")
@@ -174,7 +176,9 @@ class TestTemperatureProgramExtraction:
             except Exception as e:
                 pytest.fail(f"NGBParser failed on {test_file.name}: {e}")
 
-    def test_batch_processing_temperature_program(self, test_files: Any, tmp_path: Any) -> None:
+    def test_batch_processing_temperature_program(
+        self, test_files: Any, tmp_path: Any
+    ) -> None:
         """Test that batch processing preserves complete temperature programs in parquet files."""
         if not test_files:
             pytest.skip("No test files available")
@@ -232,7 +236,9 @@ class TestTemperatureProgramExtraction:
                         f"Stage not dict in {parquet_file.name}"
                     )
 
-    def test_temperature_program_pattern_matching(self, metadata_extractor: Any, test_files: Any) -> None:
+    def test_temperature_program_pattern_matching(
+        self, metadata_extractor: Any, test_files: Any
+    ) -> None:
         """Test that temperature program patterns find the expected number of matches."""
         if not test_files:
             pytest.skip("No test files available")

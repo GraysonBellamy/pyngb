@@ -20,7 +20,9 @@ from pyngb.exceptions import NGBStreamNotFoundError
 class TestReadNGBData:
     """Test read_ngb function."""
 
-    def test_read_ngb_basic(self, sample_ngb_file: Any, cleanup_temp_files: Any) -> None:
+    def test_read_ngb_basic(
+        self, sample_ngb_file: Any, cleanup_temp_files: Any
+    ) -> None:
         """Test basic read_ngb functionality."""
         temp_file = cleanup_temp_files(sample_ngb_file)
 
@@ -36,7 +38,9 @@ class TestReadNGBData:
         with pytest.raises(FileNotFoundError):
             read_ngb("non_existent_file.ngb-ss3")
 
-    def test_read_ngb_adds_file_hash(self, sample_ngb_file: Any, cleanup_temp_files: Any) -> None:
+    def test_read_ngb_adds_file_hash(
+        self, sample_ngb_file: Any, cleanup_temp_files: Any
+    ) -> None:
         """Test that read_ngb adds file hash to metadata."""
         temp_file = cleanup_temp_files(sample_ngb_file)
 
@@ -67,7 +71,9 @@ class TestReadNGBData:
         metadata = json.loads(metadata_bytes)
         assert "file_hash" not in metadata
 
-    def test_read_ngb_return_metadata_false(self, sample_ngb_file: Any, cleanup_temp_files: Any) -> None:
+    def test_read_ngb_return_metadata_false(
+        self, sample_ngb_file: Any, cleanup_temp_files: Any
+    ) -> None:
         """Test read_ngb with return_metadata=False (default)."""
         temp_file = cleanup_temp_files(sample_ngb_file)
 
@@ -77,7 +83,9 @@ class TestReadNGBData:
         # Should have embedded metadata
         assert b"file_metadata" in result.schema.metadata
 
-    def test_read_ngb_return_metadata_true(self, sample_ngb_file: Any, cleanup_temp_files: Any) -> None:
+    def test_read_ngb_return_metadata_true(
+        self, sample_ngb_file: Any, cleanup_temp_files: Any
+    ) -> None:
         """Test read_ngb with return_metadata=True."""
         temp_file = cleanup_temp_files(sample_ngb_file)
 
@@ -90,7 +98,9 @@ class TestReadNGBData:
             data.schema.metadata is None or b"file_metadata" not in data.schema.metadata
         )
 
-    def test_read_ngb_metadata_structure(self, sample_ngb_file: Any, cleanup_temp_files: Any) -> None:
+    def test_read_ngb_metadata_structure(
+        self, sample_ngb_file: Any, cleanup_temp_files: Any
+    ) -> None:
         """Test read_ngb metadata structure."""
         temp_file = cleanup_temp_files(sample_ngb_file)
 
@@ -260,7 +270,9 @@ class TestMainCLI:
 class TestIntegrationWithMockNGB:
     """Integration tests using mock NGB files."""
 
-    def test_integration_with_mock_file(self, sample_ngb_file: Any, cleanup_temp_files: Any) -> None:
+    def test_integration_with_mock_file(
+        self, sample_ngb_file: Any, cleanup_temp_files: Any
+    ) -> None:
         """Test complete integration with mock NGB file."""
         temp_file = cleanup_temp_files(sample_ngb_file)
 
@@ -273,7 +285,9 @@ class TestIntegrationWithMockNGB:
         assert isinstance(metadata, dict)
         assert isinstance(data, pa.Table)
 
-    def test_consistency_between_modes(self, sample_ngb_file: Any, cleanup_temp_files: Any) -> None:
+    def test_consistency_between_modes(
+        self, sample_ngb_file: Any, cleanup_temp_files: Any
+    ) -> None:
         """Test consistency between return_metadata=True/False modes."""
         temp_file = cleanup_temp_files(sample_ngb_file)
 
@@ -295,7 +309,9 @@ class TestIntegrationWithMockNGB:
             if key in embedded_metadata and key in metadata:
                 assert embedded_metadata[key] == metadata[key]
 
-    def test_polars_integration(self, sample_ngb_file: Any, cleanup_temp_files: Any) -> None:
+    def test_polars_integration(
+        self, sample_ngb_file: Any, cleanup_temp_files: Any
+    ) -> None:
         """Test integration with polars DataFrame conversion."""
         import polars as pl
 

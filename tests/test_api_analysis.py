@@ -510,7 +510,9 @@ class TestNormalizeToInitialMass:
         # Normalize (in place)
         result_table = normalize_to_initial_mass(table, columns=["mass"])
         result_df = pl.from_arrow(result_table)
-        normalized_mass = result_df["mass"].to_numpy()  # Column updated in place  # type: ignore[index]
+        normalized_mass = result_df[
+            "mass"
+        ].to_numpy()  # Column updated in place  # type: ignore[index]
 
         # Initial mass should be close to initial_offset / sample_mass
         expected_initial = 0.05 / 8.75  # ~0.0057

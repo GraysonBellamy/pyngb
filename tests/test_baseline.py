@@ -44,7 +44,9 @@ class TestBaselineSubtraction:
         """Load baseline data."""
         return read_ngb(baseline_file)
 
-    def test_standalone_subtract_baseline(self, sample_file: Any, baseline_file: Any) -> None:
+    def test_standalone_subtract_baseline(
+        self, sample_file: Any, baseline_file: Any
+    ) -> None:
         """Test standalone subtract_baseline function."""
         result = subtract_baseline(sample_file, baseline_file)
 
@@ -57,7 +59,9 @@ class TestBaselineSubtraction:
         for col in expected_columns:
             assert col in result.columns
 
-    def test_subtract_baseline_with_temperature_axis(self, sample_file: Any, baseline_file: Any) -> None:
+    def test_subtract_baseline_with_temperature_axis(
+        self, sample_file: Any, baseline_file: Any
+    ) -> None:
         """Test baseline subtraction with sample temperature axis."""
         result = subtract_baseline(
             sample_file, baseline_file, dynamic_axis="sample_temperature"
@@ -66,7 +70,9 @@ class TestBaselineSubtraction:
         assert isinstance(result, pl.DataFrame)
         assert result.height > 0
 
-    def test_subtract_baseline_with_furnace_axis(self, sample_file: Any, baseline_file: Any) -> None:
+    def test_subtract_baseline_with_furnace_axis(
+        self, sample_file: Any, baseline_file: Any
+    ) -> None:
         """Test baseline subtraction with furnace temperature axis."""
         result = subtract_baseline(
             sample_file, baseline_file, dynamic_axis="furnace_temperature"
@@ -75,14 +81,18 @@ class TestBaselineSubtraction:
         assert isinstance(result, pl.DataFrame)
         assert result.height > 0
 
-    def test_subtract_baseline_with_time_axis(self, sample_file: Any, baseline_file: Any) -> None:
+    def test_subtract_baseline_with_time_axis(
+        self, sample_file: Any, baseline_file: Any
+    ) -> None:
         """Test baseline subtraction with time axis."""
         result = subtract_baseline(sample_file, baseline_file, dynamic_axis="time")
 
         assert isinstance(result, pl.DataFrame)
         assert result.height > 0
 
-    def test_integrated_read_ngb_with_baseline(self, sample_file: Any, baseline_file: Any) -> None:
+    def test_integrated_read_ngb_with_baseline(
+        self, sample_file: Any, baseline_file: Any
+    ) -> None:
         """Test integrated read_ngb with baseline subtraction."""
         result = read_ngb(sample_file, baseline_file=baseline_file)
 
@@ -112,14 +122,18 @@ class TestBaselineSubtraction:
         assert "instrument" in metadata
         assert "sample_name" in metadata
 
-    def test_read_ngb_invalid_dynamic_axis(self, sample_file: Any, baseline_file: Any) -> None:
+    def test_read_ngb_invalid_dynamic_axis(
+        self, sample_file: Any, baseline_file: Any
+    ) -> None:
         """Test error handling for invalid dynamic axis."""
         with pytest.raises(ValueError, match="dynamic_axis must be one of"):
             read_ngb(
                 sample_file, baseline_file=baseline_file, dynamic_axis="invalid_axis"
             )
 
-    def test_baseline_subtractor_class(self, sample_data: Any, baseline_data: Any) -> None:
+    def test_baseline_subtractor_class(
+        self, sample_data: Any, baseline_data: Any
+    ) -> None:
         """Test BaselineSubtractor class directly."""
         subtractor = BaselineSubtractor()
 
@@ -142,7 +156,9 @@ class TestBaselineSubtraction:
         # Should find at least some segments
         assert len(isothermal) + len(dynamic) > 0
 
-    def test_baseline_subtractor_interpolation(self, sample_data: Any, baseline_data: Any) -> None:
+    def test_baseline_subtractor_interpolation(
+        self, sample_data: Any, baseline_data: Any
+    ) -> None:
         """Test interpolation functionality."""
         subtractor = BaselineSubtractor()
 
@@ -194,7 +210,9 @@ class TestBaselineSubtraction:
         assert isinstance(result, pl.DataFrame)
         assert result.height > 0
 
-    def test_temperature_program_validation_success(self, sample_file: Any, baseline_file: Any) -> None:
+    def test_temperature_program_validation_success(
+        self, sample_file: Any, baseline_file: Any
+    ) -> None:
         """Test that compatible temperature programs pass validation."""
         result = subtract_baseline(sample_file, baseline_file)
         assert isinstance(result, pl.DataFrame)
@@ -232,7 +250,9 @@ class TestBaselineSubtraction:
         with pytest.raises(ValueError, match="Temperature program mismatch"):
             subtractor.validate_temperature_programs(sample_metadata, baseline_metadata)
 
-    def test_baseline_subtractor_validation_success(self, sample_file: Any, baseline_file: Any) -> None:
+    def test_baseline_subtractor_validation_success(
+        self, sample_file: Any, baseline_file: Any
+    ) -> None:
         """Test BaselineSubtractor validation with compatible files."""
         subtractor = BaselineSubtractor()
 

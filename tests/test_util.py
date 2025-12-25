@@ -324,7 +324,9 @@ class TestGetHash:
     @patch("pyngb.util.logger")
     @patch("pathlib.Path.stat")
     @patch("pathlib.Path.open", side_effect=PermissionError("Permission denied"))
-    def test_get_hash_permission_error(self, mock_open: Any, mock_stat: Any, mock_logger: Any) -> None:
+    def test_get_hash_permission_error(
+        self, mock_open: Any, mock_stat: Any, mock_logger: Any
+    ) -> None:
         """Test get_hash with permission error."""
         # Mock the stat call to succeed (so we get to the open call)
         mock_stat.return_value.st_size = 1024
@@ -339,7 +341,9 @@ class TestGetHash:
     @patch("pyngb.util.logger")
     @patch("pathlib.Path.stat")
     @patch("hashlib.blake2b", side_effect=Exception("Hash error"))
-    def test_get_hash_hashing_error(self, mock_blake2b: Any, mock_stat: Any, mock_logger: Any) -> None:
+    def test_get_hash_hashing_error(
+        self, mock_blake2b: Any, mock_stat: Any, mock_logger: Any
+    ) -> None:
         """Test get_hash when hashing itself fails."""
         # Mock the stat call to succeed
         mock_stat.return_value.st_size = 1024
