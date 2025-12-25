@@ -52,7 +52,7 @@ class TestReadNGBData:
         assert metadata["file_hash"]["method"] == "BLAKE2b"
 
     @patch("pyngb.api.loaders.get_hash")
-    def test_read_ngb_hash_failure(  # type: ignore[no-untyped-def]
+    def test_read_ngb_hash_failure(
         self, mock_get_hash, sample_ngb_file, cleanup_temp_files
     ):
         """Test read_ngb when hash generation fails."""
@@ -130,7 +130,7 @@ class TestMainCLI:
     @patch("pathlib.Path.mkdir")
     @patch("pathlib.Path.touch")
     @patch("pathlib.Path.unlink")
-    def test_main_parquet_output(  # type: ignore[no-untyped-def]
+    def test_main_parquet_output(
         self,
         mock_unlink,
         mock_touch,
@@ -172,7 +172,7 @@ class TestMainCLI:
     @patch("pathlib.Path.mkdir")
     @patch("pathlib.Path.touch")
     @patch("pathlib.Path.unlink")
-    def test_main_csv_output(  # type: ignore[no-untyped-def]
+    def test_main_csv_output(
         self,
         mock_unlink,
         mock_touch,
@@ -293,7 +293,7 @@ class TestIntegrationWithMockNGB:
         core_fields = ["instrument", "sample_name"]
         for key in core_fields:
             if key in embedded_metadata and key in metadata:
-                assert embedded_metadata[key] == metadata[key]  # type: ignore[type-arg]
+                assert embedded_metadata[key] == metadata[key]
 
     def test_polars_integration(self, sample_ngb_file: Any, cleanup_temp_files: Any) -> None:
         """Test integration with polars DataFrame conversion."""

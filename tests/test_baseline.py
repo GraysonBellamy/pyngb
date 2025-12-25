@@ -94,9 +94,9 @@ class TestBaselineSubtraction:
         df = pl.from_arrow(result)
         expected_columns = ["time", "mass", "dsc_signal"]
         for col in expected_columns:
-            assert col in df.columns  # type: ignore[arg-type]
+            assert col in df.columns
 
-    def test_integrated_read_ngb_with_metadata_and_baseline(  # type: ignore[no-untyped-def]
+    def test_integrated_read_ngb_with_metadata_and_baseline(
         self, sample_file, baseline_file
     ):
         """Test integrated read_ngb with baseline and metadata return."""
@@ -134,7 +134,7 @@ class TestBaselineSubtraction:
 
         # Test segment identification
         isothermal, dynamic = subtractor.identify_segments(
-            sample_df, metadata.get("temperature_program", {})  # type: ignore[arg-type]
+            sample_df, metadata.get("temperature_program", {})
         )
 
         assert isinstance(isothermal, list)
@@ -154,11 +154,11 @@ class TestBaselineSubtraction:
         baseline_segment = baseline_df.head(100)
 
         interpolated = subtractor.interpolate_baseline(
-            sample_segment, baseline_segment, "time"  # type: ignore[arg-type]
+            sample_segment, baseline_segment, "time"
         )
 
         assert isinstance(interpolated, pl.DataFrame)
-        assert interpolated.height == sample_segment.height  # type: ignore[arg-type]
+        assert interpolated.height == sample_segment.height
 
     def test_data_preservation(self, sample_file: Any, baseline_file: Any) -> None:
         """Test that baseline subtraction succeeds and produces reasonable output."""
@@ -200,14 +200,14 @@ class TestBaselineSubtraction:
         assert isinstance(result, pl.DataFrame)
         assert result.height > 0
 
-    def test_temperature_program_validation_failure(  # type: ignore[no-untyped-def]
+    def test_temperature_program_validation_failure(
         self, incompatible_sample_file, incompatible_baseline_file
     ):
         """Test that incompatible temperature programs fail validation."""
         with pytest.raises(ValueError, match="Temperature program mismatch"):
             subtract_baseline(incompatible_sample_file, incompatible_baseline_file)
 
-    def test_integrated_api_validation_failure(  # type: ignore[no-untyped-def]
+    def test_integrated_api_validation_failure(
         self, incompatible_sample_file, incompatible_baseline_file
     ):
         """Test that incompatible temperature programs fail in integrated API."""

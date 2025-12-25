@@ -144,12 +144,12 @@ class TestRealFileIntegration:
             # Test CSV export via Polars
             df = pl.from_arrow(original_table)
             csv_file = temp_path / "test_export.csv"
-            df.write_csv(csv_file)  # type: ignore[arg-type]
+            df.write_csv(csv_file)
 
             # Read back CSV and verify basic structure
             imported_df = pl.read_csv(csv_file)
-            assert imported_df.height == df.height  # type: ignore[arg-type]
-            assert imported_df.width == df.width  # type: ignore[arg-type]
+            assert imported_df.height == df.height
+            assert imported_df.width == df.width
 
     def test_validation_on_real_data(self, real_test_files: Any) -> None:
         """Test data validation on real files."""
@@ -214,7 +214,7 @@ class TestBatchProcessingIntegration:
 
             # Verify output files exist
             for result in successful:
-                input_path = Path(result["file"])  # type: ignore[arg-type]
+                input_path = Path(result["file"])
                 parquet_path = _output_dir / f"{input_path.stem}.parquet"
                 assert parquet_path.exists(), f"Missing output file: {parquet_path}"
 
@@ -236,7 +236,7 @@ class TestBatchProcessingIntegration:
         # Test summary
         summary = dataset.summary()
         assert summary["file_count"] == len(real_test_files)
-        assert summary["loadable_files"] > 0  # type: ignore[type-arg]
+        assert summary["loadable_files"] > 0
         assert "unique_instruments" in summary
 
         # Test metadata export
@@ -428,7 +428,7 @@ class TestErrorRecoveryIntegration:
             # Test batch processing with skip_errors=True
             processor = BatchProcessor(max_workers=1, verbose=False)
             results = processor.process_files(
-                test_files, skip_errors=True, output_dir=temp_path  # type: ignore[arg-type]
+                test_files, skip_errors=True, output_dir=temp_path
             )
 
             # Should have results for all files
@@ -442,7 +442,7 @@ class TestErrorRecoveryIntegration:
             error_results = [r for r in results if r["status"] == "error"]
             for error_result in error_results:
                 assert error_result["error"] is not None
-                assert len(error_result["error"]) > 0  # type: ignore[arg-type]
+                assert len(error_result["error"]) > 0
 
     def test_validation_error_handling(self) -> None:
         """Test validation with problematic data."""

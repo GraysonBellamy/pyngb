@@ -220,7 +220,7 @@ class TestEdgeCaseFiles:
 
     def test_minimal_file_handling(self) -> None:
         """Test handling of minimal valid files."""
-        test_file = self.create_edge_case_file("minimal_zip")  # type: ignore[no-untyped-call]
+        test_file = self.create_edge_case_file("minimal_zip")
 
         try:
             # Should handle gracefully (may raise exception but shouldn't crash)
@@ -231,7 +231,7 @@ class TestEdgeCaseFiles:
 
     def test_large_metadata_handling(self) -> None:
         """Test handling of files with very large metadata."""
-        test_file = self.create_edge_case_file("large_metadata")  # type: ignore[no-untyped-call]
+        test_file = self.create_edge_case_file("large_metadata")
 
         try:
             # Should handle large metadata without memory issues
@@ -242,7 +242,7 @@ class TestEdgeCaseFiles:
 
     def test_many_streams_handling(self) -> None:
         """Test handling of files with many stream files."""
-        test_file = self.create_edge_case_file("many_streams")  # type: ignore[no-untyped-call]
+        test_file = self.create_edge_case_file("many_streams")
 
         try:
             # Should handle files with many streams
@@ -253,7 +253,7 @@ class TestEdgeCaseFiles:
 
     def test_empty_streams_handling(self) -> None:
         """Test handling of files with empty streams."""
-        test_file = self.create_edge_case_file("empty_streams")  # type: ignore[no-untyped-call]
+        test_file = self.create_edge_case_file("empty_streams")
 
         try:
             # Should handle empty streams gracefully
@@ -264,7 +264,7 @@ class TestEdgeCaseFiles:
 
     def test_corrupted_file_handling(self) -> None:
         """Test handling of corrupted files."""
-        test_file = self.create_edge_case_file("corrupted_zip")  # type: ignore[no-untyped-call]
+        test_file = self.create_edge_case_file("corrupted_zip")
 
         try:
             # Should handle corruption gracefully
@@ -317,7 +317,7 @@ class TestExtremeDataScenarios:
         )
 
         checker = QualityChecker(large_data)
-        result = checker.quick_check()  # type: ignore[type-arg]
+        result = checker.quick_check()
         # May or may not be valid depending on validation rules
 
         print("✓ Extreme data validation scenarios completed")
@@ -350,7 +350,7 @@ class TestExtremeDataScenarios:
             # Test batch processing
             processor = BatchProcessor(max_workers=1, verbose=False)
             results = processor.process_files(
-                problematic_files, skip_errors=True, output_dir=temp_path  # type: ignore[arg-type]
+                problematic_files, skip_errors=True, output_dir=temp_path
             )
 
             # Should handle all problematic files gracefully

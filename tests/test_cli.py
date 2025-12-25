@@ -46,7 +46,7 @@ class TestMainModule:
         assert hasattr(pyngb.__main__, "main")
 
         # main should be callable
-        assert callable(pyngb.__main__.main)  # type: ignore[type-arg]
+        assert callable(pyngb.__main__.main)
 
 
 class TestMainModuleStructure:

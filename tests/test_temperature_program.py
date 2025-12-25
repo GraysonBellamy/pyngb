@@ -31,7 +31,7 @@ class TestTemperatureProgramExtraction:
     def test_files(self) -> None:
         """Get available test files."""
         test_dir = Path(__file__).parent / "test_files"
-        return list(test_dir.glob("*.ngb-ss3"))  # type: ignore[type-arg]
+        return list(test_dir.glob("*.ngb-ss3"))
 
     @pytest.fixture
     def metadata_extractor(self) -> Any:
@@ -40,7 +40,7 @@ class TestTemperatureProgramExtraction:
         parser = BinaryParser()
         return MetadataExtractor(config, parser)
 
-    def test_direct_temperature_program_extraction(  # type: ignore[no-untyped-def]
+    def test_direct_temperature_program_extraction(
         self, metadata_extractor, test_files
     ):
         """Test direct temperature program extraction on stream data."""
@@ -196,7 +196,7 @@ class TestTemperatureProgramExtraction:
 
         # Check parquet files contain complete temperature programs
         for result in results:
-            test_file_name = Path(result["file"]).stem  # type: ignore[arg-type]
+            test_file_name = Path(result["file"]).stem
             parquet_file = tmp_path / f"{test_file_name}.parquet"
 
             assert parquet_file.exists(), (
@@ -326,7 +326,7 @@ class TestTemperatureProgramSpecificFiles:
             ("RO_FILED_STA_N2_10K_250129_R29.ngb-ss3", 3),
         ],
     )
-    def test_specific_file_temperature_programs(  # type: ignore[no-untyped-def]
+    def test_specific_file_temperature_programs(
         self, file_pattern, expected_min_stages
     ):
         """Test temperature program extraction on specific files with known expected results."""

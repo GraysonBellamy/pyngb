@@ -64,7 +64,7 @@ class TestValidationResult:
         result.add_error("Error")
         assert result.is_valid is False
 
-        result.add_warning("Warning")  # type: ignore[unreachable]
+        result.add_warning("Warning")
         assert result.is_valid is False  # Still invalid due to error
 
     def test_has_warnings(self) -> None:
@@ -281,49 +281,49 @@ class TestQualityChecker:
     def test_data_structure_checks(self, sample_sta_data: Any) -> None:
         """Test data structure validation."""
         checker = QualityChecker(sample_sta_data)
-        checker._check_data_structure()  # type: ignore[arg-type]
+        checker._check_data_structure()
         # Should have passed checks for valid data
         assert len(checker.result.passed_checks) > 0
 
     def test_temperature_data_checks(self, sample_sta_data: Any) -> None:
         """Test temperature data validation."""
         checker = QualityChecker(sample_sta_data)
-        checker._check_temperature_data()  # type: ignore[arg-type]
+        checker._check_temperature_data()
         # Valid temperature data should pass
         assert len(checker.result.passed_checks) > 0
 
     def test_time_data_checks(self, sample_sta_data: Any) -> None:
         """Test time data validation."""
         checker = QualityChecker(sample_sta_data)
-        checker._check_time_data()  # type: ignore[arg-type]
+        checker._check_time_data()
         # Valid time data should pass
         assert len(checker.result.passed_checks) > 0
 
     def test_mass_data_checks(self, sample_sta_data: Any) -> None:
         """Test mass data validation."""
         checker = QualityChecker(sample_sta_data)
-        checker._check_mass_data()  # type: ignore[arg-type]
+        checker._check_mass_data()
         # Valid mass data should pass
         assert len(checker.result.passed_checks) > 0
 
     def test_dsc_data_checks(self, sample_sta_data: Any) -> None:
         """Test DSC data validation."""
         checker = QualityChecker(sample_sta_data)
-        checker._check_dsc_data()  # type: ignore[arg-type]
+        checker._check_dsc_data()
         # Valid DSC data should pass
         assert len(checker.result.passed_checks) > 0
 
     def test_metadata_consistency_checks(self, sample_sta_data: Any, sample_metadata: Any) -> None:
         """Test metadata consistency validation."""
         checker = QualityChecker(sample_sta_data, sample_metadata)
-        checker._check_metadata_consistency()  # type: ignore[arg-type]
+        checker._check_metadata_consistency()
         # Valid metadata should pass
         assert len(checker.result.passed_checks) > 0
 
     def test_statistical_checks(self, sample_sta_data: Any) -> None:
         """Test statistical property validation."""
         checker = QualityChecker(sample_sta_data)
-        checker._check_statistical_properties()  # type: ignore[arg-type]
+        checker._check_statistical_properties()
         # Normal data should not have excessive outliers
         assert len([w for w in checker.result.warnings if "outlier" in w.lower()]) <= 1
 
