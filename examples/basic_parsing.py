@@ -22,7 +22,7 @@ import polars as pl
 from pyngb import read_ngb
 
 
-def demonstrate_basic_parsing(file_path: str):
+def demonstrate_basic_parsing(file_path: str) -> None:
     """Demonstrate basic NGB file parsing operations."""
 
     print(f"🔬 Parsing NGB file: {file_path}")
@@ -52,6 +52,7 @@ def demonstrate_basic_parsing(file_path: str):
 
         # Convert to Polars DataFrame for analysis
         df = pl.from_arrow(table)
+        assert isinstance(df, pl.DataFrame)  # type: ignore[misc]
 
         # Display data preview
         print("\n📈 Data Preview:")
@@ -64,27 +65,30 @@ def demonstrate_basic_parsing(file_path: str):
             # Time information
             if "time" in df.columns:
                 _time_stats = df.select("time").describe()
+                time_min = df["time"].min()  # type: ignore[index]
+                time_max = df["time"].max()  # type: ignore[index]
                 print(
-                    f"  Time range: {df['time'].min():.1f} to {df['time'].max():.1f} seconds"
+                    f"  Time range: {time_min:.1f} to {time_max:.1f} seconds"  # type: ignore[str-bytes-safe]
                 )
+                duration_min = (time_max - time_min) / 60  # type: ignore[operator]
                 print(
-                    f"  Duration: {(df['time'].max() - df['time'].min()) / 60:.1f} minutes"
+                    f"  Duration: {duration_min:.1f} minutes"  # type: ignore[str-bytes-safe]
                 )
 
             # Temperature information
             temp_cols = [col for col in df.columns if "temperature" in col.lower()]
             for temp_col in temp_cols:
-                temp_min = df[temp_col].min()
-                temp_max = df[temp_col].max()
-                print(f"  {temp_col}: {temp_min:.1f} to {temp_max:.1f} °C")
+                temp_min = df[temp_col].min()  # type: ignore[index]
+                temp_max = df[temp_col].max()  # type: ignore[index]
+                print(f"  {temp_col}: {temp_min:.1f} to {temp_max:.1f} °C")  # type: ignore[str-bytes-safe]
 
             # Mass information
             if "mass" in df.columns:
-                initial_mass = df["mass"].max()
-                final_mass = df["mass"].min()
-                mass_loss = ((initial_mass - final_mass) / initial_mass) * 100
+                initial_mass = df["mass"].max()  # type: ignore[index]
+                final_mass = df["mass"].min()  # type: ignore[index]
+                mass_loss = ((initial_mass - final_mass) / initial_mass) * 100  # type: ignore[operator]
                 print(
-                    f"  Mass loss: {mass_loss:.2f}% ({initial_mass:.3f} → {final_mass:.3f} mg)"
+                    f"  Mass loss: {mass_loss:.2f}% ({initial_mass:.3f} → {final_mass:.3f} mg)"  # type: ignore[str-bytes-safe]
                 )
 
     except Exception as e:
@@ -116,7 +120,7 @@ def demonstrate_basic_parsing(file_path: str):
             if available_fields:
                 print(f"  {category}:")
                 for field in available_fields:
-                    value = metadata[field]
+                    value = metadata[field]  # type: ignore[literal-required]
                     if isinstance(value, (int, float)) and field.endswith("_mass"):
                         print(f"    {field}: {value} mg")
                     else:
@@ -140,7 +144,7 @@ def demonstrate_basic_parsing(file_path: str):
         return False
 
 
-def main():
+def main() -> None:
     """Main function to run the example."""
 
     print("🔬 pyngb Basic Parsing Example")
@@ -178,6 +182,7 @@ def main():
             return 1
 
     # Check if file exists
+    assert file_path is not None  # Guaranteed by the check above
     if not Path(file_path).exists():
         print(f"❌ File not found: {file_path}")
         return 1

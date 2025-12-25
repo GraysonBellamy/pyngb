@@ -10,11 +10,11 @@ class TestMainModule:
     """Test the __main__ module functionality."""
 
     @patch("sys.exit")
-    @patch("pyngb.api.loaders.main")
+    @patch("pyngb.api.cli.main")
     def test_main_module_forwards_to_loaders_main(
         self, mock_main: Any, mock_exit: Any
     ) -> None:
-        """Test that __main__ module forwards to api.loaders.main."""
+        """Test that __main__ module forwards to api.cli.main."""
 
         mock_main.return_value = 0
 
@@ -48,7 +48,7 @@ class TestMainModule:
         assert hasattr(pyngb.__main__, "main")
 
         # main should be callable
-        assert callable(pyngb.__main__.main)
+        assert callable(pyngb.__main__.main)  # type: ignore[attr-defined]
 
 
 class TestMainModuleStructure:

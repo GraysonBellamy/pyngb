@@ -35,12 +35,12 @@ class TestBaselineSubtraction:
         return "tests/test_files/Douglas_Fir_STA_Baseline_10K_250813_R15.ngb-bs3"
 
     @pytest.fixture
-    def sample_data(self, sample_file) -> Any:
+    def sample_data(self, sample_file: Any) -> Any:
         """Load sample data."""
         return read_ngb(sample_file)
 
     @pytest.fixture
-    def baseline_data(self, baseline_file) -> Any:
+    def baseline_data(self, baseline_file: Any) -> Any:
         """Load baseline data."""
         return read_ngb(baseline_file)
 
@@ -102,13 +102,14 @@ class TestBaselineSubtraction:
 
         # Convert to DataFrame for column checking
         df = pl.from_arrow(result)
+        assert isinstance(df, pl.DataFrame)
         expected_columns = ["time", "mass", "dsc_signal"]
         for col in expected_columns:
             assert col in df.columns
 
     def test_integrated_read_ngb_with_metadata_and_baseline(
-        self, sample_file, baseline_file
-    ):
+        self, sample_file: Any, baseline_file: Any
+    ) -> None:
         """Test integrated read_ngb with baseline and metadata return."""
         metadata, result = read_ngb(
             sample_file, baseline_file=baseline_file, return_metadata=True
@@ -139,6 +140,7 @@ class TestBaselineSubtraction:
 
         # Convert to DataFrames
         sample_df = pl.from_arrow(sample_data)
+        assert isinstance(sample_df, pl.DataFrame)
         # Note: baseline_df would be used in more complex tests
         # baseline_df = pl.from_arrow(baseline_data)
 
@@ -163,7 +165,9 @@ class TestBaselineSubtraction:
         subtractor = BaselineSubtractor()
 
         sample_df = pl.from_arrow(sample_data)
+        assert isinstance(sample_df, pl.DataFrame)
         baseline_df = pl.from_arrow(baseline_data)
+        assert isinstance(baseline_df, pl.DataFrame)
 
         # Test interpolation on a small segment
         sample_segment = sample_df.head(100)
@@ -219,15 +223,15 @@ class TestBaselineSubtraction:
         assert result.height > 0
 
     def test_temperature_program_validation_failure(
-        self, incompatible_sample_file, incompatible_baseline_file
-    ):
+        self, incompatible_sample_file: Any, incompatible_baseline_file: Any
+    ) -> None:
         """Test that incompatible temperature programs fail validation."""
         with pytest.raises(ValueError, match="Temperature program mismatch"):
             subtract_baseline(incompatible_sample_file, incompatible_baseline_file)
 
     def test_integrated_api_validation_failure(
-        self, incompatible_sample_file, incompatible_baseline_file
-    ):
+        self, incompatible_sample_file: Any, incompatible_baseline_file: Any
+    ) -> None:
         """Test that incompatible temperature programs fail in integrated API."""
         with pytest.raises(ValueError, match="Temperature program mismatch"):
             read_ngb(incompatible_sample_file, baseline_file=incompatible_baseline_file)

@@ -83,7 +83,9 @@ class TestBatchProcessor:
 
         processor = BatchProcessor(max_workers=2, verbose=True)
         results = processor.process_files(
-            local_files, output_dir=str(work_dir), output_format="csv"
+            local_files,  # type: ignore[arg-type]
+            output_dir=str(work_dir),
+            output_format="csv",
         )
 
         assert len(results) == 3
@@ -113,7 +115,7 @@ class TestBatchProcessor:
         import threading
 
         processor = BatchProcessor(max_workers=1)  # Use single worker to avoid hanging
-        results_queue = queue.Queue()
+        results_queue: queue.Queue[Any] = queue.Queue()
 
         def worker() -> Any:
             try:
@@ -537,7 +539,7 @@ class TestBatchProcessingIntegration:
         dataset = NGBDataset.from_directory(str(test_dir))
 
         # Test concurrent access
-        results_queue = queue.Queue()
+        results_queue: queue.Queue[Any] = queue.Queue()
 
         def reader_worker() -> Any:
             try:

@@ -510,6 +510,7 @@ class TestNormalizeToInitialMass:
         # Normalize (in place)
         result_table = normalize_to_initial_mass(table, columns=["mass"])
         result_df = pl.from_arrow(result_table)
+        assert isinstance(result_df, pl.DataFrame)
         normalized_mass = result_df[
             "mass"
         ].to_numpy()  # Column updated in place  # type: ignore[index]

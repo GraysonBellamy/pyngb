@@ -10,7 +10,7 @@ import polars as pl
 from pyngb import read_ngb, subtract_baseline
 
 
-def test_baseline_subtraction():
+def test_baseline_subtraction() -> None:
     """Test baseline subtraction functionality."""
     sample_file = "tests/test_files/Douglas_Fir_STA_10K_250730_R13.ngb-ss3"
     baseline_file = "tests/test_files/Douglas_Fir_STA_Baseline_10K_250730_R13.ngb-bs3"

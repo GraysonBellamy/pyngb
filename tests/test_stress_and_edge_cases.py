@@ -180,7 +180,7 @@ class TestStressConditions:
 class TestEdgeCaseFiles:
     """Test with edge case file scenarios."""
 
-    def create_edge_case_file(self, scenario) -> Any:
+    def create_edge_case_file(self, scenario: str) -> Any:
         """Create files with specific edge case scenarios."""
         with tempfile.NamedTemporaryFile(suffix=".ngb-ss3", delete=False) as temp_file:
             if scenario == "minimal_zip":
@@ -317,8 +317,9 @@ class TestExtremeDataScenarios:
         )
 
         checker = QualityChecker(large_data)
-        result = checker.quick_check()
+        issues = checker.quick_check()
         # May or may not be valid depending on validation rules
+        assert isinstance(issues, list)
 
         print("✓ Extreme data validation scenarios completed")
 
@@ -350,7 +351,9 @@ class TestExtremeDataScenarios:
             # Test batch processing
             processor = BatchProcessor(max_workers=1, verbose=False)
             results = processor.process_files(
-                problematic_files, skip_errors=True, output_dir=temp_path
+                problematic_files,  # type: ignore[arg-type]
+                skip_errors=True,
+                output_dir=temp_path,
             )
 
             # Should handle all problematic files gracefully

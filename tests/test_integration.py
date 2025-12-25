@@ -144,6 +144,8 @@ class TestRealFileIntegration:
             # Test CSV export via Polars
             df = pl.from_arrow(original_table)
             csv_file = temp_path / "test_export.csv"
+            assert isinstance(df, pl.DataFrame)
+
             df.write_csv(csv_file)
 
             # Read back CSV and verify basic structure
@@ -214,7 +216,7 @@ class TestBatchProcessingIntegration:
 
             # Verify output files exist
             for result in successful:
-                input_path = Path(result["file"])
+                input_path = Path(str(result["file"]))
                 parquet_path = _output_dir / f"{input_path.stem}.parquet"
                 assert parquet_path.exists(), f"Missing output file: {parquet_path}"
 
@@ -236,7 +238,7 @@ class TestBatchProcessingIntegration:
         # Test summary
         summary = dataset.summary()
         assert summary["file_count"] == len(real_test_files)
-        assert summary["loadable_files"] > 0
+        assert summary["loadable_files"] > 0  # type: ignore[operator]
         assert "unique_instruments" in summary
 
         # Test metadata export
@@ -375,7 +377,7 @@ class TestAdvancedUseCases:
 
         try:
 
-            def parse_file(file_path) -> Any:
+            def parse_file(file_path: Any) -> Any:
                 try:
                     # This will likely fail with mock data, but tests concurrency
                     return read_ngb(file_path)
@@ -428,7 +430,9 @@ class TestErrorRecoveryIntegration:
             # Test batch processing with skip_errors=True
             processor = BatchProcessor(max_workers=1, verbose=False)
             results = processor.process_files(
-                test_files, skip_errors=True, output_dir=temp_path
+                test_files,  # type: ignore[arg-type]
+                skip_errors=True,
+                output_dir=temp_path,
             )
 
             # Should have results for all files
@@ -442,7 +446,7 @@ class TestErrorRecoveryIntegration:
             error_results = [r for r in results if r["status"] == "error"]
             for error_result in error_results:
                 assert error_result["error"] is not None
-                assert len(error_result["error"]) > 0
+                assert len(error_result["error"]) > 0  # type: ignore[arg-type]
 
     def test_validation_error_handling(self) -> None:
         """Test validation with problematic data."""

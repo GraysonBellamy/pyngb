@@ -47,8 +47,9 @@ class TestBinaryParserProperties:
         # Should not crash for any input
         try:
             result = parser.parse_value(
-                data, 0x08
-            )  # Try as int32  # type: ignore[arg-type]
+                data,
+                0x08,  # type: ignore[arg-type]
+            )  # Try as int32
             # Result should be valid type or None
             assert result is None or isinstance(result, (int, float, str, bytes))
         except (ValueError, struct.error):

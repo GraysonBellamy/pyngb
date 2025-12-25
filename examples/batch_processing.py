@@ -19,13 +19,14 @@ import sys
 import tempfile
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 import polars as pl
 
 from pyngb import BatchProcessor, NGBDataset, process_directory
 
 
-def demonstrate_batch_processor(files: Sequence[str | Path], output_dir: str | Path):
+def demonstrate_batch_processor() -> bool:
     """Demonstrate BatchProcessor class usage."""
 
     print("\n🔧 Method 1: BatchProcessor Class")
@@ -92,7 +93,7 @@ def demonstrate_batch_processor(files: Sequence[str | Path], output_dir: str | P
     return results
 
 
-def demonstrate_convenience_function(input_dir: str | Path, _output_dir: str | Path):
+def demonstrate_convenience_function() -> bool:
     """Demonstrate process_directory convenience function."""
 
     print("\n⚡ Method 2: Convenience Function")
@@ -121,7 +122,7 @@ def demonstrate_convenience_function(input_dir: str | Path, _output_dir: str | P
     return results
 
 
-def demonstrate_dataset_management(files: Sequence[str | Path], out_dir: Path):
+def demonstrate_dataset_management(files: Sequence[str | Path], out_dir: Path) -> None:
     """Demonstrate NGBDataset for dataset management."""
 
     print("\n📚 Method 3: Dataset Management")
@@ -180,7 +181,7 @@ def demonstrate_dataset_management(files: Sequence[str | Path], out_dir: Path):
         print(f"  ⚠️  Could not export metadata: {e}")
 
 
-def create_processing_summary(results: list[dict], output_dir: str | Path):
+def create_processing_summary(results: list[dict], output_dir: str | Path) -> None:
     """Create a summary report of batch processing results."""
 
     print("\n📋 Creating Processing Summary")
@@ -233,7 +234,7 @@ def create_processing_summary(results: list[dict], output_dir: str | Path):
         print(f"  Average time per file: {avg_time:.2f} seconds")
 
 
-def main():
+def main() -> bool:
     """Main function to run the batch processing example."""
 
     parser = argparse.ArgumentParser(

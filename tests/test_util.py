@@ -311,7 +311,7 @@ class TestGetHash:
         # Cleanup
         Path(temp_file_path).unlink()
 
-    @patch("pyngb.util.logger")
+    @patch("pyngb.util.hashing.logger")
     def test_get_hash_file_not_found(self, mock_logger: Any) -> None:
         """Test get_hash with non-existent file."""
         result = get_hash("nonexistent_file.txt")
@@ -321,7 +321,7 @@ class TestGetHash:
             "File not found while generating hash: nonexistent_file.txt"
         )
 
-    @patch("pyngb.util.logger")
+    @patch("pyngb.util.hashing.logger")
     @patch("pathlib.Path.stat")
     @patch("pathlib.Path.open", side_effect=PermissionError("Permission denied"))
     def test_get_hash_permission_error(
@@ -338,7 +338,7 @@ class TestGetHash:
             "Permission denied while generating hash for file: protected_file.txt"
         )
 
-    @patch("pyngb.util.logger")
+    @patch("pyngb.util.hashing.logger")
     @patch("pathlib.Path.stat")
     @patch("hashlib.blake2b", side_effect=Exception("Hash error"))
     def test_get_hash_hashing_error(
@@ -361,7 +361,7 @@ class TestGetHash:
             assert temp_file.name in logged_message
             assert "Hash error" in logged_message
 
-    @patch("pyngb.util.logger")
+    @patch("pyngb.util.hashing.logger")
     @patch("pathlib.Path.stat")
     def test_get_hash_io_error(self, mock_stat: Any, mock_logger: Any) -> None:
         """Test get_hash with I/O error during reading."""
@@ -573,7 +573,7 @@ class TestEdgeCases:
 
     def test_get_hash_path_edge_cases(self) -> None:
         """Test get_hash with various path formats."""
-        with patch("pyngb.util.logger") as mock_logger:
+        with patch("pyngb.util.hashing.logger") as mock_logger:
             # Test with empty path (Path("") resolves to current directory, so it will try to read directory)
             result = get_hash("")
             assert result is None

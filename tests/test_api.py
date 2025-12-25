@@ -57,8 +57,8 @@ class TestReadNGBData:
 
     @patch("pyngb.api.loaders.get_hash")
     def test_read_ngb_hash_failure(
-        self, mock_get_hash, sample_ngb_file, cleanup_temp_files
-    ):
+        self, mock_get_hash: Any, sample_ngb_file: Any, cleanup_temp_files: Any
+    ) -> None:
         """Test read_ngb when hash generation fails."""
         mock_get_hash.return_value = None
         temp_file = cleanup_temp_files(sample_ngb_file)
@@ -142,14 +142,14 @@ class TestMainCLI:
     @patch("pathlib.Path.unlink")
     def test_main_parquet_output(
         self,
-        mock_unlink,
-        mock_touch,
-        mock_mkdir,
-        mock_is_file,
-        mock_exists,
-        mock_write_table,
-        mock_read_ngb,
-    ):
+        mock_unlink: Any,
+        mock_touch: Any,
+        mock_mkdir: Any,
+        mock_is_file: Any,
+        mock_exists: Any,
+        mock_write_table: Any,
+        mock_read_ngb: Any,
+    ) -> None:
         """Test main function with parquet output."""
         import sys
         from unittest.mock import patch
@@ -175,7 +175,7 @@ class TestMainCLI:
         mock_read_ngb.assert_called_once_with("test.ngb-ss3")
         mock_write_table.assert_called_once()
 
-    @patch("pyngb.api.loaders.read_ngb")
+    @patch("pyngb.api.cli.read_ngb")
     @patch("polars.from_arrow")
     @patch("pathlib.Path.exists")
     @patch("pathlib.Path.is_file")
@@ -184,14 +184,14 @@ class TestMainCLI:
     @patch("pathlib.Path.unlink")
     def test_main_csv_output(
         self,
-        mock_unlink,
-        mock_touch,
-        mock_mkdir,
-        mock_is_file,
-        mock_exists,
-        mock_from_arrow,
-        mock_read_ngb,
-    ):
+        mock_unlink: Any,
+        mock_touch: Any,
+        mock_mkdir: Any,
+        mock_is_file: Any,
+        mock_exists: Any,
+        mock_from_arrow: Any,
+        mock_read_ngb: Any,
+    ) -> None:
         """Test main function with CSV output."""
         import sys
         from unittest.mock import patch
@@ -307,7 +307,7 @@ class TestIntegrationWithMockNGB:
         core_fields = ["instrument", "sample_name"]
         for key in core_fields:
             if key in embedded_metadata and key in metadata:
-                assert embedded_metadata[key] == metadata[key]
+                assert embedded_metadata[key] == metadata[key]  # type: ignore[literal-required]
 
     def test_polars_integration(
         self, sample_ngb_file: Any, cleanup_temp_files: Any
