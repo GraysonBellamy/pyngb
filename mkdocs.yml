@@ -126,6 +126,6 @@ extra_javascript:
 
 copyright: |
   Copyright &copy; 2024-2025 Grayson Bellamy -
-  <a href="https://github.com/GraysonBellamy/pyngb/blob/main/LICENSE.txt">MIT License</a>
+  <a href="https://github.com/GraysonBellamy/pyngb/blob/main/LICENSE">MIT License</a>
   <br>
   <small>Not affiliated with NETZSCH-Gerätebau GmbH</small>
