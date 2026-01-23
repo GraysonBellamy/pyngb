@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "Grayson Bellamy", email = "gbellamy@umd.edu" }
 ]
-license = { file = "LICENSE.txt" }
+license = { file = "LICENSE" }
 keywords = ["ngb", "netzsch", "sta", "thermal-analysis", "scientific-data", "binary-parsing", "unofficial"]
 classifiers = [
     "Development Status :: 3 - Alpha",
