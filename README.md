@@ -75,7 +75,7 @@ python -m pyngb --help
 
 ## License
 
-MIT License. See [LICENSE.txt](LICENSE.txt) for details.
+MIT License. See [LICENSE](LICENSE) for details.
 
 ## Support
 
