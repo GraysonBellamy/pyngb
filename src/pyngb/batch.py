@@ -10,7 +10,7 @@ import zipfile
 import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import TypedDict
 from collections.abc import Callable
 
 import polars as pl
