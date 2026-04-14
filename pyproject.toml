@@ -169,6 +169,7 @@ select = [
 ]
 ignore = [
     "E501",   # Line too long (handled by ruff formatter)
+    # TODO(pre-1.0): re-enable B006, B007, B008, C901 and fix violations.
     "B008",   # Do not perform function calls in argument defaults
     "C901",   # Too complex (let's not worry about complexity for now)
     "B905",   # `zip()` without an explicit `strict=` parameter

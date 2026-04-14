@@ -7,7 +7,7 @@ import polars as pl
 import pyarrow as pa
 from typing import Any
 
-from pyngb import read_ngb, subtract_baseline
+from pyngb import get_column_baseline_status, read_ngb, subtract_baseline
 from pyngb.baseline import BaselineSubtractor
 
 
@@ -106,6 +106,10 @@ class TestBaselineSubtraction:
         expected_columns = ["time", "mass", "dsc_signal"]
         for col in expected_columns:
             assert col in df.columns
+
+        assert get_column_baseline_status(result, "mass") is True
+        assert get_column_baseline_status(result, "dsc_signal") is True
+        assert get_column_baseline_status(result, "time") is None
 
     def test_integrated_read_ngb_with_metadata_and_baseline(
         self, sample_file: Any, baseline_file: Any
@@ -269,3 +273,26 @@ class TestBaselineSubtraction:
             subtractor.validate_temperature_programs(sample_metadata, baseline_metadata)
         except ValueError:
             pytest.fail("Validation should have passed for compatible files")
+
+    def test_process_baseline_subtraction_preserves_segment_order(self) -> None:
+        """Alternating stage types should not reorder the output rows."""
+        df = pl.DataFrame(
+            {
+                "time": [0.0, 60.0, 120.0, 180.0, 240.0, 300.0],
+                "mass": [10.0, 10.0, 9.0, 8.0, 8.0, 8.0],
+                "dsc_signal": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+            }
+        )
+        metadata = {
+            "temperature_program": {
+                "stage_0": {"time": 120.0, "heating_rate": 0.0, "temperature": 25.0},
+                "stage_1": {"time": 120.0, "heating_rate": 10.0, "temperature": 45.0},
+                "stage_2": {"time": 120.0, "heating_rate": 0.0, "temperature": 45.0},
+            }
+        }
+
+        result = BaselineSubtractor().process_baseline_subtraction(
+            df, df, metadata, metadata, "time"
+        )
+
+        assert result["time"].to_list() == df["time"].to_list()

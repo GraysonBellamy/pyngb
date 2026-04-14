@@ -17,6 +17,7 @@ from .constants import FileMetadata
 __all__ = ["BaselineSubtractor", "subtract_baseline"]
 
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 
 class BaselineSubtractor:
@@ -298,26 +299,23 @@ class BaselineSubtractor:
             f"Found {len(isothermal_segments)} isothermal segments and {len(dynamic_segments)} dynamic segments"
         )
 
-        # Process each segment
+        # Process segments in original row order. Isothermal stages always align
+        # on time; dynamic stages use the caller-selected axis.
+        segments = [
+            (start_idx, end_idx, "time") for start_idx, end_idx in isothermal_segments
+        ] + [
+            (start_idx, end_idx, dynamic_axis)
+            for start_idx, end_idx in dynamic_segments
+        ]
+        segments.sort(key=lambda segment: segment[0])
+
         processed_segments = []
-
-        # Process isothermal segments (always use time axis)
-        for start_idx, end_idx in isothermal_segments:
+        for start_idx, end_idx, axis in segments:
             sample_segment = sample_df.slice(start_idx, end_idx - start_idx)
             baseline_segment = baseline_df  # Use full baseline for interpolation
 
             processed_segment = self.subtract_segment(
-                sample_segment, baseline_segment, "time"
-            )
-            processed_segments.append(processed_segment)
-
-        # Process dynamic segments (use user-specified axis)
-        for start_idx, end_idx in dynamic_segments:
-            sample_segment = sample_df.slice(start_idx, end_idx - start_idx)
-            baseline_segment = baseline_df  # Use full baseline for interpolation
-
-            processed_segment = self.subtract_segment(
-                sample_segment, baseline_segment, dynamic_axis
+                sample_segment, baseline_segment, axis
             )
             processed_segments.append(processed_segment)
 

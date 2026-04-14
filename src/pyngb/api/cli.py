@@ -9,6 +9,7 @@ import polars as pl
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from ..exceptions import NGBParseError
 from .loaders import read_ngb
 
 logger = logging.getLogger(__name__)
@@ -236,16 +237,17 @@ def main(argv: list[str] | None = None) -> int:
 
         return 0
 
-    except Exception as e:
-        match e:
-            case FileNotFoundError() | ValueError() | PermissionError():
-                logger.error(str(e))
-            case OSError():
-                logger.error(f"OS error while processing file {args.input}: {e}")
-            case ImportError():
-                logger.error(f"Required dependency not available: {e}")
-            case _:
-                logger.error(f"Unexpected error while parsing file {args.input}: {e}")
+    except (FileNotFoundError, ValueError, PermissionError) as e:
+        logger.error(str(e))
+        return 1
+    except NGBParseError as e:
+        logger.error(f"Failed to parse {args.input}: {e}")
+        return 1
+    except ImportError as e:
+        logger.error(f"Required dependency not available: {e}")
+        return 1
+    except OSError as e:
+        logger.error(f"OS error while processing file {args.input}: {e}")
         return 1
 
 

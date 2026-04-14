@@ -14,13 +14,15 @@ class ParsingConfig:
 
     Attributes:
         max_file_size_mb: Maximum file size in MB to parse (default: 1000)
-        max_tables_per_stream: Maximum number of tables per stream (default: 100)
+        max_tables_per_stream: Maximum number of tables per stream (default: 10000).
+            Guards against pathological inputs; real NGB streams typically contain
+            fewer than ~1000 tables. Raise this only if a legitimate file trips it.
         max_array_size_mb: Maximum array size in MB (default: 500)
         encoding_fallback: Fallback encoding for strings (default: "utf-8")
     """
 
     max_file_size_mb: int = 1000
-    max_tables_per_stream: int = 100
+    max_tables_per_stream: int = 10000
     max_array_size_mb: int = 500
     encoding_fallback: str = "utf-8"
 

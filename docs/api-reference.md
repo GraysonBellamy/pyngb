@@ -201,7 +201,7 @@ Dictionary containing extracted metadata from NGB files.
 - `instrument` (str): Instrument model/name
 - `operator` (str): Operator name
 - `measurement_date` (str): Date of measurement
-- `temperature_program` (dict): Complete temperature program
+- `temperature_program` (dict): Complete temperature program with stage durations in seconds
 - `crucible_type` (str): Crucible type used
 - `atmosphere` (str): Measurement atmosphere
 - `heating_rate` (float): Primary heating rate
@@ -210,9 +210,9 @@ Dictionary containing extracted metadata from NGB files.
 **Temperature Program Structure:**
 ```python
 {
-    "stage_0": {"temperature": 25.0, "heating_rate": 0.0, "time": 5.0},
-    "stage_1": {"temperature": 700.0, "heating_rate": 10.0, "time": 67.5},
-    "stage_2": {"temperature": 700.0, "heating_rate": 0.0, "time": 15.0}
+    "stage_0": {"temperature": 25.0, "heating_rate": 0.0, "time": 300.0},
+    "stage_1": {"temperature": 700.0, "heating_rate": 10.0, "time": 4050.0},
+    "stage_2": {"temperature": 700.0, "heating_rate": 0.0, "time": 900.0}
 }
 ```
 

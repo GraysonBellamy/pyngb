@@ -7,11 +7,16 @@ patterns without requiring complex structural parsing logic.
 
 import re
 from datetime import datetime, timezone
-from typing import Any, ClassVar
+from typing import ClassVar
 
 from ..binary import BinaryParser
 from ..constants import PatternConfig
 from .base import BaseMetadataExtractor, FileMetadata
+
+# Values that basic fields are expected to carry after parse_value. The parser
+# can also return raw bytes for unknown types, but basic fields (instrument,
+# operator, etc.) never encounter that case.
+MetadataFieldValue = int | float | str | None
 
 __all__ = ["BasicFieldExtractor"]
 
@@ -123,7 +128,7 @@ class BasicFieldExtractor(BaseMetadataExtractor):
                         data_type, value_bytes = matches[0]
                         value = self.parser.parse_value(data_type, value_bytes)
 
-                        if value is not None:
+                        if value is not None and not isinstance(value, bytes):
                             # Special handling for specific fields
                             processed_value = self._process_field_value(
                                 field_name, value
@@ -144,7 +149,9 @@ class BasicFieldExtractor(BaseMetadataExtractor):
         else:
             self.logger.debug("No basic fields extracted")
 
-    def _process_field_value(self, field_name: str, value: Any) -> Any:
+    def _process_field_value(
+        self, field_name: str, value: MetadataFieldValue
+    ) -> MetadataFieldValue:
         """Process field values with any necessary transformations.
 
         Args:
@@ -171,7 +178,9 @@ class BasicFieldExtractor(BaseMetadataExtractor):
 
         return value
 
-    def extract_single_field(self, tables: list[bytes], field_name: str) -> Any | None:
+    def extract_single_field(
+        self, tables: list[bytes], field_name: str
+    ) -> MetadataFieldValue:
         """Extract a specific basic field from tables.
 
         This is a utility method for extracting individual fields when needed.
@@ -201,6 +210,8 @@ class BasicFieldExtractor(BaseMetadataExtractor):
                 if matches:
                     data_type, value_bytes = matches[0]
                     value = self.parser.parse_value(data_type, value_bytes)
+                    if isinstance(value, bytes):
+                        return None
                     return self._process_field_value(field_name, value)
             except Exception as e:
                 self.logger.debug(f"Error extracting {field_name} from table: {e}")

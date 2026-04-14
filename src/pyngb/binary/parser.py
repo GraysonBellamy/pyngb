@@ -5,9 +5,10 @@ Low-level binary parsing operations for NGB files.
 import logging
 import re
 import struct
-from typing import Any
 
+from ..config import DEFAULT_CONFIG, ParsingConfig
 from ..constants import BinaryMarkers, BinaryProcessing, DataType
+from ..exceptions import NGBResourceLimitError
 from .handlers import DataTypeRegistry
 
 __all__ = ["BinaryParser"]
@@ -43,9 +44,14 @@ class BinaryParser:
         - Leverages NumPy frombuffer for fast array parsing
     """
 
-    def __init__(self, markers: BinaryMarkers | None = None):
+    def __init__(
+        self,
+        markers: BinaryMarkers | None = None,
+        parsing_config: ParsingConfig | None = None,
+    ):
         self.markers = markers or BinaryMarkers()
         self.binary_config = BinaryProcessing()
+        self.parsing_config = parsing_config or DEFAULT_CONFIG.parsing
         self._compiled_patterns: dict[str, re.Pattern[bytes]] = {}
         self._data_type_registry = DataTypeRegistry()
 
@@ -138,7 +144,7 @@ class BinaryParser:
         return None
 
     @staticmethod
-    def parse_value(data_type: bytes, value: bytes) -> Any:
+    def parse_value(data_type: bytes, value: bytes) -> int | float | str | bytes | None:
         """Parse binary value based on data type.
 
         Args:
@@ -146,7 +152,8 @@ class BinaryParser:
             value: Binary data to parse
 
         Returns:
-            Parsed value or None if parsing fails
+            Parsed value (int for INT32, float for FLOAT32/64, str for STRING,
+            raw bytes for unknown types), or None if parsing fails.
 
         Raises:
             ValueError: If data length doesn't match expected type size
@@ -155,15 +162,15 @@ class BinaryParser:
             if data_type == DataType.INT32.value:
                 if len(value) != 4:
                     raise ValueError(f"INT32 requires 4 bytes, got {len(value)}")
-                return struct.unpack("<i", value)[0]
+                return int(struct.unpack("<i", value)[0])
             if data_type == DataType.FLOAT32.value:
                 if len(value) != 4:
                     raise ValueError(f"FLOAT32 requires 4 bytes, got {len(value)}")
-                return struct.unpack("<f", value)[0]
+                return float(struct.unpack("<f", value)[0])
             if data_type == DataType.FLOAT64.value:
                 if len(value) != 8:
                     raise ValueError(f"FLOAT64 requires 8 bytes, got {len(value)}")
-                return struct.unpack("<d", value)[0]
+                return float(struct.unpack("<d", value)[0])
             if data_type == DataType.STRING.value:
                 return BinaryParser._parse_string_enhanced(value)
             return value
@@ -171,7 +178,9 @@ class BinaryParser:
             logger.debug(f"Failed to parse value: {e}")
             return None
         except Exception as e:
-            logger.debug(f"Unexpected error parsing value: {e}")
+            # Broad catch keeps the parser robust against unexpected binary shapes,
+            # but log at warning so silent corruption stays visible in normal use.
+            logger.warning(f"Unexpected error parsing value: {e}")
             return None
 
     def split_tables(self, data: bytes) -> list[bytes]:
@@ -232,6 +241,14 @@ class BinaryParser:
 
         # Filter out empty tables
         valid_tables = [table for table in tables if table]
+
+        max_tables = self.parsing_config.max_tables_per_stream
+        if len(valid_tables) > max_tables:
+            raise NGBResourceLimitError(
+                f"Stream contains {len(valid_tables)} tables, "
+                f"exceeding max_tables_per_stream limit of {max_tables}"
+            )
+
         logger.debug(f"Split data into {len(valid_tables)} valid tables")
 
         return valid_tables

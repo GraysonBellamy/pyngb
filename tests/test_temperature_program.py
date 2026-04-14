@@ -387,7 +387,7 @@ class TestTemperatureProgramSpecificFiles:
                     f"Non-numeric time in {stage_key}"
                 )
                 assert 0 <= time_val <= 10000, (
-                    f"Unrealistic time {time_val}min in {stage_key}"
+                    f"Unrealistic time {time_val}s in {stage_key}"
                 )
 
 

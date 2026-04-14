@@ -31,6 +31,17 @@ class DataStreamProcessor:
             "table_sep", self.parser.markers.TABLE_SEPARATOR
         )
 
+    @staticmethod
+    def _standardize_column_values(
+        title: str | None, values: list[float]
+    ) -> list[float]:
+        """Convert raw instrument values to pyngb's public units."""
+        if title == "time":
+            # NGB stream time values are stored in minutes. pyngb exposes seconds
+            # throughout its public API so rates such as DTG are unambiguous.
+            return [value * 60.0 for value in values]
+        return values
+
     def _split_tables(self, stream_data: bytes) -> list[bytes]:
         """Split a stream into tables using the cached table-separator pattern.
 
@@ -67,8 +78,9 @@ class DataStreamProcessor:
                 title = col_map.get(title, title)
                 if len(output) > 1:
                     try:
+                        values = self._standardize_column_values(title, output)
                         output_polars = output_polars.with_columns(
-                            pl.Series(name=title, values=output)
+                            pl.Series(name=title, values=values)
                         )
                     except ShapeError:
                         logger.debug(f"Shape mismatch when adding column '{title}'")
@@ -175,8 +187,9 @@ class DataStreamProcessor:
 
                 # Save after each data block (original behavior)
                 try:
+                    values = self._standardize_column_values(title, output)
                     output_polars = output_polars.with_columns(
-                        pl.Series(name=title, values=output)
+                        pl.Series(name=title, values=values)
                     )
                 except ShapeError:
                     # Silently ignore shape issues as before

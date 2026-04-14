@@ -14,6 +14,7 @@ import pyarrow as pa
 import pytest
 
 from pyngb.api.loaders import main, read_ngb
+from pyngb.api.metadata import get_column_units
 from pyngb.exceptions import NGBStreamNotFoundError
 
 
@@ -97,6 +98,26 @@ class TestReadNGBData:
         assert (
             data.schema.metadata is None or b"file_metadata" not in data.schema.metadata
         )
+
+    def test_read_ngb_standardizes_time_to_seconds(self) -> None:
+        """NGB files store time in minutes; pyngb exposes seconds."""
+        test_file = Path("tests/test_files/DF_FILED_STA_21O2_10K_220222_R1.ngb-ss3")
+
+        metadata, data = read_ngb(test_file, return_metadata=True)
+        df = pl.from_arrow(data)
+        assert isinstance(df, pl.DataFrame)
+
+        # Raw fixture duration is 102.5 minutes, so public data should be seconds.
+        assert float(df["time"][-1]) == pytest.approx(102.5 * 60.0)
+
+        stage_duration = sum(
+            float(stage.get("time", 0.0))
+            for stage in metadata.get("temperature_program", {}).values()
+        )
+        assert stage_duration == pytest.approx(float(df["time"][-1]))
+
+        table = read_ngb(test_file)
+        assert get_column_units(table, "time") == "s"
 
     def test_read_ngb_metadata_structure(
         self, sample_ngb_file: Any, cleanup_temp_files: Any

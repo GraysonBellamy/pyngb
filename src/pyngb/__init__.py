@@ -8,7 +8,7 @@ pyngb: A Python library for parsing NETZSCH STA NGB files.
 
 from importlib.metadata import PackageNotFoundError, version
 
-# Import configuration validation first to ensure configs are valid
+# Import for side effect: validates config dataclasses at module load time.
 from . import config_validation  # noqa: F401
 
 from .analysis import dtg, dtg_custom
@@ -22,7 +22,13 @@ from .api.metadata import (
     inspect_column_metadata,
 )
 from .baseline import BaselineSubtractor, subtract_baseline
-from .batch import BatchProcessor, NGBDataset, process_directory, process_files
+from .batch import (
+    BatchProcessor,
+    BatchResult,
+    NGBDataset,
+    process_directory,
+    process_files,
+)
 from .config import (
     BatchConfig,
     DEFAULT_CONFIG,
@@ -68,6 +74,7 @@ __all__ = [
     "BaselineSubtractor",
     "BatchConfig",
     "BatchProcessor",
+    "BatchResult",
     "BinaryMarkers",
     "DataType",
     "FileMetadata",

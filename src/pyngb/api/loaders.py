@@ -20,7 +20,7 @@ def read_ngb(
     *,
     return_metadata: Literal[False] = False,
     baseline_file: None = None,
-    dynamic_axis: str = "time",
+    dynamic_axis: str = "sample_temperature",
 ) -> pa.Table: ...
 
 
@@ -30,7 +30,7 @@ def read_ngb(
     *,
     return_metadata: Literal[True],
     baseline_file: None = None,
-    dynamic_axis: str = "time",
+    dynamic_axis: str = "sample_temperature",
 ) -> tuple[FileMetadata, pa.Table]: ...
 
 
@@ -40,7 +40,7 @@ def read_ngb(
     *,
     return_metadata: Literal[False] = False,
     baseline_file: str | Path,
-    dynamic_axis: str = "time",
+    dynamic_axis: str = "sample_temperature",
 ) -> pa.Table: ...
 
 
@@ -50,7 +50,7 @@ def read_ngb(
     *,
     return_metadata: Literal[True],
     baseline_file: str | Path,
-    dynamic_axis: str = "time",
+    dynamic_axis: str = "sample_temperature",
 ) -> tuple[FileMetadata, pa.Table]: ...
 
 
@@ -207,6 +207,14 @@ def read_ngb(
 
         # Convert back to PyArrow
         data = subtracted_df.to_arrow()
+
+        # Baseline subtraction changes the meaning of mass/DSC columns, so tag
+        # applicable column metadata before either return mode hands the table back.
+        from .metadata import mark_baseline_corrected
+        from ..util import initialize_table_column_metadata
+
+        data = initialize_table_column_metadata(data)
+        data = mark_baseline_corrected(data, ["mass", "dsc_signal"])
 
     if return_metadata:
         return metadata, data

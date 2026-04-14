@@ -67,6 +67,7 @@ df = pl.from_arrow(table_with_dtg)
 
 # Alternative: Standalone DTG calculation
 from pyngb import dtg
+# pyngb exposes measurement time in seconds.
 time = df.get_column('time').to_numpy()
 mass = df.get_column('mass').to_numpy()
 dtg_values = dtg(time, mass)
@@ -162,7 +163,7 @@ import numpy as np
 # Extract columns as NumPy arrays
 temperature = table['sample_temperature'].to_numpy()
 mass = table['mass'].to_numpy()
-time = table['time'].to_numpy()
+time = table['time'].to_numpy()  # seconds
 
 # Perform NumPy operations
 mass_loss = (mass[0] - mass) / mass[0] * 100  # Mass loss percentage

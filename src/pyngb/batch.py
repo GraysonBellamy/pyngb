@@ -10,7 +10,7 @@ import zipfile
 import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 from collections.abc import Callable
 
 import polars as pl
@@ -20,9 +20,33 @@ from .api.loaders import read_ngb
 from .constants import FileMetadata
 from .exceptions import NGBParseError
 
-__all__ = ["BatchProcessor", "NGBDataset", "process_directory", "process_files"]
+__all__ = [
+    "BatchProcessor",
+    "BatchResult",
+    "NGBDataset",
+    "process_directory",
+    "process_files",
+]
+
+
+class BatchResult(TypedDict):
+    """Per-file outcome from batch processing.
+
+    ``rows``, ``columns``, and ``sample_name`` are populated only on success;
+    ``error`` is populated only on failure.
+    """
+
+    file: str
+    status: str  # "success" or "error"
+    rows: int | None
+    columns: int | None
+    sample_name: str | None
+    processing_time: float
+    error: str | None
+
 
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 
 def _process_single_file_worker(
@@ -30,7 +54,7 @@ def _process_single_file_worker(
     output_format: str,
     output_dir: str | Path,
     skip_errors: bool,
-) -> dict[str, str | float | None]:
+) -> BatchResult:
     """Top-level worker function to process a single file (multiprocessing-safe).
 
     Using a module-level function avoids pickling bound methods and reduces
@@ -133,7 +157,10 @@ class BatchProcessor:
 
     def _setup_logging(self) -> None:
         """Configure logging for batch processing without altering global config."""
-        if self.verbose and not logger.handlers:
+        has_real_handler = any(
+            not isinstance(h, logging.NullHandler) for h in logger.handlers
+        )
+        if self.verbose and not has_real_handler:
             handler = logging.StreamHandler()
             handler.setFormatter(
                 logging.Formatter(
@@ -150,7 +177,7 @@ class BatchProcessor:
         output_format: str = "parquet",
         output_dir: str | Path | None = None,
         skip_errors: bool = True,
-    ) -> list[dict[str, str | float | None]]:
+    ) -> list[BatchResult]:
         """Process all NGB files in a directory.
 
         Args:
@@ -202,7 +229,7 @@ class BatchProcessor:
         output_format: str = "parquet",
         output_dir: str | Path | None = None,
         skip_errors: bool = True,
-    ) -> list[dict[str, str | float | None]]:
+    ) -> list[BatchResult]:
         """Process a list of NGB files with parallel execution.
 
         Args:
@@ -257,7 +284,10 @@ class BatchProcessor:
                     try:
                         result = future.result()
                     except Exception as e:
-                        # Convert worker exception into an error record
+                        # Broad catch is intentional: this is a subprocess boundary,
+                        # and any unhandled worker failure must become an error record
+                        # so the rest of the batch can continue. logger.exception
+                        # preserves the traceback for post-mortem debugging.
                         result = {
                             "file": str(src),
                             "status": "error",
@@ -267,7 +297,7 @@ class BatchProcessor:
                             "processing_time": 0.0,
                             "error": f"{type(e).__name__}: {e!s}",
                         }
-                        logger.error(f"Failed to process {src}: {e!s}")
+                        logger.exception("Failed to process %s", src)
                     results.append(result)
 
                     if self.verbose:
@@ -292,7 +322,7 @@ class BatchProcessor:
                 f"- Rate: {rate:.1f} files/sec - ETA: {eta:.0f}s"
             )
 
-    def _log_summary(self, results: list[dict[str, Any]], start_time: float) -> None:
+    def _log_summary(self, results: list[BatchResult], start_time: float) -> None:
         """Log processing summary."""
         total_time = time.perf_counter() - start_time
         successful = sum(1 for r in results if r["status"] == "success")
@@ -539,7 +569,7 @@ def process_directory(
     pattern: str = "*.ngb-ss3",
     output_format: str = "parquet",
     max_workers: int | None = None,
-) -> list[dict[str, str | float | None]]:
+) -> list[BatchResult]:
     """Process all NGB files in a directory.
 
     Convenience function for quick batch processing.
@@ -568,7 +598,7 @@ def process_files(
     files: list[str | Path],
     output_format: str = "parquet",
     max_workers: int | None = None,
-) -> list[dict[str, str | float | None]]:
+) -> list[BatchResult]:
     """Process a list of NGB files.
 
     Convenience function for batch processing specific files.

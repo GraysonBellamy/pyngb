@@ -6,8 +6,12 @@ import struct
 from unittest.mock import patch
 from typing import Any
 
+import pytest
+
 from pyngb.binary.parser import BinaryParser
+from pyngb.config import ParsingConfig
 from pyngb.constants import BinaryMarkers, DataType
+from pyngb.exceptions import NGBResourceLimitError
 
 
 class TestBinaryParser:
@@ -161,6 +165,27 @@ class TestBinaryParser:
         # Verify some of the original data is present
         combined = b"".join(result)
         assert b"table1" in combined or b"table2" in combined
+
+    def test_split_tables_rejects_excessive_table_count(self) -> None:
+        """Pathological inputs with too many separators must be rejected."""
+        tight_config = ParsingConfig(max_tables_per_stream=3)
+        parser = BinaryParser(parsing_config=tight_config)
+        sep = parser.markers.TABLE_SEPARATOR
+
+        data = b"a" + sep + b"b" + sep + b"c" + sep + b"d" + sep + b"e"
+
+        with pytest.raises(NGBResourceLimitError, match="max_tables_per_stream"):
+            parser.split_tables(data)
+
+    def test_split_tables_honors_custom_limit(self) -> None:
+        """Table counts at the configured limit must still parse."""
+        config = ParsingConfig(max_tables_per_stream=3)
+        parser = BinaryParser(parsing_config=config)
+        sep = parser.markers.TABLE_SEPARATOR
+
+        data = b"a" + sep + b"b" + sep + b"c"
+        result = parser.split_tables(data)
+        assert len(result) <= 3
 
     def test_extract_data_array_no_start_marker(self) -> None:
         """Test extract_data_array with no START_DATA marker."""

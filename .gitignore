@@ -177,3 +177,9 @@ pyrightconfig.json
 
 # dev directories
 output/
+
+# AI coding assistants
+.claude
+.claude/
+.codex
+.codex/

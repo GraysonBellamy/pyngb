@@ -130,7 +130,7 @@ Columns in the data stream are identified by hex IDs. Common IDs:
 
 | Hex ID | Column Name | Units | Description |
 |--------|------------|-------|-------------|
-| `0x0154` | `time` | seconds | Elapsed time |
+| `0x0154` | `time` | raw minutes, exposed as seconds | Elapsed time |
 | `0x02bc` | `sample_temperature` | °C | Sample temperature |
 | `0x00e1` | `furnace_temperature` | °C | Furnace temperature |
 | `0x0167` | `mass` | mg | Sample mass |
@@ -162,7 +162,8 @@ Temperature programs describe heating/cooling segments:
 **Fields**:
 - Type: `0x01` = heating, `0x02` = cooling, `0x03` = isothermal
 - Temperatures: float64 (°C)
-- Rate: float64 (°C/min for dynamic, minutes for isothermal)
+- Heating/cooling rate: float64 (°C/min)
+- Stage duration: raw minutes, converted to seconds in pyngb metadata
 
 ## File Metadata Fields
 

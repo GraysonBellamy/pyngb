@@ -131,7 +131,7 @@ FIELD_APPLICABILITY = {
 
 # Default metadata for common column types
 DEFAULT_COLUMN_METADATA = {
-    "time": {"units": "min", "processing_history": ["raw"], "source": "measurement"},
+    "time": {"units": "s", "processing_history": ["raw"], "source": "measurement"},
     "mass": {
         "units": "mg",
         "processing_history": ["raw"],
@@ -303,7 +303,8 @@ class PatternConfig:
     temp_prog_value_prefix: bytes = b"\x04\x80\x01"
     cal_constants_patterns: dict[str, bytes] = field(
         default_factory=lambda: {
-            f"p{i}": bytes([0x4F + i, 0x04]) if i < 5 else b"\xc3\x04" for i in range(6)
+            **{f"p{i}": bytes([0x4F + i, 0x04]) for i in range(5)},
+            "p5": b"\xc3\x04",
         }
     )
     column_map: dict[str, str] = field(

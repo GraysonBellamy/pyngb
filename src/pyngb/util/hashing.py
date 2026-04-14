@@ -5,6 +5,7 @@ import logging
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 
 def get_hash(path: str | Path, max_size_mb: int = 1000) -> str | None:
@@ -37,7 +38,10 @@ def get_hash(path: str | Path, max_size_mb: int = 1000) -> str | None:
             logger.error(f"Hash algorithm unavailable for file {path}: {e}")
             return None
         except Exception as e:  # pragma: no cover - exercised in tests via patch
-            # Catch any other unexpected exceptions during hash initialization
+            # Hashing is non-critical metadata: a broken or unusual hashlib backend
+            # must not fail the parse. Returning None keeps the contract that
+            # callers already handle (see module docstring). Tests patch blake2b
+            # with arbitrary Exception subclasses to verify this graceful fallback.
             logger.error(f"Unexpected error while generating hash for file {path}: {e}")
             return None
         # Check file size before hashing

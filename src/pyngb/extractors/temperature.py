@@ -163,6 +163,11 @@ class TemperatureProgramExtractor(BaseMetadataExtractor):
                         value = self.parser.parse_value(data_type, value_bytes)
 
                     if value is not None:
+                        if field_name == "time" and isinstance(value, (int, float)):
+                            # Temperature-program durations are stored in minutes
+                            # in NGB metadata. Expose seconds consistently with
+                            # the public time column.
+                            value = value * 60.0
                         stage[field_name] = value
 
             if stage:  # Only add stage if it has data
