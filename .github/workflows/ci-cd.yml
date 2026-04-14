@@ -21,10 +21,10 @@ jobs:
       fail-fast: false
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
 
@@ -67,10 +67,10 @@ jobs:
       contents: read
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: "3.11"
 
@@ -90,7 +90,7 @@ jobs:
         cat performance-results.txt
 
     - name: Upload performance results
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: performance-results
         path: performance-results.txt
@@ -102,10 +102,10 @@ jobs:
       contents: read
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: "3.11"
 
@@ -136,10 +136,10 @@ jobs:
       contents: read
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: "3.11"
 
@@ -155,7 +155,7 @@ jobs:
         touch site/.nojekyll
 
     - name: Upload documentation artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: documentation
         path: site
@@ -177,7 +177,7 @@ jobs:
 
     steps:
     - name: Download documentation artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         name: documentation
         path: ./site
@@ -202,10 +202,10 @@ jobs:
     needs: [test, security]
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: "3.11"
 
@@ -223,7 +223,7 @@ jobs:
         uv run twine check dist/*
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: dist
         path: dist/
@@ -233,19 +233,20 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      # Required for PyPI Trusted Publishing (OIDC). See:
+      # https://docs.pypi.org/trusted-publishers/
+      id-token: write
     needs: [test, build]
     if: github.event_name == 'release' && github.event.action == 'published'
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Download build artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         name: dist
         path: dist/
 
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@v1.13.0
-      with:
-        password: ${{ secrets.PYPI_API_TOKEN }}
