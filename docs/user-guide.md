@@ -1,3 +1,7 @@
+---
+description: Learn the pyngb API for reading NETZSCH STA NGB files, working with Polars DataFrames and PyArrow tables, and accessing embedded experiment metadata.
+---
+
 # User Guide
 
 This guide covers the essential functionality of pyngb for parsing and analyzing NETZSCH NGB files.

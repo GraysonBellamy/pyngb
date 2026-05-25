@@ -1,3 +1,7 @@
+---
+description: Complete API reference for pyngb — read_ngb, NGBParser, BatchProcessor, configuration classes, and utilities for parsing NETZSCH STA NGB files.
+---
+
 # API Reference
 
 Complete reference for all pyngb functions and classes.

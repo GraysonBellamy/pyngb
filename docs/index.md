@@ -1,3 +1,7 @@
+---
+description: pyngb is a Python library for parsing NETZSCH STA NGB binary files into Polars and PyArrow tables with embedded metadata for thermal analysis workflows.
+---
+
 # pyNGB
 
 pyNGB is an unofficial Python library for parsing and analyzing NETZSCH STA

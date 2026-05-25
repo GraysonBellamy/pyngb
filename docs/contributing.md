@@ -1,3 +1,7 @@
+---
+description: Contribute to pyngb — development setup with uv, running the test suite with pytest, code style with ruff, and the pull request workflow.
+---
+
 # Contributing
 
 We welcome contributions to pyngb! This guide explains how to set up your development environment and contribute effectively.

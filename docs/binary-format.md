@@ -1,3 +1,7 @@
+---
+description: Reverse-engineered reference for the NETZSCH STA NGB binary format — container layout, stream sections, type codes, and metadata encoding.
+---
+
 # NGB Binary Format Reference
 
 ## Overview

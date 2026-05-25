@@ -1,3 +1,7 @@
+---
+description: pyngb internal architecture — layered design, the binary parsing pipeline, table-builder pattern, and how NGB streams become Polars and PyArrow tables.
+---
+
 # pyNGB Architecture
 
 ## Overview

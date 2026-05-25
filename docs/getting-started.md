@@ -1,3 +1,7 @@
+---
+description: Install pyngb and parse your first NETZSCH STA NGB file in Python. Covers installation requirements, a quick example, and verification steps.
+---
+
 # Getting Started
 
 This guide will help you install pyngb and parse your first NGB file.

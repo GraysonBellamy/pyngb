@@ -1,3 +1,7 @@
+---
+description: Fix common pyngb issues — installation errors, NGB parsing failures, memory problems, missing metadata, and Polars or PyArrow compatibility questions.
+---
+
 # Troubleshooting
 
 Common issues and solutions when using pyngb.
