@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata from this file."
+title: "pyngb: Unofficial parser for NETZSCH STA NGB files"
+abstract: >-
+  A high-performance, unofficial Python library for parsing NETZSCH STA
+  (Simultaneous Thermal Analysis) NGB instrument binary files, with
+  comprehensive metadata extraction and analysis tools. Not affiliated with,
+  endorsed by, or approved by NETZSCH-Gerätebau GmbH.
+type: software
+authors:
+  - given-names: Grayson
+    family-names: Bellamy
+    email: gbellamy@umd.edu
+    orcid: "https://orcid.org/0000-0001-8778-0991"
+version: 0.1.2
+date-released: 2026-04-14
+license: MIT
+repository-code: "https://github.com/GraysonBellamy/pyngb"
+url: "https://graysonbellamy.github.io/pyngb/"
+keywords:
+  - ngb
+  - netzsch
+  - sta
+  - thermal-analysis
+  - scientific-data
+  - binary-parsing
+  - unofficial
