@@ -15,10 +15,16 @@ from ..constants import (
     APP_LICENSE_FIELD,
     GAS_TYPES,
     MFC_FIELD_NAMES,
+    SENSITIVITY_RECORD_SUFFIX,
     STRING_DATA_TYPE,
+    TEMP_CAL_COEFF_SIGNATURE,
+    TEMP_CAL_FIXPOINT_CATEGORIES,
+    TEMP_CAL_RECORD_SUFFIX,
     TEMP_PROG_TYPE_PREFIX,
     PatternConfig,
     PatternOffsets,
+    TemperatureCalibration,
+    TemperatureFixpoint,
 )
 from .base import BaseMetadataExtractor, FileMetadata
 
@@ -27,6 +33,7 @@ __all__ = [
     "CalibrationExtractor",
     "MFCExtractor",
     "PIDParameterExtractor",
+    "TemperatureCalibrationExtractor",
 ]
 
 
@@ -457,6 +464,184 @@ class CalibrationExtractor(BaseMetadataExtractor):
             self.log_extraction_success(extracted_count)
         else:
             self.logger.debug("No calibration constants extracted")
+
+
+class TemperatureCalibrationExtractor(BaseMetadataExtractor):
+    """Extracts the temperature-calibration block for traceability/QA only.
+
+    Pulls three things from ``stream_1``:
+
+    1. ``coefficients`` - the [B0, B1, B2] polynomial stored as a float32 data
+       array on field ``be 04`` inside an ``f7 01`` table.
+    2. ``fixpoints`` - the phase-transition standards stored in the ``30 75`` ..
+       ``34 75`` tables. Each is one row of the Proteus calibration table:
+       ``actual`` vs ``measured`` with a ``weight``, producing a ``corrected``
+       value (``corrected = measured + correction(measured)``). Standards vary per
+       calibration and are read from the file, never hard-coded.
+    3. record paths - the external temperature-calibration record (``.ngb-ts3``)
+       and the DSC sensitivity record (``.ngb-es3``).
+
+    IMPORTANT: The ``sample_temperature`` channel stored in NGB files is already
+    temperature-corrected by Proteus, so these coefficients must NOT be applied to
+    it (that would double-correct). They are extracted for provenance only. The
+    Proteus correction (NOT applied here) is::
+
+        correction[°C] = 1e-3*B0 + 1e-5*B1*T_exp + 1e-8*B2*T_exp**2
+
+    The DSC sensitivity calibration (see ``CalibrationExtractor``) remains the only
+    calibration that genuinely must be applied downstream.
+    """
+
+    def __init__(self, config: PatternConfig, parser: BinaryParser) -> None:
+        super().__init__("Temperature Calibration")
+        self.config = config
+        self.parser = parser
+        self._compiled_fields: dict[str, re.Pattern[bytes]] = {}
+        self._compile_fixpoint_patterns()
+
+    def _compile_fixpoint_patterns(self) -> None:
+        """Compile scalar-field regexes for each fixpoint field id."""
+        TYPE_PREFIX = self.parser.markers.TYPE_PREFIX
+        TYPE_SEPARATOR = self.parser.markers.TYPE_SEPARATOR
+        END_FIELD = self.parser.markers.END_FIELD
+
+        for fname, field_id in self.config.temperature_cal_patterns.items():
+            pat = (
+                re.escape(field_id)
+                + rb".{0,12}?"
+                + re.escape(TYPE_PREFIX)
+                + rb"(.)"
+                + re.escape(TYPE_SEPARATOR)
+                + rb"(.+?)"
+                + re.escape(END_FIELD)
+            )
+            self._compiled_fields[fname] = re.compile(pat, re.DOTALL)
+
+    def can_extract(self, tables: list[bytes]) -> bool:
+        """Check if temperature-calibration data is present."""
+        if not tables:
+            return False
+        combined = b"".join(tables)
+        return (
+            TEMP_CAL_COEFF_SIGNATURE in combined
+            or TEMP_CAL_RECORD_SUFFIX.encode("utf-16le") in combined
+            or SENSITIVITY_RECORD_SUFFIX.encode("utf-16le") in combined
+        )
+
+    def extract(self, tables: list[bytes], metadata: FileMetadata) -> None:
+        """Extract the temperature-calibration block from tables."""
+        self.log_extraction_attempt(len(tables))
+
+        try:
+            combined = b"".join(tables)
+
+            cal: TemperatureCalibration = {}
+
+            coefficients = self._extract_coefficients(combined)
+            if coefficients is not None:
+                cal["coefficients"] = coefficients
+
+            fixpoints = self._extract_fixpoints(tables)
+            if fixpoints:
+                cal["fixpoints"] = fixpoints
+
+            record_path = self._extract_path(combined, TEMP_CAL_RECORD_SUFFIX)
+            if record_path:
+                cal["record_path"] = record_path
+
+            extracted_count = 0
+            if cal:
+                metadata["temperature_calibration"] = cal
+                extracted_count += len(cal)
+
+            sensitivity_path = self._extract_path(combined, SENSITIVITY_RECORD_SUFFIX)
+            if sensitivity_path:
+                metadata["sensitivity_record_path"] = sensitivity_path
+                extracted_count += 1
+
+            if extracted_count > 0:
+                self.log_extraction_success(extracted_count)
+            else:
+                self.logger.debug("No temperature-calibration data extracted")
+
+        except Exception as e:
+            self.log_extraction_failure(e)
+
+    def _extract_coefficients(self, data: bytes) -> list[float] | None:
+        """Decode the be 04 float32 data array of calibration coefficients."""
+        idx = data.find(TEMP_CAL_COEFF_SIGNATURE)
+        if idx == -1:
+            return None
+        pos = idx + len(TEMP_CAL_COEFF_SIGNATURE)
+        if pos + 4 > len(data):
+            return None
+        count = struct.unpack("<I", data[pos : pos + 4])[0]
+        pos += 4
+        if count <= 0 or count % 4 or pos + count > len(data):
+            self.logger.debug(f"Invalid coefficient array length: {count}")
+            return None
+        n = count // 4
+        return [float(x) for x in struct.unpack(f"<{n}f", data[pos : pos + count])]
+
+    def _extract_fixpoints(self, tables: list[bytes]) -> list[TemperatureFixpoint]:
+        """Extract fixpoint standards in standard order (ascending temperature).
+
+        Each standard lives in its own table categorised ``30 75`` .. ``34 75``.
+        Because the ``30 75`` category is reused by the sample tables, a fixpoint
+        table is confirmed by also carrying the actual- and corrected-temperature
+        fields - the sample tables do not.
+        """
+        actual_id = self.config.temperature_cal_patterns["actual_c"]
+        corrected_id = self.config.temperature_cal_patterns["corrected_c"]
+
+        fixpoints: list[TemperatureFixpoint] = []
+        for category in TEMP_CAL_FIXPOINT_CATEGORIES:
+            for table in tables:
+                if (
+                    table[:32].find(category) == -1
+                    or actual_id not in table
+                    or corrected_id not in table
+                ):
+                    continue
+                row = self._parse_fixpoint_row(table)
+                if row:
+                    fixpoints.append(row)
+                break  # one table per category
+        return fixpoints
+
+    def _parse_fixpoint_row(self, table: bytes) -> TemperatureFixpoint:
+        """Parse the scalar fields of a single fixpoint table."""
+        row: TemperatureFixpoint = {}
+        for fname, pattern in self._compiled_fields.items():
+            match = pattern.search(table)
+            if not match:
+                continue
+            data_type, value_bytes = match.groups()
+            value = self.parser.parse_value(data_type, value_bytes)
+            if value is None:
+                continue
+            if fname == "name" and isinstance(value, str):
+                name = value.strip()
+                if name:
+                    row["name"] = name
+            elif fname != "name" and isinstance(value, (int, float)):
+                row[fname] = float(value)  # type: ignore[literal-required]
+        return row
+
+    @staticmethod
+    def _extract_path(data: bytes, suffix: str) -> str | None:
+        """Recover a UTF-16LE record path ending in ``suffix``."""
+        marker = suffix.encode("utf-16le")
+        idx = data.find(marker)
+        if idx == -1:
+            return None
+        end = idx + len(marker)
+        # Walk backwards over printable UTF-16LE characters to the path start.
+        start = idx
+        while start >= 2 and data[start - 1] == 0 and 32 <= data[start - 2] < 127:
+            start -= 2
+        text = data[start:end].decode("utf-16le", errors="ignore")
+        return text or None
 
 
 class ApplicationLicenseExtractor(BaseMetadataExtractor):

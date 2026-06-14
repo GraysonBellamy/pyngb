@@ -17,6 +17,7 @@ from .specialized import (
     CalibrationExtractor,
     MFCExtractor,
     PIDParameterExtractor,
+    TemperatureCalibrationExtractor,
 )
 from .temperature import TemperatureProgramExtractor
 
@@ -74,6 +75,7 @@ class MetadataExtractor(BaseMetadataExtractor):
         self.manager.register(MFCExtractor(self.config, self.parser))
         self.manager.register(PIDParameterExtractor(self.config, self.parser))
         self.manager.register(CalibrationExtractor(self.config, self.parser))
+        self.manager.register(TemperatureCalibrationExtractor(self.config, self.parser))
 
         # Application/license info last (lowest priority)
         self.manager.register(ApplicationLicenseExtractor(self.config, self.parser))

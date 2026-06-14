@@ -220,6 +220,47 @@ Dictionary containing extracted metadata from NGB files.
 }
 ```
 
+**Calibration Fields:**
+- `calibration_constants` (dict): DSC sensitivity polynomial (`p0`–`p5`). This is
+  the one calibration that *must* be applied downstream — DSC is stored raw in µV.
+- `temperature_calibration` (dict): Temperature calibration captured for
+  traceability/QA **only** (see below).
+- `sensitivity_record_path` (str): Path to the external DSC sensitivity
+  calibration record (`.ngb-es3`).
+
+**Temperature Calibration Structure:**
+
+The `sample_temperature` channel stored in NGB files is **already
+temperature-corrected** by Proteus, so these coefficients are *not* re-applied to
+the data — they are extracted for provenance and quality assurance.
+
+```python
+{
+    "coefficients": [-43.898, -811.727, 247.131],   # [B0, B1, B2]
+    "fixpoints": [
+        {
+            "name": "Biphenyl",      # phase-transition standard (varies per cal)
+            "actual_c": 69.2,        # literature/reference temperature (°C)
+            "measured_c": 69.8,      # raw measured transition temperature (°C)
+            "weight": 1.0,           # regression weight for this point
+            "corrected_c": 69.202,   # measured value after the calibration polynomial
+        },
+        # ... five standards total, ascending temperature
+    ],
+    "record_path": r"C:\NETZSCH\...\Calibrations\K_44_....ngb-ts3",
+}
+```
+
+Each fixpoint is one row of the Proteus calibration table. The columns are
+related exactly by the calibration polynomial (verified by round-trip on all
+sample files):
+
+```python
+corrected_c == measured_c + (1e-3*B0 + 1e-5*B1*T + 1e-8*B2*T**2)   # T = measured_c
+```
+
+The residual `actual_c - corrected_c` is the calibration fit error.
+
 ### Column Names
 
 Standard column names in processed data:

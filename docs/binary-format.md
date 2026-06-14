@@ -196,6 +196,52 @@ DSC calibration constants for signal correction:
 
 **Formula**: `DSC_corrected = (DSC_raw + τ * dDSC/dt) / Sensitivity + E`
 
+### Temperature Calibration
+
+The temperature calibration is stored in `stream_1` and surfaced as the
+`temperature_calibration` metadata field plus a top-level
+`sensitivity_record_path`. Unlike the DSC sensitivity calibration, it is captured
+for **traceability/QA only**: the `sample_temperature` channel is already
+temperature-corrected by Proteus, so re-applying these coefficients would
+double-correct the data.
+
+**Coefficients** — three `float32` values stored as a data array on field `be 04`
+inside an `f7 01` category table:
+
+```
+be 04 | 00 00 01 00 00 00 | 0c 00 | 17 fc ff ff | 10 | a0 01 | <count u32 LE> | <data>
+```
+
+The count is `12` (3 × `float32`), giving `[B0, B1, B2]`.
+
+**Fixpoints** — the phase-transition standards used for the calibration, one per
+table, categorised `30 75` .. `34 75` (ascending temperature). Standards vary per
+calibration (Biphenyl, Benzoeacid, KClO4, In, Sn, …) and are read from the file,
+never hard-coded. The `30 75` category is reused by the sample tables, so a
+fixpoint table is confirmed by the presence of the `44 04` and `47 04` fields.
+Each table holds five scalar fields:
+
+| Field ID | Type | Name | Description |
+|----------|------|------|-------------|
+| `43 04` | string | `name` | Standard name |
+| `44 04` | float | `actual_c` | Actual (literature) temperature (°C) |
+| `45 04` | float | `measured_c` | Raw measured transition temperature (°C) |
+| `46 04` | float | `weight` | Regression weight (1.0 in observed files) |
+| `47 04` | float | `corrected_c` | Measured value after the calibration polynomial |
+
+**Relationship** (verified by round-trip on all sample files, residual `< 1e-3`):
+
+```
+corrected_c = measured_c + (1e-3*B0 + 1e-5*B1*T + 1e-8*B2*T²)   # T = measured_c
+```
+
+The residual `actual_c - corrected_c` is the calibration fit error.
+
+**Record paths** — the external calibration records, stored as UTF-16LE strings in
+the `f5 01` tables: the temperature record (`.ngb-ts3` →
+`temperature_calibration.record_path`) and the DSC sensitivity record
+(`.ngb-es3` → `sensitivity_record_path`).
+
 ## Column Metadata
 
 Each data column can have metadata:

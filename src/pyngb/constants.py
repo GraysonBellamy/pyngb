@@ -22,6 +22,8 @@ __all__ = [  # noqa: RUF022 - order chosen for logical grouping
     "REF_CRUCIBLE_SIG_FRAGMENT",
     "SAMPLE_CRUCIBLE_SIG_FRAGMENT",
     "StreamMarkers",
+    "TemperatureCalibration",
+    "TemperatureFixpoint",
     "ValidationThresholds",
 ]
 
@@ -35,6 +37,62 @@ class FileMetadataRequired(TypedDict):
 
     # No fields are strictly required - the NGB format allows for sparse metadata
     # All fields are technically optional based on file contents
+
+
+class TemperatureFixpoint(TypedDict, total=False):
+    """A single temperature-calibration fixpoint (phase-transition standard).
+
+    Each fixpoint is one row of the Proteus temperature-calibration table:
+    ``actual`` vs ``measured`` with a ``weight``, producing a ``corrected`` value.
+    Standards vary per calibration (e.g. Biphenyl, Benzoeacid, KClO4, In, Sn) -
+    the names and values are read from the file, never hard-coded.
+
+    The relationship between the columns is exact and was verified against every
+    available file (residuals ``< 1e-3``)::
+
+        corrected_c = measured_c + correction(measured_c)
+        correction(T) = 1e-3*B0 + 1e-5*B1*T + 1e-8*B2*T**2
+
+    where ``[B0, B1, B2]`` are ``TemperatureCalibration.coefficients``. The
+    remaining gap ``actual_c - corrected_c`` is the calibration residual.
+
+    Fields:
+        name: Standard name as recorded by Proteus.
+        actual_c: Actual (literature) transition temperature in °C.
+        measured_c: Raw measured transition temperature in °C (before correction).
+        weight: Regression weight for this point (1.0 in all observed files).
+        corrected_c: Measured value with the calibration polynomial applied (°C).
+    """
+
+    name: str
+    actual_c: float
+    measured_c: float
+    weight: float
+    corrected_c: float
+
+
+class TemperatureCalibration(TypedDict, total=False):
+    """Temperature-calibration block extracted for traceability/QA only.
+
+    IMPORTANT: The ``sample_temperature`` channel stored in NGB files is already
+    temperature-corrected by Proteus. These coefficients must NOT be applied to it
+    (doing so would double-correct). They are captured for provenance only.
+
+    The correction polynomial is the active one Proteus used to produce the
+    ``corrected_c`` column of each fixpoint (verified by round-trip); it is simply
+    not re-applied to the already-corrected sample channel.
+
+    Fields:
+        coefficients: Polynomial coefficients [B0, B1, B2]. The Proteus correction
+            (NOT re-applied to the data by pyngb) is
+            ``correction[°C] = 1e-3*B0 + 1e-5*B1*T_exp + 1e-8*B2*T_exp**2``.
+        fixpoints: The phase-transition standards used for the calibration.
+        record_path: Path to the external temperature-calibration record (.ngb-ts3).
+    """
+
+    coefficients: list[float]
+    fixpoints: list[TemperatureFixpoint]
+    record_path: str
 
 
 class FileMetadata(TypedDict, total=False):
@@ -73,6 +131,9 @@ class FileMetadata(TypedDict, total=False):
     licensed_to: str
     temperature_program: dict[str, dict[str, Any]]
     calibration_constants: dict[str, float]
+    # Temperature calibration (traceability/QA only - never applied to the data)
+    temperature_calibration: TemperatureCalibration
+    sensitivity_record_path: str
     file_hash: dict[str, str]
     # MFC (Mass Flow Controller) metadata
     purge_1_mfc_gas: str
@@ -307,6 +368,17 @@ class PatternConfig:
             "p5": b"\xc3\x04",
         }
     )
+    # Temperature-calibration fixpoint scalar field ids (within 30 75 .. 34 75 tables).
+    # Columns of the Proteus calibration table: actual / measured / weight / corrected.
+    temperature_cal_patterns: dict[str, bytes] = field(
+        default_factory=lambda: {
+            "name": b"\x43\x04",
+            "actual_c": b"\x44\x04",
+            "measured_c": b"\x45\x04",
+            "weight": b"\x46\x04",
+            "corrected_c": b"\x47\x04",
+        }
+    )
     column_map: dict[str, str] = field(
         default_factory=lambda: {
             "8d": "time",
@@ -357,6 +429,25 @@ MFC_FIELD_NAMES = ["Purge 1", "Purge 2", "Protective"]
 APP_LICENSE_CATEGORY = b"\x00\x03"
 APP_LICENSE_FIELD = b"\x18\xfc"
 STRING_DATA_TYPE = b"\x1f"
+
+# Temperature-calibration extraction constants
+# Coefficients live in an f7 01 table as a float32 data array anchored on field be 04:
+#   be 04 | 00 00 01 00 00 00 | 0c 00 | 17 fc ff ff | 10 | a0 01 | <count u32 LE> | <data>
+TEMP_CAL_COEFF_CATEGORY = b"\xf7\x01"
+TEMP_CAL_COEFF_SIGNATURE = (
+    b"\xbe\x04\x00\x00\x01\x00\x00\x00\x0c\x00\x17\xfc\xff\xff\x10\xa0\x01"
+)
+# Fixpoint tables are categorised 30 75 .. 34 75 (one per standard, ascending temp)
+TEMP_CAL_FIXPOINT_CATEGORIES = (
+    b"\x30\x75",
+    b"\x31\x75",
+    b"\x32\x75",
+    b"\x33\x75",
+    b"\x34\x75",
+)
+# External calibration record path suffixes (UTF-16LE in the f5 01 tables)
+TEMP_CAL_RECORD_SUFFIX = ".ngb-ts3"  # temperature calibration record
+SENSITIVITY_RECORD_SUFFIX = ".ngb-es3"  # DSC sensitivity calibration record
 
 
 @dataclass(frozen=True, slots=True)

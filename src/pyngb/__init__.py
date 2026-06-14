@@ -44,6 +44,8 @@ from .constants import (
     PatternConfig,
     BaseColumnMetadata,
     BaselinableColumnMetadata,
+    TemperatureCalibration,
+    TemperatureFixpoint,
 )
 from .core.parser import NGBParser
 from .exceptions import (
@@ -95,6 +97,8 @@ __all__ = [
     "PatternConfig",
     "PyNGBConfig",
     "QualityChecker",
+    "TemperatureCalibration",
+    "TemperatureFixpoint",
     "ValidationConfig",
     "ValidationResult",
     "__author__",
