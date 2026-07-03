@@ -190,30 +190,17 @@ class TestNGBDataset:
         assert dataset.files == []
         assert len(dataset) == 0
 
-    def test_ngb_dataset_add_file(self) -> None:
-        """Test adding files to dataset."""
-        dataset = NGBDataset([])
-
-        # NGBDataset doesn't have add_file method, use from_directory instead
+    def test_ngb_dataset_from_directory(self) -> None:
+        """from_directory must pick up every .ngb-ss3 fixture, and only those."""
         test_dir = Path(__file__).parent / "test_files"
-        if test_dir.exists():
-            dataset = NGBDataset.from_directory(str(test_dir))
-            assert len(dataset) > 0
-        else:
-            # Create a minimal test
-            dataset = NGBDataset([Path("test1.ngb")])
-            assert len(dataset) == 1
+        if not test_dir.exists():
+            pytest.skip("No test files available")
 
-    def test_ngb_dataset_add_result(self) -> None:
-        """Test adding results to dataset."""
-        dataset = NGBDataset([])
+        dataset = NGBDataset.from_directory(str(test_dir))
 
-        # NGBDataset doesn't have add_result method, test basic functionality
-        assert len(dataset) == 0
-
-        # Test with a file
-        dataset = NGBDataset([Path("test.ngb")])
-        assert len(dataset) == 1
+        expected = sorted(test_dir.glob("*.ngb-ss3"))
+        assert sorted(dataset.files) == expected
+        assert len(dataset) == len(expected)
 
     def test_ngb_dataset_get_summary(self) -> None:
         """Test getting dataset summary."""
@@ -448,37 +435,24 @@ class TestBatchProcessingIntegration:
         for result in results:
             assert result["status"] == "success"
 
-    def test_batch_processing_performance(
+    def test_batch_processing_worker_count_equivalence(
         self, sample_ngb_file: Any, tmp_path: Any
     ) -> None:
-        """Test batch processing performance with different worker counts."""
-        # Create test directory with many files
-        test_dir = tmp_path / "performance_test"
+        """Every worker count must process the same files with the same outcome."""
+        test_dir = tmp_path / "worker_count_test"
         test_dir.mkdir()
 
-        # Add many copies of sample file with correct extension
-        for i in range(5):  # Reduce from 20 to avoid hanging
+        for i in range(5):
             shutil.copy2(sample_ngb_file, test_dir / f"perf_file_{i}.ngb-ss3")
 
-        # Test with different worker counts
-        worker_counts = [1, 2, 4]
-        processing_times = []
-
-        for workers in worker_counts:
+        for workers in [1, 2, 4]:
             processor = BatchProcessor(max_workers=workers)
-
-            import time
-
-            start_time = time.time()
             results = processor.process_directory(str(test_dir))
-            end_time = time.time()
 
-            processing_times.append(end_time - start_time)
-            assert len(results) == 5  # We reduced the file count to 5
-
-        # Verify that more workers generally process faster
-        # (though this may not always be true due to overhead)
-        assert len(processing_times) == 3
+            assert len(results) == 5
+            assert all(r["status"] == "success" for r in results), (
+                f"Failures with max_workers={workers}"
+            )
 
     def test_batch_processing_error_recovery(
         self, sample_ngb_file: Any, tmp_path: Any
@@ -699,50 +673,6 @@ class TestBatchProcessingEdgeCases:
         # Verify all files processed
         for result in results:
             assert result["status"] == "success"
-
-    def test_batch_processing_cancellation(
-        self, sample_ngb_file: Any, tmp_path: Any
-    ) -> None:
-        """Test batch processing cancellation behavior."""
-        # Create test directory
-        test_dir = tmp_path / "cancellation_test"
-        test_dir.mkdir()
-
-        # Add many sample files with correct extension
-        for i in range(5):  # Reduce from 20 to avoid hanging
-            shutil.copy2(sample_ngb_file, test_dir / f"cancel_file_{i}.ngb-ss3")
-
-        # Start processing
-        processor = BatchProcessor(max_workers=1)
-
-        # This test verifies that the processor can handle interruption
-        # In a real scenario, you might use threading.Event or similar
-        results = processor.process_directory(str(test_dir))
-
-        assert len(results) == 5
-
-    def test_batch_processing_resource_cleanup(
-        self, sample_ngb_file: Any, tmp_path: Any
-    ) -> None:
-        """Test that batch processing properly cleans up resources."""
-        # Create test directory
-        test_dir = tmp_path / "resource_cleanup"
-        test_dir.mkdir()
-
-        # Add sample files with correct extension
-        for i in range(5):
-            shutil.copy2(sample_ngb_file, test_dir / f"cleanup_file_{i}.ngb-ss3")
-
-        # Process directory
-        processor = BatchProcessor()
-        results = processor.process_directory(str(test_dir))
-
-        assert len(results) == 5
-
-        # Verify processor is in clean state
-        assert processor.verbose is True
-        # max_workers can be None (default) or a number
-        assert processor.max_workers is None or isinstance(processor.max_workers, int)
 
     def test_batch_processing_logging(
         self, sample_ngb_file: Any, tmp_path: Any, caplog: Any

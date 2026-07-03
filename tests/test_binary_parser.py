@@ -149,20 +149,22 @@ class TestBinaryParser:
         assert result[0] == data
 
     def test_split_tables_with_separators(self) -> None:
-        """Test split_tables with table separators."""
-        parser = BinaryParser()
-        separator = parser.markers.TABLE_SEPARATOR
+        """Test split_tables with table separators.
 
-        # Create data with separators (accounting for the -2 offset logic)
-        data = b"table1" + separator + b"table2" + separator + b"table3"
+        A table starts 2 bytes before its separator (TABLE_SPLIT_OFFSET) and
+        runs to 2 bytes before the next separator or to the end of the data;
+        bytes before the first boundary are not part of any table.
+        """
+        parser = BinaryParser()
+        sep = parser.markers.TABLE_SEPARATOR
+
+        data = b"table1" + sep + b"table2" + sep + b"table3"
 
         result = parser.split_tables(data)
-        # The exact number depends on the separator finding logic
-        # Just verify we get multiple tables and they contain expected data
-        assert len(result) >= 1
-        # Verify some of the original data is present
-        combined = b"".join(result)
-        assert b"table1" in combined or b"table2" in combined
+        assert result == [
+            b"e1" + sep + b"tabl",
+            b"e2" + sep + b"table3",
+        ]
 
     def test_split_tables_rejects_excessive_table_count(self) -> None:
         """Pathological inputs with too many separators must be rejected."""

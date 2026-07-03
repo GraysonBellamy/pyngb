@@ -269,10 +269,3 @@ class TestCLIMetadataEmbedding:
             assert result["has_sample"], f"Missing sample name in {result['file']}"
             assert result["data_rows"] > 0, f"No data rows in {result['file']}"
             assert result["data_cols"] > 0, f"No data columns in {result['file']}"
-
-    def test_cli_metadata_embedding_roundtrip(self, tmp_path: Any) -> None:
-        """Roundtrip is covered in integration tests; smoke here."""
-        assert tmp_path is not None
-
-        # Basic smoke test - comprehensive coverage in integration tests
-        assert True

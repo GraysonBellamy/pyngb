@@ -301,24 +301,20 @@ class TestTemperatureProgramExtraction:
             tables = parser.split_tables(stream_data)
             metadata = extractor.extract_metadata(tables)
 
-            # Verify extraction worked as expected
-            if "temperature_program" in metadata:
-                temp_prog = metadata["temperature_program"]
-                assert isinstance(temp_prog, dict), (
-                    "Temperature program should be a dict"
-                )
+            # The fixed bug returned 1 stage instead of 5, so the count must
+            # be pinned exactly: every shipped fixture records a 5-stage
+            # program, and a missing program is itself a failure.
+            assert "temperature_program" in metadata, (
+                f"No temperature program extracted from {test_file.name}"
+            )
+            temp_prog = metadata["temperature_program"]
+            assert isinstance(temp_prog, dict)
 
-                stage_count = len(
-                    [k for k in temp_prog.keys() if k.startswith("stage_")]
-                )
-                assert stage_count > 0, (
-                    f"No temperature program stages in {test_file.name}"
-                )
-
-                # Log successful extraction for regression tracking
-                logger.info(
-                    f"Successfully extracted {stage_count} temperature program stages from {test_file.name}"
-                )
+            stage_count = len([k for k in temp_prog.keys() if k.startswith("stage_")])
+            assert stage_count == 5, (
+                f"Expected 5 temperature program stages in {test_file.name}, "
+                f"got {stage_count}"
+            )
 
 
 class TestTemperatureProgramSpecificFiles:

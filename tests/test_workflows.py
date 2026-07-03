@@ -471,20 +471,6 @@ class TestEndToEndWorkflows:
         # Should handle invalid files gracefully
         assert len(results) >= 1
 
-    def test_performance_monitoring_workflow(self, sample_ngb_file: Any) -> None:
-        """Test performance monitoring workflow."""
-        # Read NGB file
-        result = read_ngb(sample_ngb_file)
-
-        # Monitor performance metrics
-        # Check data dimensions
-        assert result.num_rows >= 0  # Allow empty tables
-        assert result.num_columns >= 0  # Allow empty tables
-
-        # Data should be reasonable size
-        assert result.num_rows < 1000000  # Less than 1M rows
-        assert result.num_columns < 100  # Less than 100 columns
-
     def test_data_validation_workflow_comprehensive(self, sample_ngb_file: Any) -> None:
         """Test comprehensive data validation workflow."""
         # Read NGB file

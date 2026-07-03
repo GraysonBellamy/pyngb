@@ -328,39 +328,6 @@ class TestAdvancedUseCases:
         tables = binary_parser.split_tables(test_data)
         assert isinstance(tables, list)
 
-    def test_memory_management_integration(self) -> None:
-        """Test memory management across parsing operations."""
-        import gc
-
-        # Create a realistic mock file
-        with tempfile.NamedTemporaryFile(suffix=".ngb-ss3", delete=False) as temp_file:
-            with zipfile.ZipFile(temp_file.name, "w") as z:
-                # Minimal but valid content
-                z.writestr("Streams/stream_1.table", b"mock data 1")
-                z.writestr("Streams/stream_2.table", b"mock data 2")
-            temp_file_path = temp_file.name
-
-        try:
-            # Parse multiple times to test memory cleanup
-            tables = []
-            for _ in range(5):
-                try:
-                    table = read_ngb(temp_file_path)
-                    tables.append(table)
-                except Exception:
-                    # Expected for mock data, just testing memory handling
-                    pass
-
-            # Clear references and force garbage collection
-            tables.clear()
-            gc.collect()
-
-            # Test should complete without memory issues
-            assert True
-
-        finally:
-            Path(temp_file_path).unlink(missing_ok=True)
-
     def test_concurrent_processing_safety(self) -> None:
         """Test thread safety and concurrent processing."""
         import concurrent.futures

@@ -16,7 +16,7 @@ from typing import Any
 import polars as pl
 import pytest
 
-from pyngb import BatchProcessor, NGBDataset, read_ngb
+from pyngb import BatchProcessor, read_ngb
 from pyngb.validation import QualityChecker
 
 
@@ -40,34 +40,21 @@ class TestStressConditions:
             pytest.skip("No test files available")
 
         test_file = real_test_files[0]
-        results = []
-        errors = []
 
-        def parse_file() -> Any:
-            try:
-                table = read_ngb(str(test_file))
-                results.append(table.num_rows)
-                return True
-            except Exception as e:
-                errors.append(str(e))
-                return False
+        def parse_file() -> int:
+            return read_ngb(str(test_file)).num_rows
 
-        # Test concurrent access
+        # Concurrent access to the same file must succeed on every thread and
+        # every thread must see the same data.
         with ThreadPoolExecutor(max_workers=5) as executor:
             futures = [executor.submit(parse_file) for _ in range(10)]
-            completed = [future.result() for future in futures]
+            row_counts = [future.result() for future in futures]
 
-        # Should handle concurrent access gracefully
-        successful = sum(completed)
-        assert successful > 0, (
-            f"No successful concurrent accesses. Errors: {errors[:3]}"
+        assert len(row_counts) == 10
+        assert len(set(row_counts)) == 1, (
+            f"Inconsistent results in concurrent access: {set(row_counts)}"
         )
-
-        # Results should be consistent
-        if len(set(results)) == 1:
-            print(f"✓ Concurrent access successful: {successful}/10 accesses")
-        else:
-            print(f"⚠ Inconsistent results in concurrent access: {set(results)}")
+        assert row_counts[0] > 0
 
     @pytest.mark.slow
     def test_memory_stress_repeated_parsing(self, real_test_files: Any) -> None:
@@ -84,20 +71,15 @@ class TestStressConditions:
         process = psutil.Process(os.getpid())
         initial_memory = process.memory_info().rss
 
-        # Parse the same file many times
+        # Parse the same real file many times; every parse must succeed.
         for i in range(20):
-            try:
-                table = read_ngb(str(test_file))
-                # Immediately release reference
-                del table
+            table = read_ngb(str(test_file))
+            assert table.num_rows > 0
+            del table
 
-                # Force garbage collection every 5 iterations
-                if i % 5 == 0:
-                    gc.collect()
-
-            except Exception:
-                # Some parsing failures are expected with mock data
-                pass
+            # Force garbage collection every 5 iterations
+            if i % 5 == 0:
+                gc.collect()
 
         final_memory = process.memory_info().rss
         memory_increase = final_memory - initial_memory
@@ -105,8 +87,6 @@ class TestStressConditions:
         # Memory increase should be reasonable (less than 200MB)
         memory_mb = memory_increase / 1024 / 1024
         assert memory_mb < 200, f"Memory increased by {memory_mb:.1f} MB (too much)"
-
-        print(f"✓ Memory stress test: {memory_mb:.1f} MB increase after 20 parses")
 
     def test_large_batch_processing(self, real_test_files: Any) -> None:
         """Test processing a large number of files."""
@@ -125,16 +105,9 @@ class TestStressConditions:
                 skip_errors=True,
             )
 
-            # Should handle large batches
+            # Every entry is a real fixture, so every one must succeed.
             assert len(results) == len(extended_file_list)
-
-            # Some should succeed (even if mock data fails)
-            statuses = [r["status"] for r in results]
-            unique_statuses = set(statuses)
-
-            print(
-                f"✓ Large batch test: {len(results)} files, statuses: {unique_statuses}"
-            )
+            assert all(r["status"] == "success" for r in results)
 
     def test_rapid_successive_operations(self, real_test_files: Any) -> None:
         """Test rapid successive operations on the same data."""
@@ -143,38 +116,23 @@ class TestStressConditions:
 
         test_file = real_test_files[0]
 
-        operations_completed = 0
+        # Rapid successive operations on a real file must all succeed; the
+        # fixtures parse reliably, so anything less is a regression.
+        from pyngb.core.parser import NGBParser
 
-        # Perform rapid successive operations
-        for i in range(50):
-            try:
-                # Alternate between different operations
-                if i % 3 == 0:
-                    _ = read_ngb(str(test_file))
-                    operations_completed += 1
-                elif i % 3 == 1:
-                    _metadata, _data = read_ngb(str(test_file), return_metadata=True)
-                    operations_completed += 1
-                else:
-                    from pyngb.core.parser import NGBParser
-
-                    parser = NGBParser()
-                    _metadata, _data = parser.parse(str(test_file))
-                    operations_completed += 1
-
-            except Exception:
-                # Some failures expected with rapid operations
-                pass
-
-        # Should complete a reasonable number of operations
-        success_rate = operations_completed / 50
-        assert success_rate > 0.1, (
-            f"Too few operations succeeded: {operations_completed}/50"
-        )
-
-        print(
-            f"✓ Rapid operations test: {operations_completed}/50 operations succeeded"
-        )
+        for i in range(30):
+            if i % 3 == 0:
+                table = read_ngb(str(test_file))
+                assert table.num_rows > 0
+            elif i % 3 == 1:
+                metadata, data = read_ngb(str(test_file), return_metadata=True)
+                assert metadata
+                assert data.num_rows > 0
+            else:
+                parser = NGBParser()
+                metadata, table = parser.parse(str(test_file))
+                assert metadata
+                assert table.num_rows > 0
 
 
 class TestEdgeCaseFiles:
@@ -369,49 +327,6 @@ class TestExtremeDataScenarios:
                 f"✓ Edge case batch processing: {failed_count} files failed as expected"
             )
 
-    def test_resource_exhaustion_scenarios(self) -> None:
-        """Test scenarios that might exhaust system resources."""
-
-        # Test 1: Many simultaneous parser instances
-        parsers = []
-        for _ in range(100):
-            from pyngb.core.parser import NGBParser
-
-            parser = NGBParser()
-            parsers.append(parser)
-
-        # Should be able to create many parsers
-        assert len(parsers) == 100
-
-        # Clear references
-        parsers.clear()
-        gc.collect()
-
-        # Test 2: Large dataset object
-        fake_files = [Path(f"fake_file_{i}.ngb-ss3") for i in range(1000)]
-        dataset = NGBDataset(fake_files)
-
-        # Should handle large file lists
-        assert len(dataset) == 1000
-
-        # Test 3: Many validation objects
-        sample_data = pl.DataFrame(
-            {
-                "time": [1, 2, 3],
-                "sample_temperature": [25, 50, 75],
-            }
-        )
-
-        checkers = []
-        for _ in range(50):
-            checker = QualityChecker(sample_data)
-            checkers.append(checker)
-
-        # Should be able to create many checkers
-        assert len(checkers) == 50
-
-        print("✓ Resource exhaustion scenarios completed")
-
 
 @pytest.mark.integration
 class TestConcurrencyEdgeCases:
@@ -457,12 +372,9 @@ class TestConcurrencyEdgeCases:
         for thread in threads:
             thread.join()
 
-        # Should handle concurrent batch processing
-        assert len(results) > 0, f"No successful batch processes. Errors: {errors[:3]}"
-
-        print(
-            f"✓ Thread safety test: {len(results)}/5 concurrent batch processes succeeded"
-        )
+        # Every concurrent batch run must succeed and process its one file.
+        assert len(results) == 5, f"Batch processes failed. Errors: {errors[:3]}"
+        assert all(count == 1 for count in results)
 
     def test_parser_state_isolation(self, real_test_files: Any) -> None:
         """Test that parser instances don't share state inappropriately."""
@@ -522,18 +434,11 @@ class TestConcurrencyEdgeCases:
             futures = [executor.submit(validate_data) for _ in range(10)]
             completed = [future.result() for future in futures]
 
-        # Should handle concurrent validation
-        successful = sum(completed)
-        assert successful > 0, "No successful concurrent validations"
-
-        # Results should be consistent
-        if validation_results:
-            unique_results = set(validation_results)
-            assert len(unique_results) == 1, (
-                f"Inconsistent validation results: {unique_results}"
-            )
-
-        print(f"✓ Concurrent validation test: {successful}/10 validations succeeded")
+        # Every concurrent validation must succeed and agree.
+        assert sum(completed) == 10, "Concurrent validations failed"
+        assert len(set(validation_results)) == 1, (
+            f"Inconsistent validation results: {set(validation_results)}"
+        )
 
 
 class TestBoundaryConditions:
@@ -576,14 +481,12 @@ class TestBoundaryConditions:
             }
         )
 
-        # Should handle single point data
+        # A single-row frame must be reported as an issue, not crash the
+        # checker (AUDIT NUM-03): one point cannot show heating or cooling.
         checker = QualityChecker(single_point)
-        result = checker.quick_check()
+        issues = checker.quick_check()
 
-        # May or may not be valid depending on validation rules
-        assert result is not None
-
-        print("✓ Single point data handling verified")
+        assert issues == ["Temperature is constant (no heating/cooling)"]
 
     def test_extreme_file_sizes(self) -> None:
         """Test handling of extremely small and large file scenarios."""

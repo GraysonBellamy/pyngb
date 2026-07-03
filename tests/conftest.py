@@ -140,10 +140,11 @@ def cleanup_generated_files() -> Iterator[None]:
 
 @pytest.fixture()
 def real_test_files() -> list[Path]:
-    """Provide real test files if available, otherwise skip."""
+    """Provide real test files, skipping the test when none are available."""
     test_files_dir = Path(__file__).parent / "test_files"
-    if not test_files_dir.exists():
-        return []
-
-    real_files = list(test_files_dir.glob("*.ngb-ss3"))
+    real_files = (
+        list(test_files_dir.glob("*.ngb-ss3")) if test_files_dir.exists() else []
+    )
+    if not real_files:
+        pytest.skip("No real test files available")
     return real_files
