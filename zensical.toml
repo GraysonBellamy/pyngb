@@ -1,0 +1,136 @@
+[project]
+site_name = "pyngb - NETZSCH STA File Parser"
+site_description = "Comprehensive Python library for parsing and analyzing NETZSCH STA NGB files"
+site_author = "Grayson Bellamy"
+site_url = "https://graysonbellamy.github.io/pyngb/"
+
+repo_name = "GraysonBellamy/pyngb"
+repo_url = "https://github.com/GraysonBellamy/pyngb"
+edit_uri = "edit/main/docs/"
+
+nav = [
+  { "Home" = "index.md" },
+  { "Getting Started" = "getting-started.md" },
+  { "User Guide" = "user-guide.md" },
+  { "API Reference" = "api-reference.md" },
+  { "Developer Guide" = [
+    { "Architecture" = "architecture.md" },
+    { "Binary Format" = "binary-format.md" },
+  ] },
+  { "Troubleshooting" = "troubleshooting.md" },
+  { "Contributing" = "contributing.md" },
+]
+
+extra_css = ["stylesheets/extra.css"]
+extra_javascript = ["javascripts/extra.js"]
+
+copyright = """
+Copyright &copy; 2024-2025 Grayson Bellamy -
+<a href="https://github.com/GraysonBellamy/pyngb/blob/main/LICENSE">MIT License</a>
+<br>
+<small>Not affiliated with NETZSCH-Ger&auml;tebau GmbH</small>
+"""
+
+[project.theme]
+custom_dir = "overrides"
+logo = "https://img.icons8.com/color/48/000000/test-tube.png"
+favicon = "https://img.icons8.com/color/32/000000/test-tube.png"
+features = [
+  "navigation.tabs",
+  "navigation.tabs.sticky",
+  "navigation.sections",
+  "navigation.expand",
+  "navigation.top",
+  "navigation.tracking",
+  "navigation.instant",
+  "navigation.instant.progress",
+  "search.highlight",
+  "search.share",
+  "search.suggest",
+  "content.code.copy",
+  "content.code.annotate",
+  "content.tabs.link",
+  "content.action.edit",
+  "toc.follow",
+  "toc.integrate",
+]
+language = "en"
+
+[project.theme.icon]
+repo = "fontawesome/brands/github"
+edit = "material/pencil"
+view = "material/eye"
+
+[[project.theme.palette]]
+scheme = "default"
+primary = "green"
+accent = "blue"
+toggle.icon = "material/brightness-7"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+scheme = "slate"
+primary = "green"
+accent = "blue"
+toggle.icon = "material/brightness-4"
+toggle.name = "Switch to light mode"
+
+[project.extra]
+generator = false
+
+[project.extra.analytics]
+provider = "google"
+property = "G-WLVK2ZW663"
+
+[project.extra.analytics.feedback]
+title = "Was this page helpful?"
+
+[[project.extra.analytics.feedback.ratings]]
+icon = "material/emoticon-happy-outline"
+name = "This page was helpful"
+data = 1
+note = "Thanks for your feedback!"
+
+[[project.extra.analytics.feedback.ratings]]
+icon = "material/emoticon-sad-outline"
+name = "This page could be improved"
+data = 0
+note = """
+Thanks for your feedback! Help us improve this page by
+<a href="https://github.com/GraysonBellamy/pyngb/issues/new/?title=[Docs]+{title}" target="_blank" rel="noopener">opening an issue</a>.
+"""
+
+[[project.extra.social]]
+icon = "fontawesome/brands/github"
+link = "https://github.com/GraysonBellamy/pyngb"
+
+[[project.extra.social]]
+icon = "fontawesome/brands/python"
+link = "https://pypi.org/project/pyngb/"
+
+[project.markdown_extensions.admonition]
+[project.markdown_extensions.attr_list]
+[project.markdown_extensions.md_in_html]
+[project.markdown_extensions.tables]
+[project.markdown_extensions.footnotes]
+[project.markdown_extensions.pymdownx.details]
+[project.markdown_extensions.pymdownx.superfences]
+custom_fences = [
+  { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" },
+]
+[project.markdown_extensions.pymdownx.highlight]
+anchor_linenums = true
+line_spans = "__span"
+pygments_lang_class = true
+[project.markdown_extensions.pymdownx.inlinehilite]
+[project.markdown_extensions.pymdownx.snippets]
+check_paths = true
+[project.markdown_extensions.pymdownx.tabbed]
+alternate_style = true
+[project.markdown_extensions.pymdownx.tasklist]
+custom_checkbox = true
+[project.markdown_extensions.pymdownx.critic]
+[project.markdown_extensions.pymdownx.caret]
+[project.markdown_extensions.pymdownx.keys]
+[project.markdown_extensions.pymdownx.mark]
+[project.markdown_extensions.pymdownx.tilde]
