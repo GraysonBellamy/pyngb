@@ -5,13 +5,7 @@ This module provides a clean, simple interface for DTG calculations with smart d
 """
 
 import numpy as np
-
-try:
-    from scipy.signal import savgol_filter
-
-    HAS_SCIPY = True
-except ImportError:
-    HAS_SCIPY = False
+from scipy.signal import savgol_filter
 
 __all__ = [
     "dtg",
@@ -41,6 +35,39 @@ def _get_smoothing_params(smooth: str) -> tuple[int, int]:
     raise ValueError(f"Unknown smooth level: {smooth}")
 
 
+def _validate_input(time: np.ndarray, mass: np.ndarray) -> None:
+    """Reject input a derivative cannot be honestly computed from.
+
+    A zero time step makes np.gradient divide by zero and a NaN anywhere
+    poisons every sample inside the smoothing window, so degenerate input
+    must fail loudly here rather than smear silently through the output.
+    """
+    if len(time) != len(mass):
+        raise ValueError("time and mass arrays must have the same length")
+
+    if len(time) < 3:
+        raise ValueError("Need at least 3 data points for DTG calculation")
+
+    if not np.isfinite(time).all():
+        raise ValueError(
+            f"time contains {int((~np.isfinite(time)).sum())} non-finite values"
+        )
+
+    if not np.isfinite(mass).all():
+        raise ValueError(
+            f"mass contains {int((~np.isfinite(mass)).sum())} non-finite values"
+        )
+
+    steps = np.diff(time)
+    if (steps <= 0).any():
+        raise ValueError(
+            "time must be strictly increasing; found "
+            f"{int((steps == 0).sum())} duplicate and "
+            f"{int((steps < 0).sum())} backward timestamps. "
+            "Deduplicate or sort the data before computing DTG."
+        )
+
+
 def dtg(
     time: np.ndarray,
     mass: np.ndarray,
@@ -56,13 +83,13 @@ def dtg(
     Parameters
     ----------
     time : array_like
-        Time values in seconds
+        Time values in seconds. Must be strictly increasing and finite.
     mass : array_like
-        Mass values in mg
+        Mass values in mg. Must be finite.
     method : {"savgol", "gradient"}, default "savgol"
         Calculation method:
-        - "savgol": Savitzky-Golay filter (recommended, requires scipy)
-        - "gradient": NumPy gradient (fast, always available)
+        - "savgol": smooth the mass curve, then differentiate (recommended)
+        - "gradient": differentiate the raw curve, then smooth the derivative
     smooth : {"strict", "medium", "loose"}, default "medium"
         Smoothing level:
         - "strict": Preserve all features (window=7, poly=1)
@@ -77,9 +104,8 @@ def dtg(
     Raises
     ------
     ValueError
-        If arrays have different lengths or insufficient data points
-    ImportError
-        If scipy is required but not available
+        If arrays have different lengths, contain non-finite values, have
+        insufficient data points, or time is not strictly increasing
 
     Examples
     --------
@@ -100,21 +126,13 @@ def dtg(
     time = np.asarray(time)
     mass = np.asarray(mass)
 
-    # Validation
-    if len(time) != len(mass):
-        raise ValueError("time and mass arrays must have the same length")
-
-    if len(time) < 3:
-        raise ValueError("Need at least 3 data points for DTG calculation")
+    _validate_input(time, mass)
 
     if method not in ["savgol", "gradient"]:
         raise ValueError(f"Unknown method: {method}")
 
     if smooth not in ["strict", "medium", "loose"]:
         raise ValueError(f"Unknown smooth level: {smooth}")
-
-    if method == "savgol" and not HAS_SCIPY:
-        raise ImportError("Scipy required for Savitzky-Golay method")
 
     # Get smoothing parameters
     window, polyorder = _get_smoothing_params(smooth)
@@ -129,18 +147,13 @@ def dtg(
     polyorder = min(polyorder, window - 1)
 
     if method == "savgol":
-        # Savitzky-Golay method
+        # Smooth the mass curve, then differentiate (in mg/min)
         mass_smooth = savgol_filter(mass, window, polyorder)
-        # Calculate derivative and convert to mg/min
         dtg_values = -np.gradient(mass_smooth, time) * 60
     else:
-        # Gradient method with post-smoothing
+        # Differentiate the raw curve, then smooth the derivative
         dtg_raw = -np.gradient(mass, time) * 60
-        if HAS_SCIPY and len(dtg_raw) >= window:
-            dtg_values = savgol_filter(dtg_raw, window, polyorder)
-        else:
-            # Fallback smoothing without scipy
-            dtg_values = dtg_raw
+        dtg_values = savgol_filter(dtg_raw, window, polyorder)
 
     return dtg_values  # type: ignore[no-any-return]
 
@@ -161,9 +174,9 @@ def dtg_custom(
     Parameters
     ----------
     time : array_like
-        Time values in seconds
+        Time values in seconds. Must be strictly increasing and finite.
     mass : array_like
-        Mass values in mg
+        Mass values in mg. Must be finite.
     method : {"savgol", "gradient"}, default "savgol"
         Calculation method
     window : int, default 25
@@ -179,9 +192,8 @@ def dtg_custom(
     Raises
     ------
     ValueError
-        If parameters are invalid
-    ImportError
-        If scipy is required but not available
+        If parameters are invalid or the input fails the same validation
+        as `dtg()`
 
     Examples
     --------
@@ -197,12 +209,7 @@ def dtg_custom(
     time = np.asarray(time)
     mass = np.asarray(mass)
 
-    # Validation
-    if len(time) != len(mass):
-        raise ValueError("time and mass arrays must have the same length")
-
-    if len(time) < 3:
-        raise ValueError("Need at least 3 data points for DTG calculation")
+    _validate_input(time, mass)
 
     if method not in ["savgol", "gradient"]:
         raise ValueError(f"Unknown method: {method}")
@@ -218,21 +225,13 @@ def dtg_custom(
     if polyorder >= window:
         raise ValueError(f"polyorder ({polyorder}) must be less than window ({window})")
 
-    if method == "savgol" and not HAS_SCIPY:
-        raise ImportError("Scipy required for Savitzky-Golay method")
-
     if method == "savgol":
-        # Savitzky-Golay method
+        # Smooth the mass curve, then differentiate (in mg/min)
         mass_smooth = savgol_filter(mass, window, polyorder)
-        # Calculate derivative and convert to mg/min
         dtg_values = -np.gradient(mass_smooth, time) * 60
     else:
-        # Gradient method with post-smoothing
+        # Differentiate the raw curve, then smooth the derivative
         dtg_raw = -np.gradient(mass, time) * 60
-        if HAS_SCIPY and len(dtg_raw) >= window:
-            dtg_values = savgol_filter(dtg_raw, window, polyorder)
-        else:
-            # Fallback smoothing without scipy
-            dtg_values = dtg_raw
+        dtg_values = savgol_filter(dtg_raw, window, polyorder)
 
     return dtg_values  # type: ignore[no-any-return]

@@ -229,6 +229,44 @@ class TestEdgeCases:
         assert not np.any(np.isnan(result))
 
 
+class TestDegenerateInput:
+    """Degenerate input must fail loudly (NUM-05): a duplicate timestamp used
+    to produce NaN/inf that savgol smeared across the smoothing window."""
+
+    def test_duplicate_timestamps_rejected(self) -> None:
+        time = np.array([0.0, 1.0, 1.0, 2.0, 3.0, 4.0, 5.0])
+        mass = 10 - 0.1 * time
+
+        with pytest.raises(ValueError, match="1 duplicate"):
+            dtg(time, mass)
+        with pytest.raises(ValueError, match="strictly increasing"):
+            dtg_custom(time, mass, window=3)
+
+    def test_backward_time_rejected(self) -> None:
+        time = np.array([0.0, 1.0, 2.0, 1.5, 3.0])
+        mass = np.full_like(time, 10.0)
+
+        with pytest.raises(ValueError, match="backward"):
+            dtg(time, mass)
+
+    def test_non_finite_mass_rejected(self) -> None:
+        time = np.arange(10.0)
+        mass = np.full_like(time, 10.0)
+        mass[3] = np.nan
+        mass[7] = np.inf
+
+        with pytest.raises(ValueError, match="mass contains 2 non-finite"):
+            dtg(time, mass)
+
+    def test_non_finite_time_rejected(self) -> None:
+        time = np.arange(10.0)
+        time[5] = np.nan
+        mass = np.full_like(time, 10.0)
+
+        with pytest.raises(ValueError, match="time contains 1 non-finite"):
+            dtg(time, mass)
+
+
 class TestIntegration:
     """Test integration with the analysis API."""
 
@@ -259,12 +297,6 @@ class TestIntegration:
         result = dtg(time_list, mass_list)  # type: ignore[arg-type]
         assert isinstance(result, np.ndarray)
         assert len(result) == len(time_list)
-
-    @pytest.mark.skip(reason="Requires scipy")
-    def test_without_scipy(self) -> None:
-        """Test behavior when scipy is not available."""
-        # This would need to be tested in an environment without scipy
-        # For now, just ensure the import error is properly handled
 
 
 if __name__ == "__main__":
