@@ -1,20 +1,25 @@
 """Quality checker for STA data - orchestrates validators."""
 
 import json
+import logging
 
 import polars as pl
 import pyarrow as pa
 
 from ..constants import FileMetadata
-from .base import ValidationResult
+from .base import ValidationResult, Validator
 from .consistency import ConsistencyValidator
 from .dsc import DSCValidator
+from .helpers import finite_values
 from .mass import MassValidator
 from .metadata_validator import MetadataValidator
 from .statistical import StatisticalValidator
 from .structure import StructureValidator
 from .temperature import TemperatureValidator
 from .time import TimeValidator
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 
 class QualityChecker:
@@ -68,9 +73,17 @@ class QualityChecker:
                 try:
                     if data.schema.metadata:
                         metadata = self._extract_metadata_from_table(data)
-                except (AttributeError, KeyError):
-                    # Schema has no metadata or metadata is not accessible
-                    pass
+                except (
+                    AttributeError,
+                    KeyError,
+                    UnicodeDecodeError,
+                    json.JSONDecodeError,
+                ):
+                    # Schema has no metadata, or the embedded metadata is
+                    # unreadable; validate the data without it.
+                    logger.warning(
+                        "Embedded file_metadata is unreadable; validating without it"
+                    )
         else:
             self.df = data
 
@@ -93,25 +106,29 @@ class QualityChecker:
         """
         self.result = ValidationResult()
 
-        # Create validators
-        structure_validator = StructureValidator(self.df)
-        temperature_validator = TemperatureValidator(self.df)
-        time_validator = TimeValidator(self.df)
-        mass_validator = MassValidator(self.df, self.metadata)
-        dsc_validator = DSCValidator(self.df)
-        consistency_validator = ConsistencyValidator(self.df)
-        metadata_validator = MetadataValidator(self.metadata)
-        statistical_validator = StatisticalValidator(self.df)
+        StructureValidator(self.df).validate(self.result)
+        if self.df.height == 0:
+            # Nothing further can be meaningfully checked on an empty dataset.
+            return self.result
 
-        # Run validators
-        structure_validator.validate(self.result)
-        temperature_validator.validate(self.result)
-        time_validator.validate(self.result)
-        mass_validator.validate(self.result)
-        dsc_validator.validate(self.result)
-        consistency_validator.validate(self.result)
-        metadata_validator.validate(self.result)
-        statistical_validator.validate(self.result)
+        validators: list[Validator] = [
+            TemperatureValidator(self.df),
+            TimeValidator(self.df),
+            MassValidator(self.df, self.metadata),
+            DSCValidator(self.df),
+            ConsistencyValidator(self.df),
+            MetadataValidator(self.metadata),
+            StatisticalValidator(self.df),
+        ]
+        for validator in validators:
+            try:
+                validator.validate(self.result)
+            except Exception as e:
+                # A crashing check must become a finding, not abort the run:
+                # degenerate data is exactly what validation exists to report.
+                name = type(validator).__name__
+                logger.exception(f"{name} crashed")
+                self.result.add_error(f"{name} crashed: {e}")
 
         return self.result
 
@@ -146,19 +163,18 @@ class QualityChecker:
 
         # Quick temperature check
         if "sample_temperature" in self.df.columns:
-            temp_stats = self.df.select("sample_temperature").describe()
-            temp_min = temp_stats.filter(pl.col("statistic") == "min")[
-                "sample_temperature"
-            ][0]
-            temp_max = temp_stats.filter(pl.col("statistic") == "max")[
-                "sample_temperature"
-            ][0]
+            temp = finite_values(self.df["sample_temperature"]).to_numpy()
 
-            if temp_min == temp_max:
-                issues.append("Temperature is constant (no heating/cooling)")
-            elif temp_min < -50 or temp_max > 2000:
-                issues.append(
-                    f"Unusual temperature range: {temp_min:.1f} to {temp_max:.1f}°C"
-                )
+            if len(temp) == 0:
+                issues.append("Temperature has no valid (non-null, finite) values")
+            else:
+                temp_min = float(temp.min())
+                temp_max = float(temp.max())
+                if temp_min == temp_max:
+                    issues.append("Temperature is constant (no heating/cooling)")
+                elif temp_min < -50 or temp_max > 2000:
+                    issues.append(
+                        f"Unusual temperature range: {temp_min:.1f} to {temp_max:.1f}°C"
+                    )
 
         return issues

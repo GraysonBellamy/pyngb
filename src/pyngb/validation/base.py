@@ -1,9 +1,16 @@
 """Base validation classes and results."""
 
 import logging
+from typing import Protocol
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
+
+
+class Validator(Protocol):
+    """Structural type shared by the individual validators."""
+
+    def validate(self, result: "ValidationResult") -> None: ...
 
 
 class ValidationResult:

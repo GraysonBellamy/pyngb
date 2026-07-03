@@ -4,6 +4,20 @@ import polars as pl
 import pyarrow as pa
 
 
+def finite_values(series: pl.Series) -> pl.Series:
+    """Return the non-null, finite values of a column.
+
+    Validators compute statistics on the result so that nulls and NaNs in a
+    measurement column degrade to explicit findings instead of poisoning every
+    downstream comparison (None/NaN propagates through min/std/percentile and
+    silently disables or crashes the checks).
+    """
+    s = series.drop_nulls()
+    if s.dtype.is_float():
+        s = s.filter(s.is_finite())
+    return s
+
+
 def _ensure_polars_dataframe(data: pa.Table | pl.DataFrame) -> pl.DataFrame:
     """Helper function to efficiently convert data to Polars DataFrame.
 

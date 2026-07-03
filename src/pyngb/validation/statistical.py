@@ -4,6 +4,7 @@ import numpy as np
 import polars as pl
 
 from .base import ValidationResult
+from .helpers import finite_values
 
 
 class StatisticalValidator:
@@ -34,12 +35,13 @@ class StatisticalValidator:
         ]
 
         for col in numeric_columns:
-            data = self.df.select(col).to_numpy().flatten()
+            # Nulls/NaNs would turn the percentiles into NaN and silently
+            # disable outlier detection for the whole column.
+            data = finite_values(self.df[col]).to_numpy()
 
             # Check for outliers using IQR method
             if len(data) > 10:  # Only check if enough data points
-                q1 = np.percentile(data, 25)
-                q3 = np.percentile(data, 75)
+                q1, q3 = np.percentile(data, [25, 75])
                 iqr = q3 - q1
 
                 if iqr > 0:
