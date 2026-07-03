@@ -44,6 +44,12 @@ class ValidationResult:
         """Mark a check as passed."""
         self.passed_checks.append(check_name)
 
+    def __repr__(self) -> str:
+        return (
+            f"<ValidationResult: {len(self.errors)} errors, "
+            f"{len(self.warnings)} warnings, {len(self.passed_checks)} passed>"
+        )
+
     @property
     def is_valid(self) -> bool:
         """Return True if no errors were found."""
@@ -71,7 +77,7 @@ class ValidationResult:
 
         # Summary
         summary = self.summary()
-        status = "✅ VALID" if summary["is_valid"] else "❌ INVALID"
+        status = "VALID" if summary["is_valid"] else "INVALID"
         lines.append(f"Overall Status: {status}")
         lines.append(f"Checks Passed: {summary['checks_passed']}")
         lines.append(f"Errors: {summary['error_count']}")
@@ -79,23 +85,23 @@ class ValidationResult:
 
         # Errors
         if self.errors:
-            lines.append("🔴 ERRORS:")
+            lines.append("ERRORS:")
             for error in self.errors:
-                lines.append(f"  • {error}")
+                lines.append(f"  - {error}")
             lines.append("")
 
         # Warnings
         if self.warnings:
-            lines.append("🟡 WARNINGS:")
+            lines.append("WARNINGS:")
             for warning in self.warnings:
-                lines.append(f"  • {warning}")
+                lines.append(f"  - {warning}")
             lines.append("")
 
         # Info
         if self.info:
             lines.append("INFO:")
             for info in self.info:
-                lines.append(f"  • {info}")
+                lines.append(f"  - {info}")
             lines.append("")
 
         return "\n".join(lines)

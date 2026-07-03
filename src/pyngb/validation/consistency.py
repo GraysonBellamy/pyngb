@@ -23,13 +23,7 @@ class ConsistencyValidator:
         Args:
             result: ValidationResult to store findings
         """
-        self._check_column_length(result)
         self._check_time_temperature_correlation(result)
-
-    def _check_column_length(self, result: ValidationResult) -> None:
-        """Check if all columns have the same length."""
-        # This is guaranteed by DataFrame structure
-        result.add_pass("All columns have consistent length")
 
     def _check_time_temperature_correlation(self, result: ValidationResult) -> None:
         """Check if temperature changes correlate with time."""

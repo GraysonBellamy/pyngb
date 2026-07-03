@@ -99,7 +99,7 @@ class TestValidationResult:
         result.add_pass("Test check")
 
         report = result.report()
-        assert "❌ INVALID" in report
+        assert "INVALID" in report
         assert "Test error" in report
         assert "Test warning" in report
         assert "Test info" in report

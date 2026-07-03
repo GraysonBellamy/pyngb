@@ -35,18 +35,18 @@ class QualityChecker:
     Examples:
     >>> from pyngb import read_ngb
     >>> from pyngb.validation import QualityChecker
-        >>>
-        >>> table = read_ngb("sample.ngb-ss3")
-        >>> checker = QualityChecker(table)
-        >>> result = checker.full_validation()
-        >>>
-        >>> if not result.is_valid:
-        ...     print("Data validation failed!")
-        ...     print(result.report())
-        >>>
-        >>> # Quick validation
-        >>> issues = checker.quick_check()
-        >>> print(f"Found {len(issues)} issues")
+    >>>
+    >>> table = read_ngb("sample.ngb-ss3")
+    >>> checker = QualityChecker(table)
+    >>> result = checker.full_validation()
+    >>>
+    >>> if not result.is_valid:
+    ...     print("Data validation failed!")
+    ...     print(result.report())
+    >>>
+    >>> # Quick validation
+    >>> issues = checker.quick_check()
+    >>> print(f"Found {len(issues)} issues")
     """
 
     df: pl.DataFrame
