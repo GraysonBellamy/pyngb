@@ -3,6 +3,7 @@
 import argparse
 import logging
 import sys
+import zipfile
 from pathlib import Path
 
 import polars as pl
@@ -22,12 +23,12 @@ def create_parser() -> argparse.ArgumentParser:
         Configured ArgumentParser instance
     """
     parser = argparse.ArgumentParser(description="Parse NETZSCH STA NGB files")
-    parser.add_argument("input", help="Input NGB file path")
+    parser.add_argument("input", nargs="+", help="Input NGB file path(s)")
     parser.add_argument("-o", "--output", help="Output directory", default=".")
     parser.add_argument(
         "-f",
         "--format",
-        choices=["parquet", "csv", "all"],
+        choices=["parquet", "csv", "both"],
         default="parquet",
         help="Output format",
     )
@@ -153,14 +154,14 @@ def write_output_files(
         data: PyArrow Table to write
         output_path: Directory to write files to
         base_name: Base filename (without extension)
-        output_format: Output format ("parquet", "csv", or "all")
+        output_format: Output format ("parquet", "csv", or "both")
     """
-    if output_format in ("parquet", "all"):
+    if output_format in ("parquet", "both"):
         parquet_file = output_path / f"{base_name}.parquet"
         pq.write_table(data, parquet_file, compression="snappy")
         logger.debug(f"Wrote Parquet file: {parquet_file}")
 
-    if output_format in ("csv", "all"):
+    if output_format in ("csv", "both"):
         # Optimize: Only convert to Polars when needed for CSV output
         df = pl.from_arrow(data)
         # Ensure we have a DataFrame for CSV writing
@@ -170,6 +171,46 @@ def write_output_files(
             logger.debug(f"Wrote CSV file: {csv_file}")
 
 
+def process_file(
+    input_file: str,
+    output_path: Path,
+    output_format: str,
+    baseline_file: str | None,
+    dynamic_axis: str,
+) -> None:
+    """Parse one NGB file and write its output file(s).
+
+    Args:
+        input_file: Path to input NGB file
+        output_path: Validated output directory
+        output_format: Output format ("parquet", "csv", or "both")
+        baseline_file: Optional path to baseline NGB file
+        dynamic_axis: Axis for dynamic segment alignment
+
+    Raises:
+        Anything read_ngb or the filesystem raises; the caller decides
+        whether one failure aborts the run.
+    """
+    input_path = Path(input_file)
+    validate_input_file(input_path)
+
+    data = load_data(input_file, baseline_file, dynamic_axis)
+
+    base_name = input_path.stem
+    # Add suffix to indicate baseline subtraction was performed
+    if baseline_file:
+        base_name += "_baseline_subtracted"
+
+    write_output_files(data, output_path, base_name, output_format)
+
+    if baseline_file:
+        logger.info(
+            f"Successfully parsed {input_file} with baseline subtraction from {baseline_file}"
+        )
+    else:
+        logger.info(f"Successfully parsed {input_file}")
+
+
 def main(argv: list[str] | None = None) -> int:
     """Command-line interface for the NGB parser.
 
@@ -177,7 +218,7 @@ def main(argv: list[str] | None = None) -> int:
     them to various output formats including Parquet and CSV.
 
     Usage:
-        python -m pyngb input.ngb-ss3 [options]
+        python -m pyngb input.ngb-ss3 [input2.ngb-ss3 ...] [options]
 
     Examples:
         # Parse to Parquet (default)
@@ -186,14 +227,17 @@ def main(argv: list[str] | None = None) -> int:
         # Parse to CSV with verbose logging
         python -m pyngb sample.ngb-ss3 -f csv -v
 
-        # Parse to both formats in custom directory
-        python -m pyngb sample.ngb-ss3 -f all -o /output/dir
+        # Parse many files to both formats in a custom directory
+        python -m pyngb *.ngb-ss3 -f both -o /output/dir
+
+        # Baseline-subtract every input against the same baseline
+        python -m pyngb *.ngb-ss3 -b baseline.ngb-bs3
 
     Args:
         argv: Command-line arguments (defaults to sys.argv)
 
     Returns:
-        Exit code (0 for success, non-zero for error)
+        Exit code (0 when every file succeeded, 1 otherwise)
     """
     parser = create_parser()
     args = parser.parse_args(argv)
@@ -201,54 +245,40 @@ def main(argv: list[str] | None = None) -> int:
     # Configure logging
     logging.basicConfig(level=(logging.DEBUG if args.verbose else logging.INFO))
 
+    # Validate shared inputs once; failures here abort the whole run.
     try:
-        # Validate input file
-        input_path = Path(args.input)
-        validate_input_file(input_path)
-
-        # Validate baseline file if provided
         if args.baseline:
-            baseline_path = Path(args.baseline)
-            validate_baseline_file(baseline_path)
-
-        # Load data
-        data = load_data(args.input, args.baseline, args.dynamic_axis)
-
-        # Validate and prepare output directory
+            validate_baseline_file(Path(args.baseline))
         output_path = Path(args.output)
         validate_output_directory(output_path)
-
-        # Determine output filename
-        base_name = input_path.stem
-        # Add suffix to indicate baseline subtraction was performed
-        if args.baseline:
-            base_name += "_baseline_subtracted"
-
-        # Write output files
-        write_output_files(data, output_path, base_name, args.format)
-
-        # Log success
-        if args.baseline:
-            logger.info(
-                f"Successfully parsed {args.input} with baseline subtraction from {args.baseline}"
-            )
-        else:
-            logger.info(f"Successfully parsed {args.input}")
-
-        return 0
-
-    except (FileNotFoundError, ValueError, PermissionError) as e:
+    except (FileNotFoundError, ValueError, PermissionError, OSError) as e:
         logger.error(str(e))
         return 1
-    except NGBParseError as e:
-        logger.error(f"Failed to parse {args.input}: {e}")
+
+    # Per-file failures don't stop the remaining files.
+    failures = 0
+    for input_file in args.input:
+        try:
+            process_file(
+                input_file, output_path, args.format, args.baseline, args.dynamic_axis
+            )
+        except zipfile.BadZipFile:
+            logger.error(f"{input_file} is not a valid NGB file (not a ZIP archive)")
+            failures += 1
+        except (FileNotFoundError, ValueError, PermissionError) as e:
+            logger.error(str(e))
+            failures += 1
+        except NGBParseError as e:
+            logger.error(f"Failed to parse {input_file}: {e}")
+            failures += 1
+        except OSError as e:
+            logger.error(f"OS error while processing file {input_file}: {e}")
+            failures += 1
+
+    if failures:
+        logger.error(f"{failures} of {len(args.input)} file(s) failed")
         return 1
-    except ImportError as e:
-        logger.error(f"Required dependency not available: {e}")
-        return 1
-    except OSError as e:
-        logger.error(f"OS error while processing file {args.input}: {e}")
-        return 1
+    return 0
 
 
 if __name__ == "__main__":

@@ -275,8 +275,8 @@ python -m pyngb *.ngb-ss3 --verbose --format parquet
 # Custom dynamic axis for baseline subtraction
 python -m pyngb sample.ngb-ss3 --baseline baseline.ngb-bs3 --dynamic-axis time
 
-# Specific output directory with all formats
-python -m pyngb experiments/*.ngb-ss3 --format all --output ./results/
+# Specific output directory with both formats
+python -m pyngb experiments/*.ngb-ss3 --format both --output ./results/
 ```
 
 ## Performance Tips

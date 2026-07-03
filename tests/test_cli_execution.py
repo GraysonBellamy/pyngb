@@ -144,7 +144,7 @@ class TestCLIExecution:
             "-o",
             str(output_dir),
             "-f",
-            "all",
+            "both",
         ]
 
         result = subprocess.run(cmd, capture_output=True, text=True)
@@ -163,6 +163,84 @@ class TestCLIExecution:
         data = pq.read_table(parquet_file)
         assert data.schema.metadata is not None
         assert b"file_metadata" in data.schema.metadata
+
+    def test_cli_command_execution_multiple_files(self, tmp_path: Any) -> None:
+        """Multiple positional inputs are each parsed and written."""
+        test_files = [
+            Path("tests/test_files/Red_Oak_STA_10K_250731_R7.ngb-ss3"),
+            Path("tests/test_files/DF_FILED_STA_21O2_10K_220222_R1.ngb-ss3"),
+        ]
+        if not all(f.exists() for f in test_files):
+            pytest.skip("Test files not available")
+
+        output_dir = tmp_path / "cli_multi_output"
+        output_dir.mkdir()
+
+        cmd = [
+            sys.executable,
+            "-m",
+            "pyngb",
+            *[str(f) for f in test_files],
+            "-o",
+            str(output_dir),
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        assert result.returncode == 0, f"CLI failed: {result.stderr}"
+        for f in test_files:
+            expected = output_dir / f"{f.stem}.parquet"
+            assert expected.exists(), f"Output file not created: {expected}"
+            assert pq.read_table(expected).num_rows > 0
+
+    def test_cli_command_execution_partial_failure(self, tmp_path: Any) -> None:
+        """One bad input fails the run but the good inputs still convert."""
+        test_file = Path("tests/test_files/Red_Oak_STA_10K_250731_R7.ngb-ss3")
+        if not test_file.exists():
+            pytest.skip("Test file not available")
+
+        output_dir = tmp_path / "cli_partial_output"
+        output_dir.mkdir()
+
+        cmd = [
+            sys.executable,
+            "-m",
+            "pyngb",
+            str(test_file),
+            "missing_file.ngb-ss3",
+            "-o",
+            str(output_dir),
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        assert result.returncode != 0, "CLI should fail when any file fails"
+        assert "1 of 2 file(s) failed" in result.stderr
+        # The good file was still converted
+        assert (output_dir / f"{test_file.stem}.parquet").exists()
+
+    def test_cli_command_execution_not_a_zip(self, tmp_path: Any) -> None:
+        """A non-ZIP input gets a friendly message, not a traceback."""
+        bogus = tmp_path / "bogus.ngb-ss3"
+        bogus.write_bytes(b"this is not a zip archive")
+
+        output_dir = tmp_path / "cli_badzip_output"
+        output_dir.mkdir()
+
+        cmd = [
+            sys.executable,
+            "-m",
+            "pyngb",
+            str(bogus),
+            "-o",
+            str(output_dir),
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        assert result.returncode != 0
+        assert "not a valid NGB file" in result.stderr
+        assert "Traceback" not in result.stderr
 
     def test_cli_command_execution_invalid_file(self, tmp_path: Any) -> None:
         """Test CLI command execution with invalid input file."""

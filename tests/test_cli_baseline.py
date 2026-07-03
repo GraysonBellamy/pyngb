@@ -101,8 +101,8 @@ class TestCLIBaselineSubtraction:
             )
             assert output_file.exists()
 
-    def test_cli_baseline_subtraction_all_formats(self) -> None:
-        """Test CLI baseline subtraction with all output formats."""
+    def test_cli_baseline_subtraction_both_formats(self) -> None:
+        """Test CLI baseline subtraction with both output formats."""
         sample_file = "tests/test_files/Douglas_Fir_STA_10K_250730_R13.ngb-ss3"
         baseline_file = (
             "tests/test_files/Douglas_Fir_STA_Baseline_10K_250730_R13.ngb-bs3"
@@ -118,7 +118,7 @@ class TestCLIBaselineSubtraction:
                     "-b",
                     baseline_file,
                     "-f",
-                    "all",
+                    "both",
                     "-o",
                     tmpdir,
                 ],
