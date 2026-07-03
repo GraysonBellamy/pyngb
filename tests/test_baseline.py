@@ -270,7 +270,7 @@ class TestBaselineSubtraction:
 
     def test_row_preservation_boundary_and_tail(self) -> None:
         """No row may vanish: neither the sample recorded exactly at the
-        program's end nor rows after it (audit NUM-02)."""
+        program's end nor rows after it."""
         df = pl.DataFrame(
             {
                 "time": [0.0, 30.0, 60.0, 90.0, 120.0, 150.0],
@@ -334,7 +334,7 @@ class TestBaselineSubtraction:
     def test_heat_cool_program_on_temperature_axis(self) -> None:
         """Each dynamic segment must interpolate against the baseline rows of
         the same program stage; interpolating a temperature axis against the
-        whole heat-then-cool run returns nonsense (audit NUM-01)."""
+        whole heat-then-cool run returns nonsense."""
         sample, baseline, metadata = self._heat_cool_pair()
 
         result = BaselineSubtractor().process_baseline_subtraction(
@@ -363,7 +363,7 @@ class TestBaselineSubtraction:
 
     def test_isothermal_hold_does_not_contaminate_dynamic_segment(self) -> None:
         """Baseline rows from an isothermal hold share temperatures with the
-        start of the ramp; the dynamic segment must not see them (audit NUM-01)."""
+        start of the ramp; the dynamic segment must not see them."""
         import numpy as np
 
         hold_t = np.arange(0, 50.0)

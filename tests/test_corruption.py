@@ -3,8 +3,7 @@
 These tests rebuild a real fixture with one surgically corrupted stream and
 assert the parser refuses it loudly. Before this behavior existed, a truncated
 stream_2 parsed "successfully" as a well-formed table with columns silently
-missing (AUDIT CORR-02). Resource-limit tests cover the decompression-bomb
-guard the same way (AUDIT CORR-04).
+missing. Resource-limit tests cover the decompression-bomb guard the same way.
 
 Known limitation: truncation exactly at a table boundary that removes whole
 trailing channels is indistinguishable from a file that legitimately records

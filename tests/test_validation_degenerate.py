@@ -2,8 +2,8 @@
 
 Empty frames, all-null columns, single rows, and null-poisoned columns are
 exactly what a quality checker exists to flag; before these fixes each of them
-raised TypeError/IndexError out of full_validation (AUDIT NUM-03) or silently
-disabled checks (NUM-07, NUM-11).
+raised TypeError/IndexError out of full_validation or silently disabled
+checks.
 """
 
 import json

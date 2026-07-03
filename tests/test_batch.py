@@ -98,7 +98,7 @@ class TestBatchProcessor:
     def test_parallel_strict_mode_raises(
         self, sample_ngb_file: Any, tmp_path: Any
     ) -> None:
-        """skip_errors=False must raise in the parallel path too (AUDIT PERF-04).
+        """skip_errors=False must raise in the parallel path too.
 
         The collection loop used to convert every worker exception into an
         error record, so strict mode only worked with max_workers=1.

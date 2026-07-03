@@ -1,4 +1,4 @@
-"""Regression tests for application/license metadata extraction (audit CORR-03).
+"""Regression tests for application/license metadata extraction.
 
 The extractor's filters used ``r"\\s"``-style double-escaped literals, so both
 fields were ``None`` on every file ever parsed. These tests pin the extracted

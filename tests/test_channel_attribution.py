@@ -1,4 +1,4 @@
-"""Regression tests for stream_2 channel attribution (audit CORR-01).
+"""Regression tests for stream_2 channel attribution.
 
 Stream_2 data tables carry no channel identity: a channel's header table
 precedes its data tables, so data must be named by the *preceding* header.

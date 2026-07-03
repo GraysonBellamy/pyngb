@@ -4,9 +4,8 @@ Every property here can actually fail: values are round-tripped through the
 binary parser with exact-equality assertions, corrupted real-instrument data
 must fail loudly with a typed exception, and DTG properties are checked
 against closed-form expectations on valid input instead of being swallowed
-by try/except. The previous vacuous properties (swapped parse_value
-arguments, exception-swallowing DTG checks) are documented in AUDIT
-TEST-02/TEST-05.
+by try/except. They replace previous vacuous properties (swapped
+parse_value arguments, exception-swallowing DTG checks).
 """
 
 from __future__ import annotations
@@ -94,7 +93,7 @@ class TestParseValueRoundTrip:
         """NETZSCH fffeff format: prefix + UTF-16LE code-unit count + data."""
         encoded = text.encode("utf-16le")
         code_units = len(encoded) // 2
-        assume(code_units <= 255)  # single count byte (AUDIT CORR-08)
+        assume(code_units <= 255)  # single count byte
         payload = b"\xff\xfe\xff" + bytes([code_units]) + encoded
 
         parser = BinaryParser()
@@ -156,7 +155,7 @@ def _process(stream: bytes) -> pl.DataFrame:
 class TestStreamCorruptionProperties:
     """Corrupted measurement data must parse cleanly or fail loudly.
 
-    These lock in the Phase 1 loud-corruption contract (AUDIT CORR-02): the
+    These lock in the loud-corruption contract: the
     only exception type the stream processor may leak is NGBParseError. A
     silent success is acceptable only as a well-formed DataFrame - truncation
     at a table boundary is indistinguishable from a file that legitimately

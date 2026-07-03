@@ -478,7 +478,7 @@ class TestBoundaryConditions:
         )
 
         # A single-row frame must be reported as an issue, not crash the
-        # checker (AUDIT NUM-03): one point cannot show heating or cooling.
+        # checker: one point cannot show heating or cooling.
         checker = QualityChecker(single_point)
         issues = checker.quick_check()
 
