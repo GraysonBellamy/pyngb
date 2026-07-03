@@ -1,62 +1,42 @@
 # Scripts Directory
 
-This directory contains utility and testing scripts for the pyngb project.
+Development utilities for the pyngb project. All scripts are run from the
+project root with `uv run` so the virtual environment is active.
 
 ## Scripts Overview
 
-### `run_tests.py`
-**Purpose**: Comprehensive test runner covering both core functionality and new features without requiring pytest.
-**Usage**:
-```bash
-# Run from project root
-uv run python scripts/run_tests.py
-```
-**Features**:
-- Core functionality testing (imports, exceptions, constants, binary parsing)
-- New feature testing (validation and batch processing)
-- Cross-module integration testing
-- Clear categorized output with pass/fail reporting
-- No external test framework dependencies
+### `benchmarks.py`
+Performance benchmarks for parsing, batch processing, and analysis functions.
 
-### `test_imports.py`
-**Purpose**: Validates that all package imports work correctly.
-**Usage**:
 ```bash
-uv run python scripts/test_imports.py
+uv run python scripts/benchmarks.py
 ```
 
-## Best Practices
+### `discover_patterns.py`
+Infers the (category, field) two-byte identifiers for new metadata values you
+know exist inside `Streams/stream_1.table` of an NGB file. Use this when
+adding a new field to `PatternConfig.metadata_patterns`.
 
-- **Run from project root**: All scripts are designed to be executed from the project root directory
-- **Use with uv**: Scripts should be run with `uv run` to ensure proper virtual environment activation
-- **Development workflow**: Use these scripts during development to quickly validate changes
-- **CI/CD integration**: These scripts can be integrated into continuous integration pipelines
+### `inspect_stream1_metadata.py`
+Quick dev utility to inspect stream_1 metadata fields with a general regex.
 
-## Related Testing
+### `dump_masses.py`
+Dumps mass-related fields from the test fixtures for cross-checking mass
+disambiguation.
 
-For formal unit testing with detailed reporting, use the pytest-based tests in the `tests/` directory:
+### `process_all_test_files.py`
+Runs `BatchProcessor` over every `.ngb-ss3`/`.ngb-bs3` fixture in
+`tests/test_files/`, producing CSV, Parquet, and metadata JSON per file plus a
+`processing_summary.csv`.
+
+## Testing
+
+Testing is done exclusively with pytest:
+
 ```bash
 # Run all unit tests
-uv run python -m pytest
+uv run pytest
 
 # Run specific test modules
-uv run python -m pytest tests/test_validation.py tests/test_batch.py
+uv run pytest tests/test_validation.py tests/test_batch.py
 ```
-
-## Test Coverage
-
-The integrated test runner (`run_tests.py`) provides a lightweight alternative to pytest that covers:
-
-### Core Functionality Tests:
-- ✅ Package imports and module structure
-- ✅ Exception hierarchy and error handling
-- ✅ Constants and configuration
-- ✅ Binary data handlers and parsing
-- ✅ Basic parser functionality
-
-### New Features Tests:
-- ✅ Data validation functionality
-- ✅ Batch processing capabilities
-- ✅ Cross-module integration
-
-This provides confidence that the essential functionality works without requiring the full pytest test suite.
