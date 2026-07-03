@@ -409,10 +409,14 @@ class TestSpecificValidationFunctions:
         assert "error" in analysis
 
     def test_check_dsc_data_with_peaks(self) -> None:
-        """Test DSC data with artificial peaks."""
-        # Create data with clear peaks
-        x = np.linspace(0, 10, 1000)
-        y = np.sin(x) * 10  # Clear sinusoidal pattern with peaks
+        """Isolated thermal events on a noisy baseline are each counted once."""
+        x = np.linspace(0, 100, 2000)
+        rng = np.random.default_rng(7)
+        y = (
+            rng.normal(0, 0.05, x.size)
+            + 8.0 * np.exp(-((x - 30) ** 2) / 4)  # exotherm
+            - 5.0 * np.exp(-((x - 70) ** 2) / 4)  # endotherm
+        )
         dsc_data_with_peaks = pl.DataFrame(
             {
                 "time": x,
@@ -421,9 +425,23 @@ class TestSpecificValidationFunctions:
             }
         )
         analysis = check_dsc_data(dsc_data_with_peaks)
-        pk = analysis.get("peaks_detected")
-        if isinstance(pk, (int, float)) and not isinstance(pk, bool):
-            assert pk > 0
+        assert analysis["positive_peaks"] == 1
+        assert analysis["negative_peaks"] == 1
+        assert analysis["peaks_detected"] == 2
+
+    def test_check_dsc_data_flat_noise_has_no_peaks(self) -> None:
+        """Regression for NUM-06: a flat noisy trace used to report thousands
+        of 'peaks' because raw values (not deviations) were compared to std."""
+        rng = np.random.default_rng(42)
+        flat = pl.DataFrame({"dsc_signal": 50.0 + rng.normal(0, 0.01, 5000)})
+        analysis = check_dsc_data(flat)
+        assert analysis["peaks_detected"] == 0
+
+    def test_check_dsc_data_constant_signal_has_no_peaks(self) -> None:
+        """A perfectly constant trace has zero robust scale and zero peaks."""
+        constant = pl.DataFrame({"dsc_signal": [5.0] * 100})
+        analysis = check_dsc_data(constant)
+        assert analysis["peaks_detected"] == 0
 
 
 class TestEdgeCases:

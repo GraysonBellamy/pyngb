@@ -3,6 +3,7 @@
 import numpy as np
 import polars as pl
 import pyarrow as pa
+from scipy.signal import find_peaks
 
 from ..constants import FileMetadata
 from .checker import QualityChecker
@@ -122,6 +123,29 @@ def check_mass_data(
     return analysis
 
 
+def _significant_extrema(x: np.ndarray) -> tuple[int, int]:
+    """Count local maxima and minima that clearly stand out from the trace.
+
+    Significance is judged against a robust (median/MAD) noise scale so real
+    peaks don't inflate their own threshold. An extremum counts only when
+    both its prominence and its deviation from the median exceed 5 sigma:
+    prominence alone still passes the most extreme excursions of pure noise,
+    and deviation alone counts every noise wiggle on top of a broad peak.
+    """
+    median = float(np.median(x))
+    sigma = 1.4826 * float(np.median(np.abs(x - median)))
+    if sigma == 0.0:
+        # Perfectly flat trace (or >50 % identical values): nothing can be
+        # significant relative to it.
+        return 0, 0
+
+    threshold = 5.0 * sigma
+    maxima, _ = find_peaks(x, prominence=threshold, height=median + threshold)
+    # For minima, mirror the trace: -x[i] >= threshold - median <=> x[i] <= median - threshold
+    minima, _ = find_peaks(-x, prominence=threshold, height=threshold - median)
+    return len(maxima), len(minima)
+
+
 def check_dsc_data(data: pa.Table | pl.DataFrame) -> dict[str, str | float | int]:
     """Check DSC data for quality issues.
 
@@ -145,23 +169,7 @@ def check_dsc_data(data: pa.Table | pl.DataFrame) -> dict[str, str | float | int
     if len(dsc_data_clean) == 0:
         return {"error": "No valid DSC data (all NaN or infinite)"}
 
-    # Simple peak detection
-    peaks_positive = 0
-    peaks_negative = 0
-
-    for i in range(1, len(dsc_data_clean) - 1):
-        if (
-            dsc_data_clean[i] > dsc_data_clean[i - 1]
-            and dsc_data_clean[i] > dsc_data_clean[i + 1]
-        ):
-            if dsc_data_clean[i] > np.std(dsc_data_clean):  # Significant peak
-                peaks_positive += 1
-        elif (
-            dsc_data_clean[i] < dsc_data_clean[i - 1]
-            and dsc_data_clean[i] < dsc_data_clean[i + 1]
-            and abs(dsc_data_clean[i]) > np.std(dsc_data_clean)
-        ):  # Significant through
-            peaks_negative += 1
+    peaks_positive, peaks_negative = _significant_extrema(dsc_data_clean)
 
     analysis: dict[str, str | float | int] = {
         "signal_range": float(np.ptp(dsc_data_clean)),
