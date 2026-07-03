@@ -185,6 +185,24 @@ class TestBinaryParser:
         result = parser.split_tables(data)
         assert len(result) <= 3
 
+    def test_parse_data_rejects_oversized_payload(self) -> None:
+        """A data payload larger than max_array_size_mb must be rejected."""
+        parser = BinaryParser(parsing_config=ParsingConfig(max_array_size_mb=1))
+        payload = b"\x00" * (1024 * 1024 + 8)  # one float64 over the 1 MB limit
+
+        with pytest.raises(NGBResourceLimitError, match="max_array_size_mb"):
+            parser.parse_data(DataType.FLOAT64.value, payload)
+
+    def test_parse_data_at_limit_decodes(self) -> None:
+        """A payload exactly at the configured limit must still decode."""
+        parser = BinaryParser(parsing_config=ParsingConfig(max_array_size_mb=1))
+        n = (1024 * 1024) // 8  # exactly 1 MB of float64
+        payload = struct.pack(f"<{n}d", *([1.5] * n))
+
+        result = parser.parse_data(DataType.FLOAT64.value, payload)
+        assert len(result) == n
+        assert result[0] == 1.5
+
     def test_get_compiled_pattern_caching(self) -> None:
         """Test that compiled patterns are cached."""
         parser = BinaryParser()

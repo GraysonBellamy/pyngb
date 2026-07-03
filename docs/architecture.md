@@ -257,12 +257,12 @@ sequenceDiagram
 ```python
 @dataclass(frozen=True)
 class ParsingConfig:
-    max_file_size_mb: int = 1000
+    max_stream_size_mb: int = 1000
     max_array_size_mb: int = 500
 
     def __post_init__(self) -> None:
-        if self.max_file_size_mb <= 0:
-            raise ValueError("max_file_size_mb must be positive")
+        if self.max_stream_size_mb <= 0:
+            raise ValueError("max_stream_size_mb must be positive")
 ```
 
 ### Why Validator Composition?

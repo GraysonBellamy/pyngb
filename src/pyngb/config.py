@@ -12,24 +12,29 @@ from dataclasses import dataclass, field
 class ParsingConfig:
     """Configuration for binary parsing operations.
 
+    These limits guard against pathological or malicious inputs (e.g. a
+    decompression bomb inside the NGB ZIP container). Real NGB streams
+    decompress to well under a megabyte, so the defaults leave orders of
+    magnitude of headroom; raise them only if a legitimate file trips one.
+
     Attributes:
-        max_file_size_mb: Maximum file size in MB to parse (default: 1000)
+        max_stream_size_mb: Maximum decompressed size in MB of any single
+            stream member inside the NGB archive (default: 1000). Checked
+            against the ZIP directory's declared size before decompression.
         max_tables_per_stream: Maximum number of tables per stream (default: 10000).
-            Guards against pathological inputs; real NGB streams typically contain
-            fewer than ~1000 tables. Raise this only if a legitimate file trips it.
-        max_array_size_mb: Maximum array size in MB (default: 500)
-        encoding_fallback: Fallback encoding for strings (default: "utf-8")
+            Real NGB streams typically contain fewer than ~1000 tables.
+        max_array_size_mb: Maximum size in MB of a single data payload
+            decoded into a column array (default: 500).
     """
 
-    max_file_size_mb: int = 1000
+    max_stream_size_mb: int = 1000
     max_tables_per_stream: int = 10000
     max_array_size_mb: int = 500
-    encoding_fallback: str = "utf-8"
 
     def __post_init__(self) -> None:
         """Validate parsing configuration."""
-        if self.max_file_size_mb <= 0:
-            raise ValueError("max_file_size_mb must be positive")
+        if self.max_stream_size_mb <= 0:
+            raise ValueError("max_stream_size_mb must be positive")
         if self.max_tables_per_stream <= 0:
             raise ValueError("max_tables_per_stream must be positive")
         if self.max_array_size_mb <= 0:
@@ -123,13 +128,13 @@ class PyNGBConfig:
         >>>
         >>> # Customize configuration
         >>> config = PyNGBConfig(
-        ...     parsing=ParsingConfig(max_file_size_mb=2000),
+        ...     parsing=ParsingConfig(max_stream_size_mb=2000),
         ...     validation=ValidationConfig(max_temperature=2500.0),
         ...     batch=BatchConfig(max_workers=4)
         ... )
         >>>
         >>> # Access configuration values
-        >>> max_size = config.parsing.max_file_size_mb
+        >>> max_size = config.parsing.max_stream_size_mb
         >>> max_temp = config.validation.max_temperature
     """
 
@@ -147,7 +152,7 @@ class PyNGBConfig:
         """Create configuration from environment variables.
 
         Supported environment variables:
-        - PYNGB_MAX_FILE_SIZE_MB: Maximum file size in MB
+        - PYNGB_MAX_STREAM_SIZE_MB: Maximum decompressed stream size in MB
         - PYNGB_MAX_WORKERS: Maximum number of worker processes
         - PYNGB_SKIP_ERRORS: Whether to skip files with errors (true/false)
 
@@ -155,7 +160,7 @@ class PyNGBConfig:
             Configuration instance with values from environment
         """
         parsing_config = ParsingConfig(
-            max_file_size_mb=int(os.getenv("PYNGB_MAX_FILE_SIZE_MB", "1000"))
+            max_stream_size_mb=int(os.getenv("PYNGB_MAX_STREAM_SIZE_MB", "1000"))
         )
 
         validation_config = ValidationConfig()

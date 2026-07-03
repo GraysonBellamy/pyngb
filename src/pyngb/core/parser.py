@@ -10,8 +10,13 @@ import polars as pl
 import pyarrow as pa
 
 from ..binary import BinaryParser
+from ..config import ParsingConfig
 from ..constants import BinaryMarkers, FileMetadata, PatternConfig
-from ..exceptions import NGBParseError, NGBStreamNotFoundError
+from ..exceptions import (
+    NGBParseError,
+    NGBResourceLimitError,
+    NGBStreamNotFoundError,
+)
 from ..extractors import DataStreamProcessor, MetadataExtractor
 
 __all__ = ["NGBParser"]
@@ -46,8 +51,12 @@ class NGBParser:
         >>> config.column_map["custom_id"] = "custom_column"
         >>> parser = NGBParser(config)
 
+        >>> # Tighten resource limits for untrusted input
+        >>> parser = NGBParser(parsing_config=ParsingConfig(max_stream_size_mb=50))
+
     Attributes:
         config: Pattern configuration for parsing
+        parsing_config: Resource limits enforced while parsing
         markers: Binary markers for data identification
         binary_parser: Low-level binary parsing engine
         metadata_extractor: Metadata extraction engine
@@ -58,10 +67,15 @@ class NGBParser:
         concurrent parsing operations.
     """
 
-    def __init__(self, config: PatternConfig | None = None) -> None:
+    def __init__(
+        self,
+        config: PatternConfig | None = None,
+        parsing_config: ParsingConfig | None = None,
+    ) -> None:
         self.config = config or PatternConfig()
         self.markers = BinaryMarkers()
-        self.binary_parser = BinaryParser(self.markers)
+        self.binary_parser = BinaryParser(self.markers, parsing_config)
+        self.parsing_config = self.binary_parser.parsing_config
         self.metadata_extractor = MetadataExtractor(self.config, self.binary_parser)
         self.data_processor = DataStreamProcessor(self.config, self.binary_parser)
 
@@ -92,6 +106,29 @@ class NGBParser:
 
         return available_streams
 
+    def _read_stream(self, zip_file: zipfile.ZipFile, name: str) -> bytes:
+        """Read one stream member, refusing oversized payloads before decompression.
+
+        The ZIP directory's declared uncompressed size is authoritative:
+        zipfile never decompresses past it (a member lying about its size
+        fails the CRC check instead), so checking it up front is a sound
+        guard against decompression bombs.
+
+        Raises:
+            NGBResourceLimitError: If the declared decompressed size exceeds
+                max_stream_size_mb
+        """
+        info = zip_file.getinfo(name)
+        max_bytes = self.parsing_config.max_stream_size_mb * 1024 * 1024
+        if info.file_size > max_bytes:
+            raise NGBResourceLimitError(
+                f"{name} declares {info.file_size:,} bytes decompressed, "
+                f"exceeding max_stream_size_mb limit of "
+                f"{self.parsing_config.max_stream_size_mb}"
+            )
+        with zip_file.open(name) as stream:
+            return stream.read()
+
     def parse(self, path: str | Path) -> tuple[FileMetadata, pa.Table]:
         """Parse NGB file and return metadata and Arrow table.
 
@@ -110,6 +147,8 @@ class NGBParser:
             FileNotFoundError: If the specified file doesn't exist
             NGBStreamNotFoundError: If required streams are missing
             NGBCorruptedFileError: If file structure is invalid
+            NGBResourceLimitError: If a stream or data payload exceeds the
+                configured resource limits
             zipfile.BadZipFile: If file is not a valid ZIP archive
 
         Example:
@@ -134,24 +173,19 @@ class NGBParser:
                 available_streams = self.validate_ngb_structure(z)
 
                 # stream_1: metadata
-                with z.open("Streams/stream_1.table") as stream:
-                    stream_data = stream.read()
-                    tables = self.binary_parser.split_tables(stream_data)
-                    metadata = self.metadata_extractor.extract_metadata(tables)
+                stream_data = self._read_stream(z, "Streams/stream_1.table")
+                tables = self.binary_parser.split_tables(stream_data)
+                metadata = self.metadata_extractor.extract_metadata(tables)
 
                 # stream_2: primary data
                 if "Streams/stream_2.table" in available_streams:
-                    with z.open("Streams/stream_2.table") as stream:
-                        stream_data = stream.read()
-                        data_df = self.data_processor.process_stream_2(stream_data)
+                    stream_data = self._read_stream(z, "Streams/stream_2.table")
+                    data_df = self.data_processor.process_stream_2(stream_data)
 
                 # stream_3: additional data merged into existing df
                 if "Streams/stream_3.table" in available_streams:
-                    with z.open("Streams/stream_3.table") as stream:
-                        stream_data = stream.read()
-                        data_df = self.data_processor.process_stream_3(
-                            stream_data, data_df
-                        )
+                    stream_data = self._read_stream(z, "Streams/stream_3.table")
+                    data_df = self.data_processor.process_stream_3(stream_data, data_df)
 
         except zipfile.BadZipFile as e:
             logger.error(f"Invalid ZIP archive: {e}")

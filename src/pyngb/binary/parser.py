@@ -175,6 +175,32 @@ class BinaryParser:
             logger.warning(f"Unexpected error parsing value: {e}")
             return None
 
+    def itemsize(self, data_type: bytes) -> int | None:
+        """Byte width of one element of ``data_type``, or None if unhandled."""
+        return self._data_type_registry.itemsize(data_type)
+
+    def parse_data(self, data_type: bytes, payload: bytes | memoryview) -> list[float]:
+        """Decode a data payload into values, enforcing the array size limit.
+
+        Args:
+            data_type: Binary data type identifier
+            payload: Raw array payload to decode
+
+        Returns:
+            List of decoded float values
+
+        Raises:
+            NGBResourceLimitError: If the payload exceeds max_array_size_mb
+            NGBDataTypeError: If no handler exists for the data type
+        """
+        max_bytes = self.parsing_config.max_array_size_mb * 1024 * 1024
+        if len(payload) > max_bytes:
+            raise NGBResourceLimitError(
+                f"Data payload is {len(payload):,} bytes, exceeding "
+                f"max_array_size_mb limit of {self.parsing_config.max_array_size_mb}"
+            )
+        return self._data_type_registry.parse_data(data_type, payload)
+
     def split_tables(self, data: bytes) -> list[bytes]:
         """Split binary data into tables using the known separator.
 

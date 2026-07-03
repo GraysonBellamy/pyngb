@@ -1,9 +1,10 @@
-"""Structural corruption must raise NGBCorruptedFileError, never parse silently.
+"""Hostile or damaged input must fail loudly, never parse silently.
 
 These tests rebuild a real fixture with one surgically corrupted stream and
 assert the parser refuses it loudly. Before this behavior existed, a truncated
 stream_2 parsed "successfully" as a well-formed table with columns silently
-missing (AUDIT CORR-02).
+missing (AUDIT CORR-02). Resource-limit tests cover the decompression-bomb
+guard the same way (AUDIT CORR-04).
 
 Known limitation: truncation exactly at a table boundary that removes whole
 trailing channels is indistinguishable from a file that legitimately records
@@ -11,6 +12,8 @@ fewer channels, so the parser cannot detect it. Column-presence checks belong
 to validation, not parsing.
 """
 
+import io
+import struct
 import zipfile
 from pathlib import Path
 
@@ -18,8 +21,10 @@ import pytest
 
 from pyngb import read_ngb
 from pyngb.binary import BinaryParser
+from pyngb.config import ParsingConfig
 from pyngb.constants import StreamMarkers
-from pyngb.exceptions import NGBCorruptedFileError
+from pyngb.core import NGBParser
+from pyngb.exceptions import NGBCorruptedFileError, NGBResourceLimitError
 
 FIXTURE = Path(__file__).parent / "test_files" / "Red_Oak_STA_10K_250731_R7.ngb-ss3"
 
@@ -125,6 +130,65 @@ class TestStream3Corruption:
 
         with pytest.raises(NGBCorruptedFileError, match="START_DATA without END_DATA"):
             read_ngb(corrupted)
+
+
+def lie_about_member_size(archive: bytes, member: str, declared: int) -> bytes:
+    """Patch a member's declared uncompressed size in both the local file
+    header and the central directory, leaving the compressed payload intact.
+    """
+    data = bytearray(archive)
+    with zipfile.ZipFile(io.BytesIO(archive)) as z:
+        header_offset = z.getinfo(member).header_offset
+    struct.pack_into("<I", data, header_offset + 22, declared)
+
+    name = member.encode()
+    pos = 0
+    while True:
+        pos = data.find(b"PK\x01\x02", pos)
+        assert pos != -1, "central directory entry not found"
+        (name_len,) = struct.unpack_from("<H", data, pos + 28)
+        if data[pos + 46 : pos + 46 + name_len] == name:
+            struct.pack_into("<I", data, pos + 24, declared)
+            return bytes(data)
+        pos += 4
+
+
+class TestResourceLimits:
+    def test_oversized_stream_rejected_before_decompression(
+        self, tmp_path: Path
+    ) -> None:
+        """A stream declaring more than max_stream_size_mb must be refused.
+
+        The rejection happens on the ZIP directory's declared size, before
+        any decompression — this is the decompression-bomb guard.
+        """
+        bomb = tmp_path / "bomb.ngb-ss3"
+        rewrite_stream(
+            FIXTURE, bomb, "Streams/stream_2.table", b"\x00" * (2 * 1024 * 1024)
+        )
+        parser = NGBParser(parsing_config=ParsingConfig(max_stream_size_mb=1))
+
+        with pytest.raises(NGBResourceLimitError, match="max_stream_size_mb"):
+            parser.parse(bomb)
+
+    def test_member_lying_about_size_fails_loudly(self, tmp_path: Path) -> None:
+        """Pin the invariant the size guard relies on: zipfile never
+        decompresses past a member's declared size, so a member that lies to
+        sneak under the limit fails its CRC check instead of bombing.
+        """
+        stream = read_stream(FIXTURE, "Streams/stream_2.table")
+        rebuilt = tmp_path / "rebuilt.ngb-ss3"
+        rewrite_stream(FIXTURE, rebuilt, "Streams/stream_2.table", stream)
+
+        liar = tmp_path / "liar.ngb-ss3"
+        liar.write_bytes(
+            lie_about_member_size(
+                rebuilt.read_bytes(), "Streams/stream_2.table", declared=100
+            )
+        )
+
+        with pytest.raises(zipfile.BadZipFile):
+            read_ngb(liar)
 
 
 def test_pristine_fixture_still_parses(tmp_path: Path) -> None:

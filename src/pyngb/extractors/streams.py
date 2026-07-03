@@ -56,7 +56,6 @@ class DataStreamProcessor:
         inconsistent.
         """
         markers = self.parser.markers
-        registry = self.parser._data_type_registry
 
         start_idx = table.find(markers.START_DATA)
         if start_idx == -1:
@@ -76,7 +75,7 @@ class DataStreamProcessor:
         # false-matches that would otherwise yield short or garbage columns.
         count = int.from_bytes(table[start_idx + 2 : start_idx + 6], "little")
         data_type = table[start_idx - 1 : start_idx]
-        itemsize = registry.itemsize(data_type)
+        itemsize = self.parser.itemsize(data_type)
         if itemsize is not None and len(payload) != count * itemsize:
             raise NGBCorruptedFileError(
                 f"data table {table_index}: payload is {len(payload)} bytes but "
@@ -84,7 +83,7 @@ class DataStreamProcessor:
             )
 
         try:
-            return registry.parse_data(data_type, payload)
+            return self.parser.parse_data(data_type, payload)
         except NGBDataTypeError as e:
             raise NGBCorruptedFileError(f"data table {table_index}: {e}") from e
 
