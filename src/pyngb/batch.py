@@ -284,6 +284,14 @@ class BatchProcessor:
                     try:
                         result = future.result()
                     except Exception as e:
+                        if not skip_errors:
+                            # Strict mode: surface the failure instead of
+                            # recording it. Workers re-raise when strict, so
+                            # the exception arrives here via future.result().
+                            for pending in future_to_file:
+                                pending.cancel()
+                            logger.error("Failed to process %s in strict mode", src)
+                            raise
                         # Broad catch is intentional: this is a subprocess boundary,
                         # and any unhandled worker failure must become an error record
                         # so the rest of the batch can continue. logger.exception

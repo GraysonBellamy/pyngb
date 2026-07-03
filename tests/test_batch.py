@@ -95,6 +95,40 @@ class TestBatchProcessor:
             stem = Path(f).stem
             assert (work_dir / f"{stem}.csv").exists()
 
+    def test_parallel_strict_mode_raises(
+        self, sample_ngb_file: Any, tmp_path: Any
+    ) -> None:
+        """skip_errors=False must raise in the parallel path too (AUDIT PERF-04).
+
+        The collection loop used to convert every worker exception into an
+        error record, so strict mode only worked with max_workers=1.
+        """
+        processor = BatchProcessor(max_workers=2, verbose=False)
+        files = [str(sample_ngb_file), str(tmp_path / "missing.ngb-ss3")]
+
+        with pytest.raises(FileNotFoundError):
+            processor.process_files(
+                files,  # type: ignore[arg-type]
+                output_dir=str(tmp_path),
+                skip_errors=False,
+            )
+
+    def test_parallel_lenient_mode_records_error(
+        self, sample_ngb_file: Any, tmp_path: Any
+    ) -> None:
+        """skip_errors=True keeps converting failures into error records."""
+        processor = BatchProcessor(max_workers=2, verbose=False)
+        files = [str(sample_ngb_file), str(tmp_path / "missing.ngb-ss3")]
+
+        results = processor.process_files(
+            files,  # type: ignore[arg-type]
+            output_dir=str(tmp_path),
+            skip_errors=True,
+        )
+
+        statuses = sorted(r["status"] for r in results)
+        assert statuses == ["error", "success"]
+
     @pytest.mark.slow
     def test_large_batch_processing(self, sample_ngb_file: Any) -> None:
         """Test processing a large batch of files."""
