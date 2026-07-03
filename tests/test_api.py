@@ -210,3 +210,26 @@ class TestIntegrationWithMockNGB:
         # Should have same shape
         assert df.height == df2.height
         assert df.width == df2.width
+
+
+class TestReadNGBMetadataPaths:
+    """Regression tests for DES-05: metadata initialization must not depend
+    on which flag combination read_ngb was called with."""
+
+    REAL_FILE = (
+        Path(__file__).parent / "test_files" / "Red_Oak_STA_10K_250731_R7.ngb-ss3"
+    )
+
+    def test_column_metadata_present_with_return_metadata(self) -> None:
+        """return_metadata=True must not skip column metadata initialization."""
+        if not self.REAL_FILE.exists():
+            pytest.skip("Real test file not available")
+
+        _metadata, table = read_ngb(self.REAL_FILE, return_metadata=True)
+        assert get_column_units(table, "mass") == "mg"
+        assert get_column_units(table, "sample_temperature") == "°C"
+
+    def test_dynamic_axis_validated_without_baseline(self) -> None:
+        """A bogus dynamic_axis is rejected up front, before any file I/O."""
+        with pytest.raises(ValueError, match="dynamic_axis"):
+            read_ngb("does-not-exist.ngb-ss3", dynamic_axis="bogus")

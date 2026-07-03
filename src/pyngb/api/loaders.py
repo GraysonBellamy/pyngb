@@ -96,6 +96,8 @@ def read_ngb(
 
     Raises
     ------
+    ValueError
+        If dynamic_axis is not a recognized axis name
     FileNotFoundError
         If the specified file does not exist
     NGBStreamNotFoundError
@@ -178,6 +180,12 @@ def read_ngb(
     NGBParser : Low-level parser for custom processing
     BatchProcessor : Process multiple files efficiently
     """
+    valid_axes = ["time", "sample_temperature", "furnace_temperature"]
+    if dynamic_axis not in valid_axes:
+        raise ValueError(
+            f"dynamic_axis must be one of {valid_axes}, got '{dynamic_axis}'"
+        )
+
     parser = NGBParser()
     metadata, data = parser.parse(path)
 
@@ -192,13 +200,6 @@ def read_ngb(
 
     # Handle baseline subtraction if requested
     if baseline_file is not None:
-        # Validate dynamic_axis
-        valid_axes = ["time", "sample_temperature", "furnace_temperature"]
-        if dynamic_axis not in valid_axes:
-            raise ValueError(
-                f"dynamic_axis must be one of {valid_axes}, got '{dynamic_axis}'"
-            )
-
         baseline_metadata, baseline_data = parser.parse(baseline_file)
 
         sample_df = pl.from_arrow(data)
@@ -215,18 +216,18 @@ def read_ngb(
         # Convert back to PyArrow
         data = subtracted_df.to_arrow()
 
-        # Baseline subtraction changes the meaning of mass/DSC columns, so tag
-        # applicable column metadata before either return mode hands the table back.
-        data = initialize_table_column_metadata(data)
+    if not return_metadata:
+        # Attach file-level metadata to the Arrow schema; with
+        # return_metadata=True it is handed back separately instead.
+        data = set_metadata(data, tbl_meta={"file_metadata": metadata, "type": "STA"})
+
+    # Column metadata (units, processing history, source) is present on every
+    # return path; baseline subtraction changes the meaning of the mass/DSC
+    # columns, so tag them as corrected.
+    data = initialize_table_column_metadata(data)
+    if baseline_file is not None:
         data = mark_baseline_corrected(data, ["mass", "dsc_signal"])
 
     if return_metadata:
         return metadata, data
-
-    # Attach metadata to the Arrow table
-    data = set_metadata(data, tbl_meta={"file_metadata": metadata, "type": "STA"})
-
-    # Initialize column metadata for all columns
-    data = initialize_table_column_metadata(data)
-
     return data
