@@ -13,6 +13,7 @@ import polars as pl
 import pyarrow as pa
 
 from ..analysis import dtg
+from ..util import get_column_metadata, set_column_metadata, with_polars
 
 __all__ = [
     "add_dtg",
@@ -87,38 +88,13 @@ def add_dtg(
     if "mass" not in column_names:
         raise ValueError("Table must contain 'mass' column")
 
-    # Convert to DataFrame for easier manipulation
-    df = pl.from_arrow(table)
-    if not isinstance(df, pl.DataFrame):
-        raise TypeError("Failed to convert PyArrow table to Polars DataFrame")
+    def _add_dtg_column(df: pl.DataFrame) -> pl.DataFrame:
+        time = df.get_column("time").to_numpy()
+        mass = df.get_column("mass").to_numpy()
+        dtg_values = dtg(time, mass, method=method, smooth=smooth)
+        return df.with_columns(pl.Series(column_name, dtg_values))
 
-    # Get data arrays
-    time = df.get_column("time").to_numpy()
-    mass = df.get_column("mass").to_numpy()
-
-    # Calculate DTG
-    dtg_values = dtg(time, mass, method=method, smooth=smooth)
-
-    # Add DTG column
-    df = df.with_columns(pl.Series(column_name, dtg_values))
-
-    # Convert back to PyArrow table while preserving all metadata
-    new_table = df.to_arrow()
-
-    # Preserve table-level metadata
-    if table.schema.metadata:
-        new_table = new_table.replace_schema_metadata(table.schema.metadata)
-
-    # Preserve column-level metadata for all existing columns
-    from ..util import set_column_metadata, get_column_metadata
-
-    for col in table.column_names:
-        if col in new_table.column_names:  # Column exists in new table
-            original_metadata = get_column_metadata(table, col)
-            if original_metadata:  # If original column had metadata
-                new_table = set_column_metadata(
-                    new_table, col, original_metadata, replace=True
-                )
+    new_table = with_polars(table, _add_dtg_column)
 
     # Set metadata for the new DTG column
     dtg_metadata = {
@@ -169,8 +145,8 @@ def calculate_table_dtg(
     >>> table = read_ngb("sample.ngb-ss3")
     >>> dtg_values = calculate_table_dtg(table, method="savgol", smooth="medium")
     >>>
-    >>> # Find maximum mass loss rate
-    >>> max_loss_rate = abs(dtg_values.min())
+    >>> # Find maximum mass loss rate (positive DTG values indicate mass loss)
+    >>> max_loss_rate = dtg_values.max()
     >>> print(f"Maximum mass loss rate: {max_loss_rate:.3f} mg/min")
     """
     # Check required columns
@@ -289,38 +265,18 @@ def normalize_to_initial_mass(
         if missing_columns:
             raise KeyError(f"Columns not found in table: {missing_columns}")
 
-    # Convert to DataFrame for easier manipulation
-    df = pl.from_arrow(table)
-    if not isinstance(df, pl.DataFrame):
-        raise TypeError("Failed to convert PyArrow table to Polars DataFrame")
-
-    # Normalize specified columns in place
-    normalization_exprs = []
-    for col in columns:
-        # Check if column is numeric
-        if not df[col].dtype.is_numeric():
-            raise ValueError(f"Column '{col}' is not numeric and cannot be normalized")
-        # Update the column in place by dividing by sample mass
-        normalization_exprs.append((pl.col(col) / sample_mass).alias(col))
-
-    # Apply normalizations (updates existing columns)
-    df = df.with_columns(normalization_exprs)
-
-    # Convert back to PyArrow table while preserving all metadata
-    new_table = df.to_arrow()
-    if table.schema.metadata:
-        new_table = new_table.replace_schema_metadata(table.schema.metadata)
-
-    # Preserve column-level metadata for all existing columns
-    from ..util import get_column_metadata, set_column_metadata
-
-    for col in table.column_names:
-        if col in new_table.column_names:  # Column exists in new table
-            original_metadata = get_column_metadata(table, col)
-            if original_metadata:  # If original column had metadata
-                new_table = set_column_metadata(
-                    new_table, col, original_metadata, replace=True
+    def _normalize_columns(df: pl.DataFrame) -> pl.DataFrame:
+        normalization_exprs = []
+        for col in columns:
+            if not df[col].dtype.is_numeric():
+                raise ValueError(
+                    f"Column '{col}' is not numeric and cannot be normalized"
                 )
+            # Update the column in place by dividing by sample mass
+            normalization_exprs.append((pl.col(col) / sample_mass).alias(col))
+        return df.with_columns(normalization_exprs)
+
+    new_table = with_polars(table, _normalize_columns)
 
     # Update metadata for normalized columns
     for col in columns:
@@ -419,8 +375,6 @@ def apply_dsc_calibration(
         raise ValueError(f"Table must contain '{dsc_column}' column")
 
     # Check if calibration has already been applied
-    from ..util import get_column_metadata
-
     dsc_metadata = get_column_metadata(table, dsc_column)
     if dsc_metadata and dsc_metadata.get("calibration_applied", False):
         raise ValueError(
@@ -466,55 +420,36 @@ def apply_dsc_calibration(
             "Invalid calibration constants: p1 (temperature scale) is zero"
         )
 
-    # Convert to DataFrame for easier manipulation
-    df = pl.from_arrow(table)
-    if not isinstance(df, pl.DataFrame):
-        raise TypeError("Failed to convert PyArrow table to Polars DataFrame")
+    def _calibrate_dsc(df: pl.DataFrame) -> pl.DataFrame:
+        temperature = df.get_column(temperature_column).to_numpy()
+        dsc_signal = df.get_column(dsc_column).to_numpy()
 
-    # Get temperature and DSC signal arrays
-    temperature = df.get_column(temperature_column).to_numpy()
-    dsc_signal = df.get_column(dsc_column).to_numpy()
+        # Calculate calibration factor using the formula
+        # z = (T - P0) / P1
+        z = (temperature - P0) / P1
 
-    # Calculate calibration factor using the formula
-    # z = (T - P0) / P1
-    z = (temperature - P0) / P1
+        # y = (P2 + P3*z + P4*z^2 + P5*z^3) * exp(-z^2)
+        y = (P2 + P3 * z + P4 * z**2 + P5 * z**3) * np.exp(-(z**2))
 
-    # y = (P2 + P3*z + P4*z^2 + P5*z^3) * exp(-z^2)
-    y = (P2 + P3 * z + P4 * z**2 + P5 * z**3) * np.exp(-(z**2))
+        # Apply calibration: calibrated_signal = dsc_signal_uV / y (µV to mW)
+        # where y is sensitivity in µV/mW, so µV ÷ (µV/mW) = mW.
+        # Only where the sensitivity is meaningfully positive; elsewhere NaN.
+        valid = y > MIN_DSC_SENSITIVITY_UV_PER_MW  # False for NaN temps too
+        if not valid.all():
+            bad_temps = temperature[~valid]
+            logger.warning(
+                f"DSC sensitivity is below {MIN_DSC_SENSITIVITY_UV_PER_MW} µV/mW "
+                f"for {int((~valid).sum())} of {len(y)} samples (temperatures "
+                f"{np.nanmin(bad_temps):.1f}-{np.nanmax(bad_temps):.1f} °C are "
+                "outside the calibration's valid range); calibrated DSC set to "
+                "NaN there"
+            )
+        calibrated_dsc = np.full(len(dsc_signal), np.nan)
+        calibrated_dsc[valid] = dsc_signal[valid] / y[valid]
 
-    # Apply calibration: calibrated_signal = dsc_signal_uV / y (converts µV to mW)
-    # where y is sensitivity in µV/mW, so µV ÷ (µV/mW) = mW.
-    # Only where the sensitivity is meaningfully positive; elsewhere NaN.
-    valid = y > MIN_DSC_SENSITIVITY_UV_PER_MW  # False for NaN temperatures too
-    if not valid.all():
-        bad_temps = temperature[~valid]
-        logger.warning(
-            f"DSC sensitivity is below {MIN_DSC_SENSITIVITY_UV_PER_MW} µV/mW for "
-            f"{int((~valid).sum())} of {len(y)} samples (temperatures "
-            f"{np.nanmin(bad_temps):.1f}-{np.nanmax(bad_temps):.1f} °C are outside "
-            "the calibration's valid range); calibrated DSC set to NaN there"
-        )
-    calibrated_dsc = np.full(len(dsc_signal), np.nan)
-    calibrated_dsc[valid] = dsc_signal[valid] / y[valid]
+        return df.with_columns(pl.Series(dsc_column, calibrated_dsc))
 
-    # Update DSC column with calibrated values
-    df = df.with_columns(pl.Series(dsc_column, calibrated_dsc))
-
-    # Convert back to PyArrow table while preserving all metadata
-    new_table = df.to_arrow()
-    if table.schema.metadata:
-        new_table = new_table.replace_schema_metadata(table.schema.metadata)
-
-    # Preserve column-level metadata for all existing columns
-    from ..util import get_column_metadata, set_column_metadata
-
-    for col in table.column_names:
-        if col in new_table.column_names:  # Column exists in new table
-            original_metadata = get_column_metadata(table, col)
-            if original_metadata:  # If original column had metadata
-                new_table = set_column_metadata(
-                    new_table, col, original_metadata, replace=True
-                )
+    new_table = with_polars(table, _calibrate_dsc)
 
     # Update metadata for the calibrated DSC column
     original_dsc_metadata = get_column_metadata(table, dsc_column) or {}

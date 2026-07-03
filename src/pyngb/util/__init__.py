@@ -18,6 +18,7 @@ from .columns import (
     set_column_metadata,
     set_default_column_metadata,
     update_column_metadata,
+    with_polars,
 )
 from .hashing import get_hash
 from .metadata import set_metadata
@@ -36,4 +37,5 @@ __all__ = [
     # General metadata
     "set_metadata",
     "update_column_metadata",
+    "with_polars",
 ]

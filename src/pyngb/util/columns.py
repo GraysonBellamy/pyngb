@@ -2,8 +2,10 @@
 
 import json
 import logging
+from collections.abc import Callable
 from typing import Any
 
+import polars as pl
 import pyarrow as pa
 
 logger = logging.getLogger(__name__)
@@ -273,3 +275,39 @@ def initialize_table_column_metadata(table: pa.Table) -> pa.Table:
         return table
 
     return table.cast(pa.schema(fields, metadata=table.schema.metadata))
+
+
+def with_polars(
+    table: pa.Table, fn: Callable[[pl.DataFrame], pl.DataFrame]
+) -> pa.Table:
+    """Apply a Polars transformation to an Arrow table, preserving metadata.
+
+    Converts the table to a DataFrame, applies ``fn``, converts back, and
+    restores the schema-level metadata plus the per-column metadata of every
+    column that survives the transformation (Polars round-trips drop both).
+
+    Args:
+        table: PyArrow table to transform
+        fn: Transformation taking and returning a Polars DataFrame
+
+    Returns:
+        Transformed PyArrow table with the original metadata restored
+    """
+    df = pl.from_arrow(table)
+    if not isinstance(df, pl.DataFrame):
+        raise TypeError("Failed to convert PyArrow table to Polars DataFrame")
+
+    new_table = fn(df).to_arrow()
+
+    if table.schema.metadata:
+        new_table = new_table.replace_schema_metadata(table.schema.metadata)
+
+    for col in table.column_names:
+        if col in new_table.column_names:
+            original_metadata = get_column_metadata(table, col)
+            if original_metadata:
+                new_table = set_column_metadata(
+                    new_table, col, original_metadata, replace=True
+                )
+
+    return new_table
