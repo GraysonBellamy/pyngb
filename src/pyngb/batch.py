@@ -8,7 +8,7 @@ import logging
 import time
 import zipfile
 import multiprocessing as mp
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import Future, ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import TypedDict
 from collections.abc import Callable
@@ -133,17 +133,17 @@ class BatchProcessor:
 
     Examples:
     >>> from pyngb.batch import BatchProcessor
-        >>>
-        >>> processor = BatchProcessor(max_workers=4)
-        >>> results = processor.process_directory("./data/", output_format="parquet")
-        >>> print(f"Processed {len(results)} files")
-        >>>
-        >>> # Custom processing with error handling
-        >>> results = processor.process_files(
-        ...     file_list,
-        ...     output_dir="./output/",
-        ...     skip_errors=True
-        ... )
+    >>>
+    >>> processor = BatchProcessor(max_workers=4)
+    >>> results = processor.process_directory("./data/", output_format="parquet")
+    >>> print(f"Processed {len(results)} files")
+    >>>
+    >>> # Custom processing with error handling
+    >>> results = processor.process_files(
+    ...     file_list,
+    ...     output_dir="./output/",
+    ...     skip_errors=True
+    ... )
     """
 
     def __init__(self, max_workers: int | None = None, verbose: bool = True):
@@ -281,6 +281,7 @@ class BatchProcessor:
                 }
 
                 # Collect results as they complete
+                result_by_future: dict[Future[BatchResult], BatchResult] = {}
                 for future in as_completed(future_to_file):
                     src = future_to_file[future]
                     try:
@@ -308,10 +309,16 @@ class BatchProcessor:
                             "error": f"{type(e).__name__}: {e!s}",
                         }
                         logger.exception("Failed to process %s", src)
-                    results.append(result)
+                    result_by_future[future] = result
 
                     if self.verbose:
-                        self._log_progress(len(results), len(files), start_time)
+                        self._log_progress(
+                            len(result_by_future), len(files), start_time
+                        )
+
+                # Return results in input order (matching sequential mode);
+                # future_to_file preserves submission order.
+                results.extend(result_by_future[f] for f in future_to_file)
 
         self._log_summary(results, start_time)
         return results
@@ -343,10 +350,10 @@ class BatchProcessor:
 
         logger.info(
             f"Batch processing completed in {total_time:.1f}s:\n"
-            f"  ✅ Successful: {successful}\n"
-            f"  ❌ Failed: {failed}\n"
-            f"  📊 Total rows processed: {total_rows:,}\n"
-            f"  ⚡ Average rate: {avg_rate:.1f} files/sec"
+            f"  Successful: {successful}\n"
+            f"  Failed: {failed}\n"
+            f"  Total rows processed: {total_rows:,}\n"
+            f"  Average rate: {avg_rate:.1f} files/sec"
         )
 
 
@@ -359,21 +366,21 @@ class NGBDataset:
 
     Examples:
     >>> from pyngb.batch import NGBDataset
-        >>>
-        >>> # Create dataset from directory
-        >>> dataset = NGBDataset.from_directory("./experiments/")
-        >>>
-        >>> # Get overview
-        >>> summary = dataset.summary()
-        >>> print(f"Dataset contains {len(dataset)} files")
-        >>>
-        >>> # Export metadata
-        >>> dataset.export_metadata("experiment_summary.csv")
-        >>>
-        >>> # Filter by criteria
-        >>> polymer_samples = dataset.filter_by_metadata(
-        ...     lambda meta: 'polymer' in meta.get('material', '').lower()
-        ... )
+    >>>
+    >>> # Create dataset from directory
+    >>> dataset = NGBDataset.from_directory("./experiments/")
+    >>>
+    >>> # Get overview
+    >>> summary = dataset.summary()
+    >>> print(f"Dataset contains {len(dataset)} files")
+    >>>
+    >>> # Export metadata
+    >>> dataset.export_metadata("experiment_summary.csv")
+    >>>
+    >>> # Filter by criteria
+    >>> polymer_samples = dataset.filter_by_metadata(
+    ...     lambda meta: 'polymer' in meta.get('material', '').lower()
+    ... )
     """
 
     def __init__(self, files: list[Path]):
@@ -406,6 +413,9 @@ class NGBDataset:
     def __len__(self) -> int:
         """Return number of files in dataset."""
         return len(self.files)
+
+    def __repr__(self) -> str:
+        return f"<NGBDataset: {len(self.files)} files>"
 
     def summary(
         self,
@@ -608,10 +618,10 @@ def process_directory(
 
     Examples:
     >>> from pyngb.batch import process_directory
-        >>>
-        >>> results = process_directory("./data/", output_format="both")
-        >>> successful = [r for r in results if r['status'] == 'success']
-        >>> print(f"Successfully processed {len(successful)} files")
+    >>>
+    >>> results = process_directory("./data/", output_format="both")
+    >>> successful = [r for r in results if r['status'] == 'success']
+    >>> print(f"Successfully processed {len(successful)} files")
     """
     processor = BatchProcessor(max_workers=max_workers)
     return processor.process_directory(directory, pattern, output_format)
