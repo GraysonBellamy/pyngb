@@ -3,7 +3,6 @@ Data stream processing for NGB measurement data.
 """
 
 import logging
-from itertools import tee, zip_longest
 
 import polars as pl
 
@@ -27,9 +26,6 @@ class DataStreamProcessor:
         self.parser = parser
         self.binary_config = BinaryProcessing()
         self.stream_markers = StreamMarkers()
-        self._table_sep_re = self.parser._get_compiled_pattern(
-            "table_sep", self.parser.markers.TABLE_SEPARATOR
-        )
 
     @staticmethod
     def _standardize_column_values(
@@ -42,18 +38,6 @@ class DataStreamProcessor:
             return [value * 60.0 for value in values]
         return values
 
-    def _split_tables(self, stream_data: bytes) -> list[bytes]:
-        """Split a stream into tables using the cached table-separator pattern.
-
-        Mirrors the existing splitting logic used elsewhere in the codebase to
-        avoid behavioral drift while keeping this class self-contained.
-        """
-        indices = [m.start() - 2 for m in self._table_sep_re.finditer(stream_data)]
-        start, end = tee(indices)
-        next(end, None)
-        tables = [stream_data[i:j] for i, j in zip_longest(start, end)]
-        return [t for t in tables if t]
-
     # --- Stream 2 ---
     def process_stream_2(self, stream_data: bytes) -> pl.DataFrame:
         """Process primary data stream (stream_2).
@@ -64,8 +48,7 @@ class DataStreamProcessor:
         header, and is flushed under that name when the next header (or the
         end of the stream) is reached.
         """
-        # Split into tables - preserve original splitting behavior
-        stream_table = self._split_tables(stream_data)
+        stream_table = self.parser.split_tables(stream_data)
 
         output: list[float] = []
         output_polars = pl.DataFrame()
@@ -150,8 +133,7 @@ class DataStreamProcessor:
         self, stream_data: bytes, existing_df: pl.DataFrame
     ) -> pl.DataFrame:
         """Process secondary data stream (stream_3)."""
-        # Split into tables - preserve original splitting behavior
-        stream_table = self._split_tables(stream_data)
+        stream_table = self.parser.split_tables(stream_data)
 
         output: list[float] = []
         output_polars = existing_df
