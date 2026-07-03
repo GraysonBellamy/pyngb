@@ -26,6 +26,9 @@ logger.addHandler(logging.NullHandler())
 class DataTypeHandler(Protocol):
     """Protocol for data type handlers."""
 
+    itemsize: int
+    """Byte width of one element of this data type."""
+
     def can_handle(self, data_type: bytes) -> bool:
         """Check if this handler can process the given data type."""
         ...
@@ -51,6 +54,8 @@ class Float64Handler:
         [1.0]
     """
 
+    itemsize = 8
+
     def can_handle(self, data_type: bytes) -> bool:
         return data_type == DataType.FLOAT64.value
 
@@ -75,6 +80,8 @@ class Float32Handler:
         [1.0]
     """
 
+    itemsize = 4
+
     def can_handle(self, data_type: bytes) -> bool:
         return data_type == DataType.FLOAT32.value
 
@@ -98,6 +105,8 @@ class Int32Handler:
         >>> handler.parse_data(data)
         [42.0]
     """
+
+    itemsize = 4
 
     def can_handle(self, data_type: bytes) -> bool:
         return data_type == DataType.INT32.value
@@ -149,6 +158,13 @@ class DataTypeRegistry:
     def register(self, handler: DataTypeHandler) -> None:
         """Register a new data type handler."""
         self._handlers.append(handler)
+
+    def itemsize(self, data_type: bytes) -> int | None:
+        """Byte width of one element of data_type, or None if unhandled."""
+        for handler in self._handlers:
+            if handler.can_handle(data_type):
+                return handler.itemsize
+        return None
 
     def parse_data(self, data_type: bytes, data: bytes | memoryview) -> list[float]:
         """Parse data using appropriate handler.

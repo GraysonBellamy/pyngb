@@ -320,10 +320,8 @@ Typical performance on modern hardware:
 ```
 NGBParseError (base)
 ├── NGBCorruptedFileError
-├── NGBUnsupportedVersionError
 ├── NGBDataTypeError
 ├── NGBStreamNotFoundError
-├── NGBMetadataExtractionError
 ├── NGBBaselineError
 ├── NGBValidationError
 ├── NGBResourceLimitError

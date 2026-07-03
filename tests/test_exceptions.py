@@ -9,7 +9,6 @@ from pyngb.exceptions import (
     NGBDataTypeError,
     NGBParseError,
     NGBStreamNotFoundError,
-    NGBUnsupportedVersionError,
 )
 
 
@@ -28,12 +27,6 @@ class TestNGBExceptions:
         assert str(error) == "File is corrupted"
         assert isinstance(error, NGBParseError)
         assert isinstance(error, Exception)
-
-    def test_ngb_unsupported_version_error(self) -> None:
-        """Test NGBUnsupportedVersionError inheritance."""
-        error = NGBUnsupportedVersionError("Version not supported")
-        assert str(error) == "Version not supported"
-        assert isinstance(error, NGBParseError)
 
     def test_ngb_data_type_error(self) -> None:
         """Test NGBDataTypeError inheritance."""
@@ -63,7 +56,6 @@ class TestNGBExceptions:
         exceptions = [
             NGBParseError,
             NGBCorruptedFileError,
-            NGBUnsupportedVersionError,
             NGBDataTypeError,
             NGBStreamNotFoundError,
         ]

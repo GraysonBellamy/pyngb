@@ -10,7 +10,7 @@ from polars.exceptions import ShapeError
 
 from ..binary import BinaryParser
 from ..constants import BinaryProcessing, PatternConfig, StreamMarkers
-from ..exceptions import NGBDataTypeError
+from ..exceptions import NGBCorruptedFileError, NGBDataTypeError
 
 __all__ = ["DataStreamProcessor"]
 
@@ -19,7 +19,14 @@ logger.addHandler(logging.NullHandler())
 
 
 class DataStreamProcessor:
-    """Processes data streams from NGB files with optimized parsing."""
+    """Processes data streams from NGB files with optimized parsing.
+
+    Structural corruption (a truncated data table, a payload that disagrees
+    with its declared element count, an unknown data type, or a channel whose
+    length does not match the rest of the frame) raises
+    :class:`~pyngb.exceptions.NGBCorruptedFileError` rather than silently
+    producing a frame with missing or wrong columns.
+    """
 
     def __init__(self, config: PatternConfig, parser: BinaryParser) -> None:
         self.config = config
@@ -38,9 +45,57 @@ class DataStreamProcessor:
             return [value * 60.0 for value in values]
         return values
 
-    # --- Stream 2 ---
-    def process_stream_2(self, stream_data: bytes) -> pl.DataFrame:
-        """Process primary data stream (stream_2).
+    def _extract_data_values(
+        self, table: bytes, table_index: int
+    ) -> list[float] | None:
+        """Decode the data payload of a table carrying the data marker.
+
+        Returns None for structural tables that carry the marker byte but no
+        payload (the 90-byte category tables present in every file). Raises
+        NGBCorruptedFileError when a payload exists but is structurally
+        inconsistent.
+        """
+        markers = self.parser.markers
+        registry = self.parser._data_type_registry
+
+        start_idx = table.find(markers.START_DATA)
+        if start_idx == -1:
+            return None
+
+        payload = table[start_idx + self.binary_config.START_DATA_HEADER_OFFSET :]
+        end_idx = payload.find(markers.END_DATA)
+        if end_idx == -1:
+            raise NGBCorruptedFileError(
+                f"data table {table_index}: START_DATA without END_DATA - "
+                "stream is truncated or corrupt"
+            )
+        payload = payload[:end_idx]
+
+        # START_DATA is followed by a u32 LE element count. Validating it
+        # against the payload length catches truncation and START_DATA
+        # false-matches that would otherwise yield short or garbage columns.
+        count = int.from_bytes(table[start_idx + 2 : start_idx + 6], "little")
+        data_type = table[start_idx - 1 : start_idx]
+        itemsize = registry.itemsize(data_type)
+        if itemsize is not None and len(payload) != count * itemsize:
+            raise NGBCorruptedFileError(
+                f"data table {table_index}: payload is {len(payload)} bytes but "
+                f"the count field declares {count} values of {itemsize} bytes"
+            )
+
+        try:
+            return registry.parse_data(data_type, payload)
+        except NGBDataTypeError as e:
+            raise NGBCorruptedFileError(f"data table {table_index}: {e}") from e
+
+    def _process_stream(
+        self,
+        stream_data: bytes,
+        header_marker: bytes,
+        header_pos: int,
+        initial_df: pl.DataFrame,
+    ) -> pl.DataFrame:
+        """Decode one measurement stream into columns of ``initial_df``.
 
         A channel's header table precedes its data tables, and data tables
         carry no channel identity of their own. Data accumulated in ``output``
@@ -51,151 +106,68 @@ class DataStreamProcessor:
         stream_table = self.parser.split_tables(stream_data)
 
         output: list[float] = []
-        output_polars = pl.DataFrame()
+        frame = initial_df
         title: str | None = None
-
         col_map = self.config.column_map
-        markers = self.parser.markers
 
         def flush_channel() -> None:
-            nonlocal output, output_polars
+            nonlocal output, frame
             if output:
                 if title is None:
-                    logger.debug(
-                        f"Discarding {len(output)} data values with no preceding "
-                        "channel header"
+                    raise NGBCorruptedFileError(
+                        f"{len(output)} data values precede any channel header"
                     )
-                else:
-                    try:
-                        values = self._standardize_column_values(title, output)
-                        output_polars = output_polars.with_columns(
-                            pl.Series(name=title, values=values)
-                        )
-                    except ShapeError:
-                        logger.debug(f"Shape mismatch when adding column '{title}'")
+                if title in frame.columns:
+                    logger.warning(
+                        f"Channel '{title}' appears more than once; "
+                        "overwriting the earlier column"
+                    )
+                try:
+                    values = self._standardize_column_values(title, output)
+                    frame = frame.with_columns(pl.Series(name=title, values=values))
+                except ShapeError as e:
+                    raise NGBCorruptedFileError(
+                        f"channel '{title}' has {len(output)} values but the "
+                        f"frame has {frame.height} rows"
+                    ) from e
             output = []
 
-        for table in stream_table:
-            # Check for header marker
-            header_slice = table[
-                self.stream_markers.STREAM2_HEADER_POS : self.stream_markers.STREAM2_HEADER_POS
-                + len(self.stream_markers.STREAM2_HEADER)
-            ]
-            if header_slice == self.stream_markers.STREAM2_HEADER:
+        data_marker = self.stream_markers.STREAM2_DATA
+        data_pos = self.stream_markers.DATA_MARKER_POS
+
+        for index, table in enumerate(stream_table):
+            if table[header_pos : header_pos + len(header_marker)] == header_marker:
                 flush_channel()
                 channel_id = table[0:1].hex()
                 title = col_map.get(channel_id, channel_id)
 
-            # Check for data marker
-            data_slice = table[
-                self.stream_markers.DATA_MARKER_POS : self.stream_markers.DATA_MARKER_POS
-                + len(self.stream_markers.STREAM2_DATA)
-            ]
-            if data_slice == self.stream_markers.STREAM2_DATA:
-                start_idx = table.find(markers.START_DATA)
-                if start_idx == -1:
-                    logger.debug("START_DATA marker not found in table - skipping")
-                    continue
+            if table[data_pos : data_pos + len(data_marker)] == data_marker:
+                values = self._extract_data_values(table, index)
+                if values is not None:
+                    output.extend(values)
 
-                payload_start = start_idx + self.binary_config.START_DATA_HEADER_OFFSET
-                data = table[payload_start:]
-                end_data = data.find(markers.END_DATA)
-                if end_data == -1:
-                    logger.debug("END_DATA marker not found in table - skipping")
-                    continue
-
-                data = data[:end_data]
-                # Data type byte immediately precedes START_DATA
-                if start_idx <= 0:
-                    logger.debug(
-                        "No data type byte found before START_DATA - skipping table"
-                    )
-                    continue
-                data_type = table[start_idx - 1 : start_idx]
-
-                try:
-                    parsed_data = self.parser._data_type_registry.parse_data(
-                        data_type, data
-                    )
-                    output.extend(parsed_data)
-                except NGBDataTypeError as e:
-                    logger.debug(f"Failed to parse data: {e}")
-                    continue
-
-        # Flush the final channel: real files end with data-less trailing
-        # headers, but a stream must not depend on them to emit its last column.
+        # Real files end with data-less trailing headers, but a stream must
+        # not depend on them to emit its last column.
         flush_channel()
 
-        return output_polars
+        return frame
 
-    # --- Stream 3 ---
+    def process_stream_2(self, stream_data: bytes) -> pl.DataFrame:
+        """Process primary data stream (stream_2)."""
+        return self._process_stream(
+            stream_data,
+            self.stream_markers.STREAM2_HEADER,
+            self.stream_markers.STREAM2_HEADER_POS,
+            pl.DataFrame(),
+        )
+
     def process_stream_3(
         self, stream_data: bytes, existing_df: pl.DataFrame
     ) -> pl.DataFrame:
-        """Process secondary data stream (stream_3)."""
-        stream_table = self.parser.split_tables(stream_data)
-
-        output: list[float] = []
-        output_polars = existing_df
-        title: str | None = None
-
-        col_map = self.config.column_map
-        markers = self.parser.markers
-
-        for table in stream_table:
-            # Check for Stream 3 header marker
-            header_slice = table[
-                self.stream_markers.STREAM3_HEADER_POS : self.stream_markers.STREAM3_HEADER_POS
-                + len(self.stream_markers.STREAM3_HEADER)
-            ]
-            if header_slice == self.stream_markers.STREAM3_HEADER:
-                title = table[0:1].hex()
-                title = col_map.get(title, title)
-                output = []
-
-            # Check for data marker (same as Stream 2)
-            data_slice = table[
-                self.stream_markers.DATA_MARKER_POS : self.stream_markers.DATA_MARKER_POS
-                + len(self.stream_markers.STREAM3_DATA)
-            ]
-            if data_slice == self.stream_markers.STREAM3_DATA:
-                start_idx = table.find(markers.START_DATA)
-                if start_idx == -1:
-                    logger.debug("START_DATA marker not found in table - skipping")
-                    continue
-
-                payload_start = start_idx + self.binary_config.START_DATA_HEADER_OFFSET
-                data = table[payload_start:]
-                end_data = data.find(markers.END_DATA)
-                if end_data == -1:
-                    logger.debug("END_DATA marker not found in table - skipping")
-                    continue
-
-                data = data[:end_data]
-                if start_idx <= 0:
-                    logger.debug(
-                        "No data type byte found before START_DATA - skipping table"
-                    )
-                    continue
-                data_type = table[start_idx - 1 : start_idx]
-
-                try:
-                    parsed_data = self.parser._data_type_registry.parse_data(
-                        data_type, data
-                    )
-                    output.extend(parsed_data)
-                except NGBDataTypeError as e:
-                    logger.debug(f"Failed to parse data: {e}")
-                    continue
-
-                # Save after each data block (original behavior)
-                try:
-                    values = self._standardize_column_values(title, output)
-                    output_polars = output_polars.with_columns(
-                        pl.Series(name=title, values=values)
-                    )
-                except ShapeError:
-                    # Silently ignore shape issues as before
-                    pass
-
-        return output_polars
+        """Process secondary data stream (stream_3), merging into existing_df."""
+        return self._process_stream(
+            stream_data,
+            self.stream_markers.STREAM3_HEADER,
+            self.stream_markers.STREAM3_HEADER_POS,
+            existing_df,
+        )

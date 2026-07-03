@@ -7,11 +7,9 @@ __all__ = [
     "NGBConfigurationError",
     "NGBCorruptedFileError",
     "NGBDataTypeError",
-    "NGBMetadataExtractionError",
     "NGBParseError",
     "NGBResourceLimitError",
     "NGBStreamNotFoundError",
-    "NGBUnsupportedVersionError",
     "NGBValidationError",
 ]
 
@@ -28,20 +26,12 @@ class NGBCorruptedFileError(NGBParseError):
     """Raised when NGB file is corrupted or has invalid structure."""
 
 
-class NGBUnsupportedVersionError(NGBParseError):
-    """Raised when NGB file version is not supported."""
-
-
 class NGBDataTypeError(NGBParseError):
     """Raised when encountering unknown or invalid data type."""
 
 
 class NGBStreamNotFoundError(NGBParseError):
     """Raised when expected stream is not found in NGB file."""
-
-
-class NGBMetadataExtractionError(NGBParseError):
-    """Raised when failed to extract metadata from binary stream."""
 
 
 class NGBBaselineError(NGBParseError):

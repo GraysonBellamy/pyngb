@@ -3,8 +3,6 @@ Unit tests for pyngb binary parser.
 """
 
 import struct
-from unittest.mock import patch
-from typing import Any
 
 import pytest
 
@@ -187,53 +185,6 @@ class TestBinaryParser:
         result = parser.split_tables(data)
         assert len(result) <= 3
 
-    def test_extract_data_array_no_start_marker(self) -> None:
-        """Test extract_data_array with no START_DATA marker."""
-        parser = BinaryParser()
-        table = b"no_start_marker_here"
-
-        result = parser.extract_data_array(table, DataType.FLOAT64.value)
-        assert result == []
-
-    def test_extract_data_array_no_end_marker(self) -> None:
-        """Test extract_data_array with no END_DATA marker."""
-        parser = BinaryParser()
-        markers = parser.markers
-        table = b"prefix" + markers.START_DATA + b"data_without_end"
-
-        result = parser.extract_data_array(table, DataType.FLOAT64.value)
-        assert result == []
-
-    def test_extract_data_array_valid_data(self) -> None:
-        """Test extract_data_array with valid data structure."""
-        parser = BinaryParser()
-        markers = parser.markers
-
-        # Create table with proper structure - use actual float64 bytes
-        import struct
-
-        float_data = struct.pack("<d", 1.0)  # 1.0 as little-endian float64
-        table = (
-            b"prefix" + markers.START_DATA + float_data + markers.END_DATA + b"suffix"
-        )
-
-        result = parser.extract_data_array(table, DataType.FLOAT64.value)
-        # The result might be empty if the data parsing doesn't work as expected
-        # Let's just verify it returns a list
-        assert isinstance(result, list)
-
-    def test_extract_data_array_unknown_data_type(self) -> None:
-        """Test extract_data_array with unknown data type."""
-        parser = BinaryParser()
-        markers = parser.markers
-
-        table = (
-            b"prefix" + markers.START_DATA + b"some_data" + markers.END_DATA + b"suffix"
-        )
-
-        result = parser.extract_data_array(table, b"\x99")
-        assert result == []
-
     def test_get_compiled_pattern_caching(self) -> None:
         """Test that compiled patterns are cached."""
         parser = BinaryParser()
@@ -263,37 +214,3 @@ class TestBinaryParser:
         # The patterns themselves may be the same object due to internal regex caching
         # but they should both work correctly
         assert pattern1.pattern == pattern2.pattern
-
-    def test_memory_view_optimization(self) -> None:
-        """Test that extract_data_array uses memory views efficiently."""
-        parser = BinaryParser()
-        markers = parser.markers
-
-        # Create large-ish data to test memory efficiency - use struct.pack for proper encoding
-        import struct
-
-        float_data = b"".join(struct.pack("<d", 1.0) for _ in range(100))
-        table = (
-            b"prefix" * 50
-            + markers.START_DATA
-            + float_data
-            + markers.END_DATA
-            + b"suffix" * 50
-        )
-
-        result = parser.extract_data_array(table, DataType.FLOAT64.value)
-        # The parser might not extract all values due to implementation details
-        # Just verify it's a list and doesn't crash
-        assert isinstance(result, list)
-
-    @patch("pyngb.binary.parser.logger")
-    def test_logging_debug_messages(self, mock_logger: Any) -> None:
-        """Test that debug messages are logged appropriately."""
-        parser = BinaryParser()
-
-        # Test with table that has no START_DATA
-        table = b"no_markers_here"
-        result = parser.extract_data_array(table, DataType.FLOAT64.value)
-
-        assert result == []
-        mock_logger.debug.assert_called_with("Table missing START_DATA marker")

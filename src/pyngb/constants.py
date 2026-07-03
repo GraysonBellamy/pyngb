@@ -480,7 +480,6 @@ class BinaryProcessing:
     """Constants for binary data processing."""
 
     TABLE_SPLIT_OFFSET: int = -2
-    MIN_FLOAT64_BYTES: int = 8
     START_DATA_HEADER_OFFSET: int = 6
 
     # Memory management
