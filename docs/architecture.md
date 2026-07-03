@@ -38,8 +38,6 @@ graph TB
     end
 
     subgraph "Configuration"
-        L[PyNGBConfig]
-        M[ValidationConfig]
         N[ParsingConfig]
     end
 
@@ -50,8 +48,6 @@ graph TB
     D --> J
     E --> F
     J --> K
-    G --> M
-    H --> L
     D --> N
 ```
 
@@ -204,16 +200,10 @@ sequenceDiagram
 ### Configuration
 
 #### `pyngb.config` - Configuration Management
-**Responsibility**: Centralized configuration
-- Parsing limits (file size, array size)
-- Validation thresholds (temperature, mass)
-- Batch processing settings (workers, memory)
+**Responsibility**: Parsing resource limits (stream size, table count, array size)
 
 **Key Classes**:
-- `PyNGBConfig`: Main configuration container
-- `ParsingConfig`: Binary parsing settings
-- `ValidationConfig`: Validation thresholds
-- `BatchConfig`: Batch processing settings
+- `ParsingConfig`: Binary parsing settings, accepted by `NGBParser`
 
 ## Key Design Decisions
 
@@ -323,8 +313,7 @@ NGBParseError (base)
 ├── NGBStreamNotFoundError
 ├── NGBBaselineError
 ├── NGBValidationError
-├── NGBResourceLimitError
-└── NGBConfigurationError
+└── NGBResourceLimitError
 ```
 
 ### Error Recovery

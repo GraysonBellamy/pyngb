@@ -4,7 +4,6 @@ Custom exceptions for NETZSCH NGB file parsing.
 
 __all__ = [
     "NGBBaselineError",
-    "NGBConfigurationError",
     "NGBCorruptedFileError",
     "NGBDataTypeError",
     "NGBParseError",
@@ -16,10 +15,6 @@ __all__ = [
 
 class NGBParseError(Exception):
     """Base exception for NGB file parsing errors."""
-
-
-class NGBConfigurationError(NGBParseError):
-    """Raised when configuration validation fails."""
 
 
 class NGBCorruptedFileError(NGBParseError):

@@ -145,6 +145,11 @@ class TestPatternConfig:
             assert len(hex_id) >= 1  # At least one character
             assert len(column_name) >= 1  # At least one character
 
+    def test_pattern_config_rejects_non_hex_column_ids(self) -> None:
+        """Construction fails when a column_map key is not a hex ID."""
+        with pytest.raises(ValueError, match="Invalid hex column ID"):
+            PatternConfig(column_map={"not-hex": "time"})
+
 
 class TestFileMetadata:
     """Test FileMetadata TypedDict."""

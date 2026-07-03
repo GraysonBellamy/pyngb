@@ -24,7 +24,6 @@ __all__ = [  # noqa: RUF022 - order chosen for logical grouping
     "StreamMarkers",
     "TemperatureCalibration",
     "TemperatureFixpoint",
-    "ValidationThresholds",
 ]
 
 
@@ -406,6 +405,15 @@ class PatternConfig:
         }
     )
 
+    def __post_init__(self) -> None:
+        for hex_id, column_name in self.column_map.items():
+            try:
+                int(hex_id, 16)
+            except ValueError:
+                raise ValueError(
+                    f"Invalid hex column ID {hex_id!r} for column {column_name!r}"
+                ) from None
+
 
 # Structural signature fragments used to differentiate sample vs reference crucible mass
 # occurrences when both share identical (category, field) byte patterns.
@@ -522,24 +530,3 @@ class PatternOffsets:
     # MFC signature values
     MFC_SIGNATURE: int = 0x1048
     GAS_CONTEXT_SIGNATURE: int = 0x1B
-
-
-@dataclass(frozen=True)
-class ValidationThresholds:
-    """Thresholds for data validation."""
-
-    # Temperature ranges (Celsius)
-    MIN_TEMPERATURE: float = -200.0
-    MAX_TEMPERATURE: float = 2000.0
-
-    # Mass ranges (mg)
-    MIN_MASS: float = 0.0
-    MAX_MASS: float = 10000.0
-
-    # Flow rates (ml/min)
-    MIN_FLOW_RATE: float = 0.1
-    MAX_FLOW_RATE: float = 1000.0
-
-    # Heating rates (K/min)
-    MIN_HEATING_RATE: float = 0.0
-    MAX_HEATING_RATE: float = 100.0

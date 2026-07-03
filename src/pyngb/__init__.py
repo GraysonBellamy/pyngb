@@ -8,9 +8,6 @@ pyngb: A Python library for parsing NETZSCH STA NGB files.
 
 from importlib.metadata import PackageNotFoundError, version
 
-# Import for side effect: validates config dataclasses at module load time.
-from . import config_validation  # noqa: F401
-
 from .analysis import dtg, dtg_custom
 from .api.analysis import add_dtg, calculate_table_dtg, normalize_to_initial_mass
 from .api.loaders import read_ngb
@@ -29,13 +26,7 @@ from .batch import (
     process_directory,
     process_files,
 )
-from .config import (
-    BatchConfig,
-    DEFAULT_CONFIG,
-    ParsingConfig,
-    PyNGBConfig,
-    ValidationConfig,
-)
+from .config import ParsingConfig
 from .constants import (
     BinaryMarkers,
     DataType,
@@ -50,7 +41,6 @@ from .constants import (
 from .core.parser import NGBParser
 from .exceptions import (
     NGBBaselineError,
-    NGBConfigurationError,
     NGBCorruptedFileError,
     NGBDataTypeError,
     NGBParseError,
@@ -68,11 +58,9 @@ __author__ = "Grayson Bellamy"
 __email__ = "gbellamy@umd.edu"
 
 __all__ = [
-    "DEFAULT_CONFIG",
     "BaseColumnMetadata",
     "BaselinableColumnMetadata",
     "BaselineSubtractor",
-    "BatchConfig",
     "BatchProcessor",
     "BatchResult",
     "BinaryMarkers",
@@ -80,7 +68,6 @@ __all__ = [
     "FileMetadata",
     "FileMetadataRequired",
     "NGBBaselineError",
-    "NGBConfigurationError",
     "NGBCorruptedFileError",
     "NGBDataTypeError",
     "NGBDataset",
@@ -91,11 +78,9 @@ __all__ = [
     "NGBValidationError",
     "ParsingConfig",
     "PatternConfig",
-    "PyNGBConfig",
     "QualityChecker",
     "TemperatureCalibration",
     "TemperatureFixpoint",
-    "ValidationConfig",
     "ValidationResult",
     "__author__",
     "__email__",

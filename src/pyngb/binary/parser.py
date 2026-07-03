@@ -9,7 +9,7 @@ import struct
 import numpy as np
 import numpy.typing as npt
 
-from ..config import DEFAULT_CONFIG, ParsingConfig
+from ..config import ParsingConfig
 from ..constants import BinaryMarkers, BinaryProcessing, DataType
 from ..exceptions import NGBResourceLimitError
 from .handlers import DataTypeRegistry
@@ -46,7 +46,7 @@ class BinaryParser:
     ):
         self.markers = markers or BinaryMarkers()
         self.binary_config = BinaryProcessing()
-        self.parsing_config = parsing_config or DEFAULT_CONFIG.parsing
+        self.parsing_config = parsing_config or ParsingConfig()
         self._compiled_patterns: dict[str, re.Pattern[bytes]] = {}
         self._data_type_registry = DataTypeRegistry()
 
