@@ -74,16 +74,19 @@ class BasicFieldExtractor(BaseMetadataExtractor):
         for field_name in self.BASIC_FIELDS:
             if field_name in self.config.metadata_patterns:
                 category, field_bytes = self.config.metadata_patterns[field_name]
+                # category/field_bytes are regex-source bytes (rb"\x.."
+                # escapes), already regex-safe; the markers are literal bytes
+                # and must be escaped.
                 pattern = (
                     category
                     + rb".+?"
                     + field_bytes
                     + rb".+?"
-                    + TYPE_PREFIX
+                    + re.escape(TYPE_PREFIX)
                     + rb"(.+?)"
-                    + TYPE_SEPARATOR
+                    + re.escape(TYPE_SEPARATOR)
                     + rb"(.+?)"
-                    + END_FIELD
+                    + re.escape(END_FIELD)
                 )
                 self._compiled_patterns[field_name] = re.compile(pattern, re.DOTALL)
 

@@ -602,8 +602,14 @@ class TemperatureCalibrationExtractor(BaseMetadataExtractor):
             return None
         end = idx + len(marker)
         # Walk backwards over printable UTF-16LE characters to the path start.
+        # Accepts printable Latin-1 (not just ASCII) so path components like
+        # C:\Nutzer\Müller survive; characters outside the BMP Latin-1 range
+        # still stop the walk.
         start = idx
-        while start >= 2 and data[start - 1] == 0 and 32 <= data[start - 2] < 127:
+        while start >= 2 and data[start - 1] == 0:
+            char = data[start - 2]
+            if not (32 <= char <= 126 or 160 <= char <= 255):
+                break
             start -= 2
         text = data[start:end].decode("utf-16le", errors="ignore")
         return text or None

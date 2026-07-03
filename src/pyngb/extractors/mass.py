@@ -60,32 +60,38 @@ class MassExtractor(BaseMetadataExtractor):
         # Crucible mass pattern (handles both sample and reference)
         if "crucible_mass" in self.config.metadata_patterns:
             category, field_bytes = self.config.metadata_patterns["crucible_mass"]
+            # category/field_bytes are regex-source bytes (rb"\x.." escapes),
+            # already regex-safe; the markers are literal bytes and must be
+            # escaped.
             pattern = (
                 category
                 + rb".+?"
                 + field_bytes
                 + rb".+?"
-                + TYPE_PREFIX
+                + re.escape(TYPE_PREFIX)
                 + rb"(.+?)"
-                + TYPE_SEPARATOR
+                + re.escape(TYPE_SEPARATOR)
                 + rb"(.+?)"
-                + END_FIELD
+                + re.escape(END_FIELD)
             )
             self._compiled_crucible_pattern = re.compile(pattern, re.DOTALL)
 
         # Sample mass pattern
         if "sample_mass" in self.config.metadata_patterns:
             category, field_bytes = self.config.metadata_patterns["sample_mass"]
+            # category/field_bytes are regex-source bytes (rb"\x.." escapes),
+            # already regex-safe; the markers are literal bytes and must be
+            # escaped.
             pattern = (
                 category
                 + rb".+?"
                 + field_bytes
                 + rb".+?"
-                + TYPE_PREFIX
+                + re.escape(TYPE_PREFIX)
                 + rb"(.+?)"
-                + TYPE_SEPARATOR
+                + re.escape(TYPE_SEPARATOR)
                 + rb"(.+?)"
-                + END_FIELD
+                + re.escape(END_FIELD)
             )
             self._compiled_sample_pattern = re.compile(pattern, re.DOTALL)
 
