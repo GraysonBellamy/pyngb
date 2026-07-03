@@ -7,6 +7,7 @@ import struct
 from typing import Protocol
 
 import numpy as np
+import numpy.typing as npt
 
 from ..constants import DataType
 from ..exceptions import NGBDataTypeError
@@ -33,8 +34,8 @@ class DataTypeHandler(Protocol):
         """Check if this handler can process the given data type."""
         ...
 
-    def parse_data(self, data: bytes | memoryview) -> list[float]:
-        """Parse binary data and return list of floats."""
+    def parse_data(self, data: bytes | memoryview) -> npt.NDArray[np.float64]:
+        """Decode binary data into a float64 array."""
         ...
 
 
@@ -42,8 +43,8 @@ class Float64Handler:
     """Handler for 64-bit IEEE 754 double precision floating point data.
 
     This handler processes binary data containing arrays of 64-bit doubles
-    stored in little-endian format. Uses NumPy's frombuffer for optimal
-    performance.
+    stored in little-endian format, decoding them zero-copy via NumPy's
+    frombuffer.
 
     Example:
         >>> handler = Float64Handler()
@@ -51,7 +52,7 @@ class Float64Handler:
         True
         >>> data = b'\\x00\\x00\\x00\\x00\\x00\\x00\\xf0\\x3f'  # 1.0 as double
         >>> handler.parse_data(data)
-        [1.0]
+        array([1.])
     """
 
     itemsize = 8
@@ -59,17 +60,16 @@ class Float64Handler:
     def can_handle(self, data_type: bytes) -> bool:
         return data_type == DataType.FLOAT64.value
 
-    def parse_data(self, data: bytes | memoryview) -> list[float]:
-        arr = np.frombuffer(data, dtype="<f8")
-        return [float(x) for x in arr]
+    def parse_data(self, data: bytes | memoryview) -> npt.NDArray[np.float64]:
+        return np.frombuffer(data, dtype="<f8")
 
 
 class Float32Handler:
     """Handler for 32-bit IEEE 754 single precision floating point data.
 
     This handler processes binary data containing arrays of 32-bit floats
-    stored in little-endian format. Uses NumPy's frombuffer for optimal
-    performance.
+    stored in little-endian format, widening them to float64 in one
+    vectorized copy.
 
     Example:
         >>> handler = Float32Handler()
@@ -77,7 +77,7 @@ class Float32Handler:
         True
         >>> data = b'\\x00\\x00\\x80\\x3f'  # 1.0 as float
         >>> handler.parse_data(data)
-        [1.0]
+        array([1.])
     """
 
     itemsize = 4
@@ -85,17 +85,16 @@ class Float32Handler:
     def can_handle(self, data_type: bytes) -> bool:
         return data_type == DataType.FLOAT32.value
 
-    def parse_data(self, data: bytes | memoryview) -> list[float]:
-        arr = np.frombuffer(data, dtype="<f4")
-        return [float(x) for x in arr]
+    def parse_data(self, data: bytes | memoryview) -> npt.NDArray[np.float64]:
+        return np.frombuffer(data, dtype="<f4").astype(np.float64)
 
 
 class Int32Handler:
     """Handler for 32-bit signed integer data.
 
     This handler processes binary data containing arrays of 32-bit integers
-    stored in little-endian format. Uses NumPy's frombuffer for optimal
-    performance.
+    stored in little-endian format, widening them to float64 (which represents
+    every int32 exactly) in one vectorized copy.
 
     Example:
         >>> handler = Int32Handler()
@@ -103,7 +102,7 @@ class Int32Handler:
         True
         >>> data = b'\\x2a\\x00\\x00\\x00'  # 42 as little-endian int32
         >>> handler.parse_data(data)
-        [42.0]
+        array([42.])
     """
 
     itemsize = 4
@@ -111,9 +110,8 @@ class Int32Handler:
     def can_handle(self, data_type: bytes) -> bool:
         return data_type == DataType.INT32.value
 
-    def parse_data(self, data: bytes | memoryview) -> list[float]:
-        arr = np.frombuffer(data, dtype="<i4")
-        return [float(x) for x in arr]
+    def parse_data(self, data: bytes | memoryview) -> npt.NDArray[np.float64]:
+        return np.frombuffer(data, dtype="<i4").astype(np.float64)
 
 
 class DataTypeRegistry:
@@ -129,12 +127,12 @@ class DataTypeRegistry:
     Example:
         >>> registry = DataTypeRegistry()
         >>> registry.parse_data(b'\\x05', binary_data)  # Uses Float64Handler
-        [1.0, 2.0, 3.0]
+        array([1., 2., 3.])
 
         >>> # Add custom handler
         >>> class CustomHandler:
         ...     def can_handle(self, data_type): return data_type == b'\\x06'
-        ...     def parse_data(self, data): return [42.0]
+        ...     def parse_data(self, data): return np.array([42.0])
         >>> registry.register(CustomHandler())
 
     Attributes:
@@ -166,7 +164,9 @@ class DataTypeRegistry:
                 return handler.itemsize
         return None
 
-    def parse_data(self, data_type: bytes, data: bytes | memoryview) -> list[float]:
+    def parse_data(
+        self, data_type: bytes, data: bytes | memoryview
+    ) -> npt.NDArray[np.float64]:
         """Parse data using appropriate handler.
 
         Args:
@@ -174,7 +174,7 @@ class DataTypeRegistry:
             data: Binary data to parse
 
         Returns:
-            List of parsed float values
+            Decoded float64 array
 
         Raises:
             NGBDataTypeError: If no handler is found for the data type

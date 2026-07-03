@@ -2,18 +2,32 @@
 Unit tests for pyngb binary parsing handlers.
 """
 
+import struct
+
+import numpy as np
 import pytest
 
-from pyngb.binary.handlers import DataTypeRegistry, Float32Handler, Float64Handler
+from pyngb.binary.handlers import (
+    DataTypeRegistry,
+    Float32Handler,
+    Float64Handler,
+    Int32Handler,
+)
 from pyngb.constants import DataType
 from pyngb.exceptions import NGBDataTypeError
+
+
+def _assert_f64_array(result: np.ndarray, expected: list[float]) -> None:
+    """Every handler returns a float64 array with exactly these values."""
+    assert isinstance(result, np.ndarray)
+    assert result.dtype == np.float64
+    np.testing.assert_array_equal(result, np.array(expected, dtype=np.float64))
 
 
 class TestFloat64Handler:
     """Test Float64Handler class."""
 
     def test_can_handle_float64(self) -> None:
-        """Test that Float64Handler recognizes FLOAT64 data type."""
         handler = Float64Handler()
         assert handler.can_handle(DataType.FLOAT64.value)
         assert not handler.can_handle(DataType.FLOAT32.value)
@@ -21,45 +35,28 @@ class TestFloat64Handler:
         assert not handler.can_handle(b"\x99")
 
     def test_parse_single_float64(self) -> None:
-        """Test parsing a single 64-bit float."""
         handler = Float64Handler()
-
-        # 1.0 as 64-bit float in little-endian
-        data = b"\x00\x00\x00\x00\x00\x00\xf0\x3f"
-        result = handler.parse_data(data)
-
-        assert len(result) == 1
-        assert abs(result[0] - 1.0) < 1e-15
+        _assert_f64_array(handler.parse_data(struct.pack("<d", 1.0)), [1.0])
 
     def test_parse_multiple_float64(self) -> None:
-        """Test parsing multiple 64-bit floats."""
         handler = Float64Handler()
-
-        # Array of [1.0, 2.0, 3.0] as 64-bit floats
-        data = (
-            b"\x00\x00\x00\x00\x00\x00\xf0\x3f"  # 1.0
-            b"\x00\x00\x00\x00\x00\x00\x00\x40"  # 2.0
-            b"\x00\x00\x00\x00\x00\x00\x08\x40"  # 3.0
-        )
-        result = handler.parse_data(data)
-
-        assert len(result) == 3
-        assert abs(result[0] - 1.0) < 1e-15
-        assert abs(result[1] - 2.0) < 1e-15
-        assert abs(result[2] - 3.0) < 1e-15
+        data = struct.pack("<3d", 1.0, -2.5, 3.75)
+        _assert_f64_array(handler.parse_data(data), [1.0, -2.5, 3.75])
 
     def test_parse_empty_data(self) -> None:
-        """Test parsing empty data."""
         handler = Float64Handler()
-        result = handler.parse_data(b"")
-        assert result == []
+        _assert_f64_array(handler.parse_data(b""), [])
+
+    def test_parse_misaligned_data_raises(self) -> None:
+        handler = Float64Handler()
+        with pytest.raises(ValueError):
+            handler.parse_data(b"\x00\x00\x00")  # not a multiple of 8
 
 
 class TestFloat32Handler:
     """Test Float32Handler class."""
 
     def test_can_handle_float32(self) -> None:
-        """Test that Float32Handler recognizes FLOAT32 data type."""
         handler = Float32Handler()
         assert handler.can_handle(DataType.FLOAT32.value)
         assert not handler.can_handle(DataType.FLOAT64.value)
@@ -67,76 +64,85 @@ class TestFloat32Handler:
         assert not handler.can_handle(b"\x99")
 
     def test_parse_single_float32(self) -> None:
-        """Test parsing a single 32-bit float."""
         handler = Float32Handler()
-
-        # 1.0 as 32-bit float in little-endian
-        data = b"\x00\x00\x80\x3f"
-        result = handler.parse_data(data)
-
-        assert len(result) == 1
-        assert abs(result[0] - 1.0) < 1e-6
+        _assert_f64_array(handler.parse_data(struct.pack("<f", 1.0)), [1.0])
 
     def test_parse_multiple_float32(self) -> None:
-        """Test parsing multiple 32-bit floats."""
         handler = Float32Handler()
+        data = struct.pack("<2f", 1.0, -2.5)
+        _assert_f64_array(handler.parse_data(data), [1.0, -2.5])
 
-        # Array of [1.0, 2.0] as 32-bit floats
-        data = (
-            b"\x00\x00\x80\x3f"  # 1.0
-            b"\x00\x00\x00\x40"  # 2.0
-        )
-        result = handler.parse_data(data)
-
-        assert len(result) == 2
-        assert abs(result[0] - 1.0) < 1e-6
-        assert abs(result[1] - 2.0) < 1e-6
+    def test_widening_preserves_float32_value_exactly(self) -> None:
+        """The f64 result equals the f32 value bit-exactly, not the decimal it rounds."""
+        handler = Float32Handler()
+        result = handler.parse_data(struct.pack("<f", 0.1))
+        _assert_f64_array(result, [np.float32(0.1)])
+        assert result[0] != 0.1  # 0.1f32 widened, not 0.1f64
 
     def test_parse_empty_data(self) -> None:
-        """Test parsing empty data."""
         handler = Float32Handler()
-        result = handler.parse_data(b"")
-        assert result == []
+        _assert_f64_array(handler.parse_data(b""), [])
+
+
+class TestInt32Handler:
+    """Test Int32Handler class."""
+
+    def test_can_handle_int32(self) -> None:
+        handler = Int32Handler()
+        assert handler.can_handle(DataType.INT32.value)
+        assert not handler.can_handle(DataType.FLOAT64.value)
+        assert not handler.can_handle(b"\x99")
+
+    def test_parse_int32_values(self) -> None:
+        handler = Int32Handler()
+        data = struct.pack("<3i", 42, -7, 2**31 - 1)
+        _assert_f64_array(handler.parse_data(data), [42.0, -7.0, 2147483647.0])
+
+    def test_parse_empty_data(self) -> None:
+        handler = Int32Handler()
+        _assert_f64_array(handler.parse_data(b""), [])
 
 
 class TestDataTypeRegistry:
     """Test DataTypeRegistry class."""
 
     def test_default_handlers_registered(self) -> None:
-        """Test that default handlers are registered."""
         registry = DataTypeRegistry()
 
-        # Should handle float64 and float32
-        data_f64 = b"\x00\x00\x00\x00\x00\x00\xf0\x3f"  # 1.0 as float64
-        result = registry.parse_data(DataType.FLOAT64.value, data_f64)
-        assert len(result) == 1
-        assert abs(result[0] - 1.0) < 1e-15
+        _assert_f64_array(
+            registry.parse_data(DataType.FLOAT64.value, struct.pack("<d", 1.0)), [1.0]
+        )
+        _assert_f64_array(
+            registry.parse_data(DataType.FLOAT32.value, struct.pack("<f", 1.0)), [1.0]
+        )
+        _assert_f64_array(
+            registry.parse_data(DataType.INT32.value, struct.pack("<i", 42)), [42.0]
+        )
 
-        data_f32 = b"\x00\x00\x80\x3f"  # 1.0 as float32
-        result = registry.parse_data(DataType.FLOAT32.value, data_f32)
-        assert len(result) == 1
-        assert abs(result[0] - 1.0) < 1e-6
+    def test_itemsize(self) -> None:
+        registry = DataTypeRegistry()
+        assert registry.itemsize(DataType.FLOAT64.value) == 8
+        assert registry.itemsize(DataType.FLOAT32.value) == 4
+        assert registry.itemsize(DataType.INT32.value) == 4
+        assert registry.itemsize(b"\x99") is None
 
     def test_register_custom_handler(self) -> None:
-        """Test registering a custom handler."""
         registry = DataTypeRegistry()
 
         class CustomHandler:
+            itemsize = 1
+
             def can_handle(self, data_type: bytes) -> bool:
                 return data_type == b"\x99"
 
-            def parse_data(self, data: bytes) -> list:  # type: ignore[type-arg]
-                return [42.0]  # Always return 42.0
+            def parse_data(self, data: bytes) -> np.ndarray:
+                return np.array([42.0])
 
-        custom_handler = CustomHandler()
-        registry.register(custom_handler)  # type: ignore[arg-type]
+        registry.register(CustomHandler())  # type: ignore[arg-type]
 
-        # Should use custom handler
-        result = registry.parse_data(b"\x99", b"any_data")
-        assert result == [42.0]
+        _assert_f64_array(registry.parse_data(b"\x99", b"any_data"), [42.0])
 
     def test_unknown_data_type_error(self) -> None:
-        """Test that unknown data type raises NGBDataTypeError."""
         registry = DataTypeRegistry()
 
         with pytest.raises(NGBDataTypeError) as exc_info:
@@ -145,68 +151,35 @@ class TestDataTypeRegistry:
         assert "No handler found for data type: 99" in str(exc_info.value)
 
     def test_handler_precedence(self) -> None:
-        """Test that handlers are checked in registration order."""
+        """Handlers are checked in registration order."""
         registry = DataTypeRegistry()
 
         class FirstHandler:
+            itemsize = 1
+
             def can_handle(self, data_type: bytes) -> bool:
                 return data_type == b"\x99"
 
-            def parse_data(self, data: bytes) -> list:  # type: ignore[type-arg]
-                return [1.0]
+            def parse_data(self, data: bytes) -> np.ndarray:
+                return np.array([1.0])
 
         class SecondHandler:
+            itemsize = 1
+
             def can_handle(self, data_type: bytes) -> bool:
                 return data_type == b"\x99"
 
-            def parse_data(self, data: bytes) -> list:  # type: ignore[type-arg]
-                return [2.0]
+            def parse_data(self, data: bytes) -> np.ndarray:
+                return np.array([2.0])
 
-        # Register in order
         registry.register(FirstHandler())  # type: ignore[arg-type]
         registry.register(SecondHandler())  # type: ignore[arg-type]
 
-        # Should use first handler (registered first)
-        result = registry.parse_data(b"\x99", b"data")
-        assert result == [1.0]
+        _assert_f64_array(registry.parse_data(b"\x99", b"data"), [1.0])
 
     def test_empty_registry(self) -> None:
-        """Test registry with no handlers."""
-        # Create registry without default handlers
         registry = DataTypeRegistry()
-        registry._handlers.clear()  # Remove default handlers
+        registry._handlers.clear()
 
         with pytest.raises(NGBDataTypeError):
             registry.parse_data(DataType.FLOAT64.value, b"data")
-
-
-class TestDataTypeHandlerProtocol:
-    """Test DataTypeHandler protocol compliance."""
-
-    def test_float64_handler_implements_protocol(self) -> None:
-        """Test that Float64Handler implements DataTypeHandler protocol."""
-        handler = Float64Handler()
-
-        # Should have required methods
-        assert hasattr(handler, "can_handle")
-        assert hasattr(handler, "parse_data")
-        assert callable(handler.can_handle)
-        assert callable(handler.parse_data)
-
-        # Methods should work correctly
-        assert isinstance(handler.can_handle(b"\x05"), bool)
-        assert isinstance(handler.parse_data(b""), list)
-
-    def test_float32_handler_implements_protocol(self) -> None:
-        """Test that Float32Handler implements DataTypeHandler protocol."""
-        handler = Float32Handler()
-
-        # Should have required methods
-        assert hasattr(handler, "can_handle")
-        assert hasattr(handler, "parse_data")
-        assert callable(handler.can_handle)
-        assert callable(handler.parse_data)
-
-        # Methods should work correctly
-        assert isinstance(handler.can_handle(b"\x04"), bool)
-        assert isinstance(handler.parse_data(b""), list)

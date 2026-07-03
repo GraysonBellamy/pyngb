@@ -6,6 +6,9 @@ import logging
 import re
 import struct
 
+import numpy as np
+import numpy.typing as npt
+
 from ..config import DEFAULT_CONFIG, ParsingConfig
 from ..constants import BinaryMarkers, BinaryProcessing, DataType
 from ..exceptions import NGBResourceLimitError
@@ -179,7 +182,9 @@ class BinaryParser:
         """Byte width of one element of ``data_type``, or None if unhandled."""
         return self._data_type_registry.itemsize(data_type)
 
-    def parse_data(self, data_type: bytes, payload: bytes | memoryview) -> list[float]:
+    def parse_data(
+        self, data_type: bytes, payload: bytes | memoryview
+    ) -> npt.NDArray[np.float64]:
         """Decode a data payload into values, enforcing the array size limit.
 
         Args:
@@ -187,7 +192,7 @@ class BinaryParser:
             payload: Raw array payload to decode
 
         Returns:
-            List of decoded float values
+            Decoded float64 array
 
         Raises:
             NGBResourceLimitError: If the payload exceeds max_array_size_mb

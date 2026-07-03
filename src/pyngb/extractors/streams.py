@@ -4,6 +4,8 @@ Data stream processing for NGB measurement data.
 
 import logging
 
+import numpy as np
+import numpy.typing as npt
 import polars as pl
 
 from polars.exceptions import ShapeError
@@ -34,20 +36,9 @@ class DataStreamProcessor:
         self.binary_config = BinaryProcessing()
         self.stream_markers = StreamMarkers()
 
-    @staticmethod
-    def _standardize_column_values(
-        title: str | None, values: list[float]
-    ) -> list[float]:
-        """Convert raw instrument values to pyngb's public units."""
-        if title == "time":
-            # NGB stream time values are stored in minutes. pyngb exposes seconds
-            # throughout its public API so rates such as DTG are unambiguous.
-            return [value * 60.0 for value in values]
-        return values
-
     def _extract_data_values(
         self, table: bytes, table_index: int
-    ) -> list[float] | None:
+    ) -> npt.NDArray[np.float64] | None:
         """Decode the data payload of a table carrying the data marker.
 
         Returns None for structural tables that carry the marker byte but no
@@ -104,32 +95,37 @@ class DataStreamProcessor:
         """
         stream_table = self.parser.split_tables(stream_data)
 
-        output: list[float] = []
+        chunks: list[npt.NDArray[np.float64]] = []
         frame = initial_df
         title: str | None = None
         col_map = self.config.column_map
 
         def flush_channel() -> None:
-            nonlocal output, frame
-            if output:
+            nonlocal chunks, frame
+            if chunks:
+                values = np.concatenate(chunks)
                 if title is None:
                     raise NGBCorruptedFileError(
-                        f"{len(output)} data values precede any channel header"
+                        f"{len(values)} data values precede any channel header"
                     )
                 if title in frame.columns:
                     logger.warning(
                         f"Channel '{title}' appears more than once; "
                         "overwriting the earlier column"
                     )
+                if title == "time":
+                    # NGB stream time values are stored in minutes. pyngb
+                    # exposes seconds throughout its public API so rates such
+                    # as DTG are unambiguous.
+                    values = values * 60.0
                 try:
-                    values = self._standardize_column_values(title, output)
                     frame = frame.with_columns(pl.Series(name=title, values=values))
                 except ShapeError as e:
                     raise NGBCorruptedFileError(
-                        f"channel '{title}' has {len(output)} values but the "
+                        f"channel '{title}' has {len(values)} values but the "
                         f"frame has {frame.height} rows"
                     ) from e
-            output = []
+            chunks = []
 
         data_marker = self.stream_markers.STREAM2_DATA
         data_pos = self.stream_markers.DATA_MARKER_POS
@@ -142,8 +138,8 @@ class DataStreamProcessor:
 
             if table[data_pos : data_pos + len(data_marker)] == data_marker:
                 values = self._extract_data_values(table, index)
-                if values is not None:
-                    output.extend(values)
+                if values is not None and len(values):
+                    chunks.append(values)
 
         # Real files end with data-less trailing headers, but a stream must
         # not depend on them to emit its last column.
