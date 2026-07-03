@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from typing import ClassVar
 
 import numpy as np
 import polars as pl
@@ -27,10 +28,12 @@ class TestDSCCalibration:
 
         table = pa.table(test_data)
 
-        # Create mock calibration constants
+        # Mock calibration constants; the temperature scale keeps z = (T-p0)/p1
+        # well inside the fitted range so every sensitivity is valid (real
+        # fits behave the same way over their calibrated temperatures).
         cal_constants = {
             "p0": 25.0,  # Reference temperature
-            "p1": 100.0,  # Temperature scale
+            "p1": 1000.0,  # Temperature scale
             "p2": 1.0,  # Base calibration factor
             "p3": 0.1,  # Linear term
             "p4": 0.01,  # Quadratic term
@@ -282,3 +285,68 @@ class TestDSCCalibration:
         original_data = original_df["dsc_signal"].to_numpy()  # type: ignore[index]
         calibrated_data = calibrated_df["dsc_signal"].to_numpy()  # type: ignore[index]
         assert not np.array_equal(original_data, calibrated_data)
+
+
+class TestSensitivityGuards:
+    """The calibration polynomial is only meaningful inside its fitted range;
+    outside it the Gaussian envelope collapses toward zero (and the cubic can
+    cross it), so dividing by it would amplify noise arbitrarily (NUM-04)."""
+
+    # Constants from a real fixture (Douglas Fir): y ~ 7.3 uV/mW at 25 degC,
+    # ~2.3 at 800 degC, and negative beyond ~1700 degC.
+    REAL_CONSTANTS: ClassVar[dict[str, float]] = {
+        "p0": 69.19999694824219,
+        "p1": 678.8131103515625,
+        "p2": 7.053184509277344,
+        "p3": -4.022271156311035,
+        "p4": 5.7613935470581055,
+        "p5": -1.777075171470642,
+    }
+
+    @staticmethod
+    def _make_table(temperatures: list[float], constants: dict[str, float]) -> pa.Table:
+        table = pa.table(
+            {
+                "sample_temperature": temperatures,
+                "dsc_signal": [1.0] * len(temperatures),
+            }
+        )
+        metadata = {"calibration_constants": constants}
+        schema_metadata = {b"file_metadata": json.dumps(metadata).encode()}
+        return table.cast(table.schema.with_metadata(schema_metadata))
+
+    def test_zero_p1_raises(self) -> None:
+        table = self._make_table([100.0, 200.0], {**self.REAL_CONSTANTS, "p1": 0.0})
+        with pytest.raises(ValueError, match="p1"):
+            apply_dsc_calibration(table)
+
+    def test_vanishing_sensitivity_masked_to_nan(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Out-of-range temperatures yield NaN plus a warning, not kilowatts."""
+        table = self._make_table([25.0, 800.0, 2500.0], self.REAL_CONSTANTS)
+
+        with caplog.at_level("WARNING", logger="pyngb.api.analysis"):
+            calibrated_table = apply_dsc_calibration(table)
+
+        df = pl.from_arrow(calibrated_table)
+        values = df["dsc_signal"].to_numpy()  # type: ignore[index]
+
+        # In-range values calibrate normally
+        assert np.isfinite(values[0]) and np.isfinite(values[1])
+        assert values[0] == pytest.approx(1.0 / 7.309, rel=1e-3)
+        # The out-of-range value is masked, not published as -24596 mW
+        assert np.isnan(values[2])
+        assert any("outside" in r.message for r in caplog.records)
+
+    def test_real_file_untouched_by_guard(self) -> None:
+        """Fixture temperatures stay far inside the calibrated range: the
+        guard must not mask a single real sample."""
+        test_file = Path("tests/test_files/Red_Oak_STA_10K_250731_R7.ngb-ss3")
+        if not test_file.exists():
+            pytest.skip("Test file not available")
+
+        calibrated_table = apply_dsc_calibration(read_ngb(str(test_file)))
+        df = pl.from_arrow(calibrated_table)
+        values = df["dsc_signal"].to_numpy()  # type: ignore[index]
+        assert np.isfinite(values).all()

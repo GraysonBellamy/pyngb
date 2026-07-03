@@ -6,6 +6,8 @@ and mass normalization on PyArrow tables.
 """
 
 import json
+import logging
+
 import numpy as np
 import polars as pl
 import pyarrow as pa
@@ -18,6 +20,16 @@ __all__ = [
     "calculate_table_dtg",
     "normalize_to_initial_mass",
 ]
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
+
+# Smallest sensitivity (µV/mW) accepted from the calibration polynomial.
+# Real fits sit around 2-7 µV/mW inside their calibrated range; the Gaussian
+# envelope exp(-z²) collapses toward zero (and the cubic can cross it) beyond
+# that range, where dividing by y would turn microvolt noise into kilowatt
+# readings. Samples below this floor are masked to NaN instead.
+MIN_DSC_SENSITIVITY_UV_PER_MW = 1e-2
 
 
 def add_dtg(
@@ -369,11 +381,15 @@ def apply_dsc_calibration(
         Table with calibrated DSC column in mW, updated units, and calibration
         status added to metadata
 
+    Where the fitted sensitivity is not meaningfully positive (outside the
+    calibration's temperature range), the calibrated signal is set to NaN and
+    a warning is logged rather than publishing arbitrarily amplified noise.
+
     Raises
     ------
     ValueError
-        If required columns are missing, calibration constants not found in metadata,
-        or if calibration has already been applied
+        If required columns are missing, calibration constants not found in
+        metadata, calibration has already been applied, or p1 is zero
     KeyError
         If required calibration constants (P0-P5) are missing
 
@@ -445,6 +461,11 @@ def apply_dsc_calibration(
     P4 = calibration_constants["p4"]
     P5 = calibration_constants["p5"]
 
+    if P1 == 0:
+        raise ValueError(
+            "Invalid calibration constants: p1 (temperature scale) is zero"
+        )
+
     # Convert to DataFrame for easier manipulation
     df = pl.from_arrow(table)
     if not isinstance(df, pl.DataFrame):
@@ -462,8 +483,19 @@ def apply_dsc_calibration(
     y = (P2 + P3 * z + P4 * z**2 + P5 * z**3) * np.exp(-(z**2))
 
     # Apply calibration: calibrated_signal = dsc_signal_uV / y (converts µV to mW)
-    # where y is sensitivity in µV/mW, so µV ÷ (µV/mW) = mW
-    calibrated_dsc = dsc_signal / y
+    # where y is sensitivity in µV/mW, so µV ÷ (µV/mW) = mW.
+    # Only where the sensitivity is meaningfully positive; elsewhere NaN.
+    valid = y > MIN_DSC_SENSITIVITY_UV_PER_MW  # False for NaN temperatures too
+    if not valid.all():
+        bad_temps = temperature[~valid]
+        logger.warning(
+            f"DSC sensitivity is below {MIN_DSC_SENSITIVITY_UV_PER_MW} µV/mW for "
+            f"{int((~valid).sum())} of {len(y)} samples (temperatures "
+            f"{np.nanmin(bad_temps):.1f}-{np.nanmax(bad_temps):.1f} °C are outside "
+            "the calibration's valid range); calibrated DSC set to NaN there"
+        )
+    calibrated_dsc = np.full(len(dsc_signal), np.nan)
+    calibrated_dsc[valid] = dsc_signal[valid] / y[valid]
 
     # Update DSC column with calibrated values
     df = df.with_columns(pl.Series(dsc_column, calibrated_dsc))
