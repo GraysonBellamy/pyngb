@@ -705,11 +705,7 @@ class ApplicationLicenseExtractor(BaseMetadataExtractor):
 
             # application_version: match leading 'Version x.y.z'
             app = next(
-                (
-                    s
-                    for s in strings
-                    if re.match(r"^\\s*Version\\s+\\d+\\.\\d+\\.\\d+", s)
-                ),
+                (s for s in strings if re.match(r"^\s*Version\s+\d+\.\d+\.\d+", s)),
                 None,
             )
             if app and "application_version" not in metadata:
@@ -720,7 +716,7 @@ class ApplicationLicenseExtractor(BaseMetadataExtractor):
             license_candidates = [
                 s
                 for s in strings
-                if ("\\n" in s and not s.lstrip().startswith("Version"))
+                if ("\n" in s and not s.lstrip().startswith("Version"))
             ]
             if license_candidates and "licensed_to" not in metadata:
                 # Choose the longest reasonable candidate
