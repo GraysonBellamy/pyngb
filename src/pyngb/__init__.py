@@ -42,13 +42,11 @@ from .constants import (
 )
 from .core.parser import NGBParser
 from .exceptions import (
-    NGBBaselineError,
     NGBCorruptedFileError,
     NGBDataTypeError,
     NGBParseError,
     NGBResourceLimitError,
     NGBStreamNotFoundError,
-    NGBValidationError,
 )
 from .validation import QualityChecker, ValidationResult, validate_sta_data
 
@@ -66,7 +64,6 @@ __all__ = [
     "BatchProcessor",
     "BatchResult",
     "FileMetadata",
-    "NGBBaselineError",
     "NGBCorruptedFileError",
     "NGBDataTypeError",
     "NGBDataset",
@@ -74,7 +71,6 @@ __all__ = [
     "NGBParser",
     "NGBResourceLimitError",
     "NGBStreamNotFoundError",
-    "NGBValidationError",
     "ParsingConfig",
     "PatternConfig",
     "QualityChecker",

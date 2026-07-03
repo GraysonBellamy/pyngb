@@ -3,13 +3,11 @@ Custom exceptions for NETZSCH NGB file parsing.
 """
 
 __all__ = [
-    "NGBBaselineError",
     "NGBCorruptedFileError",
     "NGBDataTypeError",
     "NGBParseError",
     "NGBResourceLimitError",
     "NGBStreamNotFoundError",
-    "NGBValidationError",
 ]
 
 
@@ -27,22 +25,6 @@ class NGBDataTypeError(NGBParseError):
 
 class NGBStreamNotFoundError(NGBParseError):
     """Raised when expected stream is not found in NGB file."""
-
-
-class NGBBaselineError(NGBParseError):
-    """Raised when baseline subtraction operation failed."""
-
-
-class NGBValidationError(NGBParseError):
-    """Raised when data validation failed.
-
-    Attributes:
-        errors: List of specific validation error messages
-    """
-
-    def __init__(self, message: str, errors: list[str] | None = None) -> None:
-        super().__init__(message)
-        self.errors = errors or []
 
 
 class NGBResourceLimitError(NGBParseError):
