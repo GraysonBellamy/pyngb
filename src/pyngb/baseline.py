@@ -8,6 +8,7 @@ the API layer's job (``read_ngb(path, baseline_file=...)``).
 """
 
 import logging
+import math
 from dataclasses import dataclass
 from typing import Literal
 
@@ -265,8 +266,6 @@ class BaselineSubtractor:
             )
 
         # Check each stage for compatibility
-        tolerance = 1e-3  # Tolerance for floating point comparison
-
         for stage_key in sample_temp_prog:
             if stage_key not in baseline_temp_prog:
                 raise ValueError(
@@ -283,7 +282,22 @@ class BaselineSubtractor:
                 sample_val = sample_stage.get(param, 0.0)
                 baseline_val = baseline_stage.get(param, 0.0)
 
-                if abs(sample_val - baseline_val) > tolerance:
+                if not isinstance(sample_val, (int, float)) or not isinstance(
+                    baseline_val, (int, float)
+                ):
+                    if sample_val != baseline_val:
+                        raise ValueError(
+                            f"Temperature program mismatch in stage '{stage_key}', parameter '{param}': "
+                            f"sample={sample_val!r}, baseline={baseline_val!r}"
+                        )
+                    continue
+
+                # Stage values derive from float32 and durations are scaled
+                # x60, so a fixed absolute tolerance is too tight for large
+                # values (float32 spacing at 7200 s is ~1e-3 already).
+                if not math.isclose(
+                    sample_val, baseline_val, rel_tol=1e-5, abs_tol=1e-3
+                ):
                     raise ValueError(
                         f"Temperature program mismatch in stage '{stage_key}', parameter '{param}': "
                         f"sample={sample_val}, baseline={baseline_val}"
