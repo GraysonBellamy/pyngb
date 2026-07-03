@@ -172,7 +172,7 @@ def read_ngb(
     -----------------
     - Fast binary parsing with NumPy optimization
     - Memory-efficient processing with PyArrow
-    - Typical parsing time: 0.1-10 seconds depending on file size
+    - Typical parsing time: well under a second per file
     - Includes file hash for integrity verification
 
     See Also

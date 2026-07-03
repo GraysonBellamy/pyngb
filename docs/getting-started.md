@@ -92,7 +92,9 @@ if "mass" in df.columns:
 
 ## Command Line Interface
 
-pyngb includes a powerful CLI for batch processing and automation.
+pyngb includes a powerful CLI for batch processing and automation. It is
+installed as the `pyngb` console script; `python -m pyngb` is equivalent and
+used in the examples below.
 
 ### Basic Usage
 

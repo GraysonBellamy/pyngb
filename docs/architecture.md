@@ -298,8 +298,8 @@ class QualityChecker:
 
 ### Benchmarks
 Typical performance on modern hardware:
-- Single file parsing: ~0.5-1.0 seconds (500KB file)
-- Batch processing: ~5-10 files/second
+- Single file parsing: tens of milliseconds (~20 ms for a 400 KB file)
+- Batch processing: dozens of files/second, scaling with worker count
 - DTG calculation: ~50ms (10,000 points)
 - Full validation: ~100ms (typical dataset)
 
@@ -311,8 +311,6 @@ NGBParseError (base)
 ├── NGBCorruptedFileError
 ├── NGBDataTypeError
 ├── NGBStreamNotFoundError
-├── NGBBaselineError
-├── NGBValidationError
 └── NGBResourceLimitError
 ```
 
