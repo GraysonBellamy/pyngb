@@ -16,7 +16,7 @@ from ..constants import (
     PatternConfig,
 )
 from ..exceptions import NGBParseError
-from .base import BaseMetadataExtractor, FileMetadata
+from .base import BaseMetadataExtractor, FileMetadata, StreamTables
 
 __all__ = ["MassExtractor"]
 
@@ -91,7 +91,7 @@ class MassExtractor(BaseMetadataExtractor):
 
         self.logger.debug("Compiled mass extraction patterns")
 
-    def can_extract(self, tables: list[bytes]) -> bool:
+    def can_extract(self, tables: StreamTables) -> bool:
         """Check if mass fields can be extracted from the tables.
 
         Args:
@@ -109,7 +109,7 @@ class MassExtractor(BaseMetadataExtractor):
             self.config.metadata_patterns.get("crucible_mass", (b"", b""))[1],
         ]
 
-        combined_data = b"".join(tables)
+        combined_data = tables.combined
 
         for marker in mass_markers:
             if marker and marker in combined_data:
@@ -121,7 +121,7 @@ class MassExtractor(BaseMetadataExtractor):
             or REF_CRUCIBLE_SIG_FRAGMENT in combined_data
         )
 
-    def extract(self, tables: list[bytes], metadata: FileMetadata) -> None:
+    def extract(self, tables: StreamTables, metadata: FileMetadata) -> None:
         """Extract mass metadata fields from tables.
 
         Args:
@@ -147,7 +147,7 @@ class MassExtractor(BaseMetadataExtractor):
             self.logger.debug("No mass fields extracted")
 
     def _extract_simple_sample_mass(
-        self, tables: list[bytes], metadata: FileMetadata
+        self, tables: StreamTables, metadata: FileMetadata
     ) -> int:
         """Extract simple sample mass field.
 
@@ -178,7 +178,7 @@ class MassExtractor(BaseMetadataExtractor):
         return 0
 
     def _extract_crucible_masses_structural(
-        self, tables: list[bytes], metadata: FileMetadata
+        self, tables: StreamTables, metadata: FileMetadata
     ) -> int:
         """Extract crucible masses using structural parsing.
 
@@ -195,7 +195,7 @@ class MassExtractor(BaseMetadataExtractor):
         if not self._compiled_crucible_pattern:
             return 0
 
-        combined_data = b"".join(tables)
+        combined_data = tables.combined
         extracted_count = 0
 
         # Find all crucible mass occurrences

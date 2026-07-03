@@ -10,6 +10,23 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
+def _encode_metadata(metadata: dict[str, Any]) -> dict[bytes, bytes]:
+    """Encode a metadata dict into the bytes->bytes form Arrow fields require.
+
+    Strings are UTF-8 encoded, bytes pass through, everything else is JSON.
+    """
+    encoded: dict[bytes, bytes] = {}
+    for k, v in metadata.items():
+        key = k.encode() if isinstance(k, str) else k
+        if isinstance(v, bytes):
+            encoded[key] = v
+        elif isinstance(v, str):
+            encoded[key] = v.encode("utf-8")
+        else:
+            encoded[key] = json.dumps(v).encode("utf-8")
+    return encoded
+
+
 def set_column_metadata(
     table: pa.Table, column: str, metadata: dict[str, Any], replace: bool = False
 ) -> pa.Table:
@@ -31,26 +48,11 @@ def set_column_metadata(
         raise ValueError(f"Column '{column}' not found in table")
 
     if replace:
-        # For replacement, we need to create a new field with only the new metadata
-        # First get all fields
+        # Rebuild the schema with only the new metadata on the target column
         fields = []
         for col_name in table.schema.names:
             if col_name == column:
-                # Create field with only the new metadata (encoded properly)
-                encoded_metadata = {}
-                for k, v in metadata.items():
-                    if isinstance(v, bytes):
-                        encoded_metadata[k.encode() if isinstance(k, str) else k] = v
-                    elif isinstance(v, str):
-                        encoded_metadata[k.encode() if isinstance(k, str) else k] = (
-                            v.encode("utf-8")
-                        )
-                    else:
-                        encoded_metadata[k.encode() if isinstance(k, str) else k] = (
-                            json.dumps(v).encode("utf-8")
-                        )
-
-                field = table.field(col_name).with_metadata(encoded_metadata)
+                field = table.field(col_name).with_metadata(_encode_metadata(metadata))
                 fields.append(field)
             else:
                 fields.append(table.field(col_name))
@@ -240,18 +242,34 @@ def set_default_column_metadata(table: pa.Table, column: str) -> pa.Table:
 def initialize_table_column_metadata(table: pa.Table) -> pa.Table:
     """Initialize default metadata for all columns in a table.
 
+    Columns that already carry metadata keep it untouched; the rest get the
+    defaults for their name. The schema is rebuilt and cast exactly once
+    rather than once per column.
+
     Args:
         table: PyArrow table to initialize metadata for
 
     Returns:
         New table with default metadata set for all columns
     """
-    result_table = table
+    from ..constants import DEFAULT_COLUMN_METADATA
 
-    for column in table.column_names:
-        # Only set metadata if column doesn't already have metadata
-        existing_metadata = get_column_metadata(result_table, column)
-        if not existing_metadata:
-            result_table = set_default_column_metadata(result_table, column)
+    fallback = {"units": "unknown", "processing_history": ["raw"], "source": "unknown"}
 
-    return result_table
+    fields = []
+    changed = False
+    for column in table.schema.names:
+        field = table.field(column)
+        if field.metadata:
+            fields.append(field)
+            continue
+        default_metadata = DEFAULT_COLUMN_METADATA.get(column, fallback)
+        if not isinstance(default_metadata, dict):
+            default_metadata = fallback
+        fields.append(field.with_metadata(_encode_metadata(default_metadata)))
+        changed = True
+
+    if not changed:
+        return table
+
+    return table.cast(pa.schema(fields, metadata=table.schema.metadata))

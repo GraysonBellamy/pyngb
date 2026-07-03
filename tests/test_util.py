@@ -327,16 +327,17 @@ class TestGetHash:
     def test_get_hash_permission_error(
         self, mock_open: Any, mock_stat: Any, mock_logger: Any
     ) -> None:
-        """Test get_hash with permission error."""
+        """A permission error is logged and reported as None, not raised."""
         # Mock the stat call to succeed (so we get to the open call)
         mock_stat.return_value.st_size = 1024
 
         result = get_hash("protected_file.txt")
 
         assert result is None
-        mock_logger.error.assert_called_once_with(
-            "Permission denied while generating hash for file: protected_file.txt"
-        )
+        mock_logger.error.assert_called_once()
+        logged_message = mock_logger.error.call_args[0][0]
+        assert "protected_file.txt" in logged_message
+        assert "Permission denied" in logged_message
 
     @patch("pyngb.util.hashing.logger")
     @patch("pathlib.Path.stat")
@@ -344,7 +345,7 @@ class TestGetHash:
     def test_get_hash_hashing_error(
         self, mock_blake2b: Any, mock_stat: Any, mock_logger: Any
     ) -> None:
-        """Test get_hash when hashing itself fails."""
+        """A broken hashlib backend is logged and reported as None, not raised."""
         # Mock the stat call to succeed
         mock_stat.return_value.st_size = 1024
 
@@ -352,19 +353,15 @@ class TestGetHash:
             result = get_hash(temp_file.name)
 
             assert result is None
-            # Check that error was logged with the exception object
             mock_logger.error.assert_called_once()
-            call_args = mock_logger.error.call_args
-            # With f-strings, there's only one argument now (the formatted string)
-            logged_message = call_args[0][0]
-            assert "Unexpected error while generating hash for file" in logged_message
+            logged_message = mock_logger.error.call_args[0][0]
             assert temp_file.name in logged_message
             assert "Hash error" in logged_message
 
     @patch("pyngb.util.hashing.logger")
     @patch("pathlib.Path.stat")
     def test_get_hash_io_error(self, mock_stat: Any, mock_logger: Any) -> None:
-        """Test get_hash with I/O error during reading."""
+        """An I/O error during reading is logged and reported as None."""
         # Mock the stat call to succeed
         mock_stat.return_value.st_size = 1024
 
@@ -376,12 +373,8 @@ class TestGetHash:
             result = get_hash("test_file.txt")
 
             assert result is None
-            # Check that error was logged with the OS error message
             mock_logger.error.assert_called_once()
-            call_args = mock_logger.error.call_args
-            # With f-strings, there's only one argument now (the formatted string)
-            logged_message = call_args[0][0]
-            assert "OS error while generating hash for file" in logged_message
+            logged_message = mock_logger.error.call_args[0][0]
             assert "test_file.txt" in logged_message
             assert "I/O error" in logged_message
 

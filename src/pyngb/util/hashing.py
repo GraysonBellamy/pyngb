@@ -7,9 +7,16 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
+_CHUNK_SIZE = 1024 * 1024  # 1 MiB
+
 
 def get_hash(path: str | Path, max_size_mb: int = 1000) -> str | None:
-    """Generate file hash for metadata.
+    """Generate a BLAKE2b file hash for metadata.
+
+    The file is read in 1 MiB chunks, so memory use stays flat regardless of
+    file size. The hash is optional provenance metadata and must never fail a
+    parse: any failure (missing file, permissions, oversized file, broken
+    hashlib backend) is logged and reported as None rather than raised.
 
     Args:
         path: Path to the file to hash
@@ -17,34 +24,9 @@ def get_hash(path: str | Path, max_size_mb: int = 1000) -> str | None:
 
     Returns:
         BLAKE2b hash as hex string, or None if hashing fails
-
-    Raises:
-        OSError: If there are file system related errors
-        PermissionError: If file access is denied
     """
     path = Path(path)
     try:
-        # Pre-flight: ensure blake2b constructor is callable. If a hashing backend
-        # failure occurs (e.g., during unit tests that patch blake2b to raise),
-        # surface it as an unexpected error per contract.
-        try:
-            _ = hashlib.blake2b()
-        except (
-            RuntimeError,
-            AttributeError,
-            TypeError,
-        ) as e:  # pragma: no cover - exercised in tests via patch
-            # Specific exceptions that can occur during hash algorithm initialization
-            logger.error(f"Hash algorithm unavailable for file {path}: {e}")
-            return None
-        except Exception as e:  # pragma: no cover - exercised in tests via patch
-            # Hashing is non-critical metadata: a broken or unusual hashlib backend
-            # must not fail the parse. Returning None keeps the contract that
-            # callers already handle (see module docstring). Tests patch blake2b
-            # with arbitrary Exception subclasses to verify this graceful fallback.
-            logger.error(f"Unexpected error while generating hash for file {path}: {e}")
-            return None
-        # Check file size before hashing
         file_size = path.stat().st_size
         max_size_bytes = max_size_mb * 1024 * 1024
 
@@ -54,18 +36,14 @@ def get_hash(path: str | Path, max_size_mb: int = 1000) -> str | None:
             )
             return None
 
+        digest = hashlib.blake2b()
         with path.open("rb") as file:
-            return hashlib.blake2b(file.read()).hexdigest()
+            while chunk := file.read(_CHUNK_SIZE):
+                digest.update(chunk)
+        return digest.hexdigest()
     except FileNotFoundError:
         logger.warning(f"File not found while generating hash: {path}")
         return None
-    except PermissionError:
-        logger.error(f"Permission denied while generating hash for file: {path}")
-        return None
-    except OSError as e:
-        logger.error(f"OS error while generating hash for file {path}: {e}")
-        return None
-    except (RuntimeError, MemoryError) as e:
-        # Handle unexpected runtime issues (e.g., memory exhausted, hash computation failed)
-        logger.error(f"Runtime error while generating hash for file {path}: {e}")
+    except Exception as e:
+        logger.error(f"Failed to generate hash for file {path}: {e}")
         return None

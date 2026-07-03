@@ -9,7 +9,7 @@ import logging
 
 from ..binary import BinaryParser
 from ..constants import PatternConfig
-from .base import BaseMetadataExtractor, ExtractorManager, FileMetadata
+from .base import BaseMetadataExtractor, ExtractorManager, FileMetadata, StreamTables
 from .basic_fields import BasicFieldExtractor
 from .mass import MassExtractor
 from .specialized import (
@@ -84,7 +84,7 @@ class MetadataExtractor(BaseMetadataExtractor):
             f"Registered {len(self.manager.extractors)} specialized extractors"
         )
 
-    def can_extract(self, tables: list[bytes]) -> bool:
+    def can_extract(self, tables: list[bytes] | StreamTables) -> bool:
         """Check if any metadata can be extracted from the tables.
 
         Args:
@@ -96,14 +96,16 @@ class MetadataExtractor(BaseMetadataExtractor):
         if not tables:
             return False
 
+        stream = StreamTables.wrap(tables)
+
         # Check if any extractor can handle the tables
-        for extractor in self.manager.extractors:
-            if extractor.can_extract(tables):
-                return True
+        return any(
+            extractor.can_extract(stream) for extractor in self.manager.extractors
+        )
 
-        return False
-
-    def extract(self, tables: list[bytes], metadata: FileMetadata) -> None:
+    def extract(
+        self, tables: list[bytes] | StreamTables, metadata: FileMetadata
+    ) -> None:
         """Extract metadata using all registered extractors.
 
         Args:
@@ -116,7 +118,7 @@ class MetadataExtractor(BaseMetadataExtractor):
         # Update the provided metadata dictionary
         metadata.update(extracted_metadata)
 
-    def extract_metadata(self, tables: list[bytes]) -> FileMetadata:
+    def extract_metadata(self, tables: list[bytes] | StreamTables) -> FileMetadata:
         """Extract all metadata from tables.
 
         Args:

@@ -11,7 +11,7 @@ from typing import ClassVar
 
 from ..binary import BinaryParser
 from ..constants import PatternConfig
-from .base import BaseMetadataExtractor, FileMetadata
+from .base import BaseMetadataExtractor, FileMetadata, StreamTables
 
 # Values that basic fields are expected to carry after parse_value. The parser
 # can also return raw bytes for unknown types, but basic fields (instrument,
@@ -91,7 +91,7 @@ class BasicFieldExtractor(BaseMetadataExtractor):
             f"Compiled {len(self._compiled_patterns)} basic field patterns"
         )
 
-    def can_extract(self, tables: list[bytes]) -> bool:
+    def can_extract(self, tables: StreamTables) -> bool:
         """Check if any basic fields can be extracted from the tables.
 
         Args:
@@ -104,7 +104,7 @@ class BasicFieldExtractor(BaseMetadataExtractor):
         # as it handles common metadata fields that are likely present
         return bool(tables)
 
-    def extract(self, tables: list[bytes], metadata: FileMetadata) -> None:
+    def extract(self, tables: StreamTables, metadata: FileMetadata) -> None:
         """Extract basic metadata fields from tables.
 
         Args:
@@ -179,7 +179,7 @@ class BasicFieldExtractor(BaseMetadataExtractor):
         return value
 
     def extract_single_field(
-        self, tables: list[bytes], field_name: str
+        self, tables: StreamTables, field_name: str
     ) -> MetadataFieldValue:
         """Extract a specific basic field from tables.
 

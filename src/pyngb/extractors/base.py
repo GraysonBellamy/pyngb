@@ -6,6 +6,9 @@ by specialized metadata extractors throughout the pyngb package.
 """
 
 import logging
+from collections.abc import Iterator
+from dataclasses import dataclass
+from functools import cached_property
 from typing import Protocol
 
 
@@ -17,10 +20,47 @@ __all__ = [
     "ExtractorManager",
     "FileMetadata",
     "MetadataExtractorProtocol",
+    "StreamTables",
 ]
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
+
+
+@dataclass
+class StreamTables:
+    """Tables split from a metadata stream, with the joined stream cached.
+
+    Extractors iterate and index this like a list of tables; scans that need
+    the whole stream use :attr:`combined`, which is computed once and shared
+    by every extractor in the run instead of re-joined per extractor.
+    """
+
+    tables: list[bytes]
+
+    @classmethod
+    def wrap(cls, tables: "list[bytes] | StreamTables") -> "StreamTables":
+        """Return ``tables`` as a StreamTables, wrapping a plain list."""
+        if isinstance(tables, StreamTables):
+            return tables
+        return cls(tables)
+
+    @cached_property
+    def combined(self) -> bytes:
+        """All tables joined into one buffer."""
+        return b"".join(self.tables)
+
+    def __iter__(self) -> Iterator[bytes]:
+        return iter(self.tables)
+
+    def __len__(self) -> int:
+        return len(self.tables)
+
+    def __getitem__(self, index: int) -> bytes:
+        return self.tables[index]
+
+    def __bool__(self) -> bool:
+        return bool(self.tables)
 
 
 class MetadataExtractorProtocol(Protocol):
@@ -39,22 +79,22 @@ class MetadataExtractorProtocol(Protocol):
         ...             metadata["custom_field"] = "extracted_value"
     """
 
-    def can_extract(self, tables: list[bytes]) -> bool:
+    def can_extract(self, tables: StreamTables) -> bool:
         """Check if this extractor can process the given tables.
 
         Args:
-            tables: List of binary table data from NGB streams
+            tables: Tables split from an NGB stream
 
         Returns:
             True if the extractor can extract metadata from these tables
         """
         ...
 
-    def extract(self, tables: list[bytes], metadata: FileMetadata) -> None:
+    def extract(self, tables: StreamTables, metadata: FileMetadata) -> None:
         """Extract metadata from tables and update the metadata dictionary.
 
         Args:
-            tables: List of binary table data from NGB streams
+            tables: Tables split from an NGB stream
             metadata: Metadata dictionary to update (modified in-place)
 
         Note:
@@ -146,11 +186,12 @@ class ExtractorManager:
         self.extractors.append(extractor)
         self.logger.debug(f"Registered extractor: {extractor.name}")
 
-    def extract_all(self, tables: list[bytes]) -> FileMetadata:
+    def extract_all(self, tables: list[bytes] | StreamTables) -> FileMetadata:
         """Extract metadata using all registered extractors.
 
         Args:
-            tables: List of binary table data from NGB streams
+            tables: Tables split from an NGB stream (a plain list is wrapped
+                so the joined stream is computed once for all extractors)
 
         Returns:
             FileMetadata dictionary with extracted fields
@@ -159,6 +200,7 @@ class ExtractorManager:
             Extractors are run in registration order. Later extractors
             can override fields set by earlier ones.
         """
+        tables = StreamTables.wrap(tables)
         metadata: FileMetadata = {}
 
         self.logger.debug(f"Starting extraction with {len(self.extractors)} extractors")

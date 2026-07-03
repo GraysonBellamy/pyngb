@@ -11,7 +11,7 @@ from typing import Any
 
 from ..binary import BinaryParser
 from ..constants import TEMP_PROG_TYPE_PREFIX, PatternConfig
-from .base import BaseMetadataExtractor, FileMetadata
+from .base import BaseMetadataExtractor, FileMetadata, StreamTables
 
 __all__ = ["TemperatureProgramExtractor"]
 
@@ -64,7 +64,7 @@ class TemperatureProgramExtractor(BaseMetadataExtractor):
             f"Compiled {len(self._compiled_temp_prog)} temperature program patterns"
         )
 
-    def can_extract(self, tables: list[bytes]) -> bool:
+    def can_extract(self, tables: StreamTables) -> bool:
         """Check if temperature program can be extracted from the tables.
 
         Args:
@@ -76,7 +76,7 @@ class TemperatureProgramExtractor(BaseMetadataExtractor):
         if not tables:
             return False
 
-        combined_data = b"".join(tables)
+        combined_data = tables.combined
 
         # Check for temperature program category bytes
         if b"\xf4\x01" in combined_data or b"\xf5\x01" in combined_data:
@@ -85,7 +85,7 @@ class TemperatureProgramExtractor(BaseMetadataExtractor):
         # Check for temperature program type prefix
         return TEMP_PROG_TYPE_PREFIX in combined_data
 
-    def extract(self, tables: list[bytes], metadata: FileMetadata) -> None:
+    def extract(self, tables: StreamTables, metadata: FileMetadata) -> None:
         """Extract temperature program from tables.
 
         Args:
@@ -98,7 +98,7 @@ class TemperatureProgramExtractor(BaseMetadataExtractor):
             return
 
         # Combine all table data for temperature program extraction
-        combined_data = b"".join(tables)
+        combined_data = tables.combined
 
         # Extract temperature program stages
         temp_prog = self._extract_temperature_program(combined_data)

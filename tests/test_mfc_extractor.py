@@ -20,6 +20,7 @@ from pyngb.constants import (
     PatternConfig,
     PatternOffsets,
 )
+from pyngb.extractors.base import StreamTables
 from pyngb.extractors.specialized import MFCExtractor
 
 TEST_DIR = Path(__file__).parent / "test_files"
@@ -45,10 +46,10 @@ def _extractor() -> MFCExtractor:
     return MFCExtractor(PatternConfig(), BinaryParser())
 
 
-def _stream1_tables(path: Path) -> list[bytes]:
+def _stream1_tables(path: Path) -> StreamTables:
     parser = BinaryParser()
     with zipfile.ZipFile(path) as z:
-        return parser.split_tables(z.read("Streams/stream_1.table"))
+        return StreamTables(parser.split_tables(z.read("Streams/stream_1.table")))
 
 
 @pytest.mark.parametrize(

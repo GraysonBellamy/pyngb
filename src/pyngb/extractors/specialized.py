@@ -27,7 +27,7 @@ from ..constants import (
     TemperatureCalibration,
     TemperatureFixpoint,
 )
-from .base import BaseMetadataExtractor, FileMetadata
+from .base import BaseMetadataExtractor, FileMetadata, StreamTables
 
 __all__ = [
     "ApplicationLicenseExtractor",
@@ -55,12 +55,12 @@ class MFCExtractor(BaseMetadataExtractor):
         )
         self._range_record = self._signature + FIELD_VALUE_BRIDGE_F32
 
-    def can_extract(self, tables: list[bytes]) -> bool:
+    def can_extract(self, tables: StreamTables) -> bool:
         """Check if MFC metadata can be extracted."""
         if not tables:
             return False
 
-        combined_data = b"".join(tables)
+        combined_data = tables.combined
 
         # Check for MFC field names
         for field_name in MFC_FIELD_NAMES:
@@ -71,7 +71,7 @@ class MFCExtractor(BaseMetadataExtractor):
         # Check for MFC signatures
         return self._signature in combined_data
 
-    def extract(self, tables: list[bytes], metadata: FileMetadata) -> None:
+    def extract(self, tables: StreamTables, metadata: FileMetadata) -> None:
         """Extract MFC metadata from tables."""
         self.log_extraction_attempt(len(tables))
 
@@ -123,7 +123,7 @@ class MFCExtractor(BaseMetadataExtractor):
         except Exception as e:
             self.log_extraction_failure(e)
 
-    def _find_mfc_field_definitions(self, tables: list[bytes]) -> list[dict[str, Any]]:
+    def _find_mfc_field_definitions(self, tables: StreamTables) -> list[dict[str, Any]]:
         """Find MFC field name definitions in tables."""
         field_definitions = []
         for field_name in MFC_FIELD_NAMES:
@@ -139,7 +139,7 @@ class MFCExtractor(BaseMetadataExtractor):
 
         return field_definitions
 
-    def _find_mfc_range_tables(self, tables: list[bytes]) -> list[dict[str, Any]]:
+    def _find_mfc_range_tables(self, tables: StreamTables) -> list[dict[str, Any]]:
         """Find MFC range tables using signature identification."""
         range_tables = []
 
@@ -169,7 +169,7 @@ class MFCExtractor(BaseMetadataExtractor):
             return None
         return float(value)
 
-    def _build_gas_context_map(self, tables: list[bytes]) -> dict[int, str]:
+    def _build_gas_context_map(self, tables: StreamTables) -> dict[int, str]:
         """Build gas context map for MFC gas assignment."""
         gas_context_map = {}
 
@@ -244,12 +244,12 @@ class PIDParameterExtractor(BaseMetadataExtractor):
         self.config = config
         self.parser = parser
 
-    def can_extract(self, tables: list[bytes]) -> bool:
+    def can_extract(self, tables: StreamTables) -> bool:
         """Check if PID parameters can be extracted."""
         if not tables:
             return False
 
-        combined_data = b"".join(tables)
+        combined_data = tables.combined
 
         # Check for PID signatures
         for sig_val, _ in self.PID_SIGNATURES:
@@ -260,12 +260,12 @@ class PIDParameterExtractor(BaseMetadataExtractor):
 
         return False
 
-    def extract(self, tables: list[bytes], metadata: FileMetadata) -> None:
+    def extract(self, tables: StreamTables, metadata: FileMetadata) -> None:
         """Extract PID control parameters from tables."""
         self.log_extraction_attempt(len(tables))
 
         try:
-            combined_data = b"".join(tables)
+            combined_data = tables.combined
             matches = self._scan_pid_parameters(combined_data)
 
             if not matches:
@@ -384,7 +384,7 @@ class CalibrationExtractor(BaseMetadataExtractor):
             f"Compiled {len(self._compiled_cal_consts)} calibration patterns"
         )
 
-    def can_extract(self, tables: list[bytes]) -> bool:
+    def can_extract(self, tables: StreamTables) -> bool:
         """Check if calibration constants can be extracted."""
         if not tables:
             return False
@@ -393,7 +393,7 @@ class CalibrationExtractor(BaseMetadataExtractor):
         CATEGORY = b"\xf5\x01"
         return any(CATEGORY in table for table in tables)
 
-    def extract(self, tables: list[bytes], metadata: FileMetadata) -> None:
+    def extract(self, tables: StreamTables, metadata: FileMetadata) -> None:
         """Extract calibration constants from tables."""
         self.log_extraction_attempt(len(tables))
 
@@ -482,23 +482,23 @@ class TemperatureCalibrationExtractor(BaseMetadataExtractor):
             )
             self._compiled_fields[fname] = re.compile(pat, re.DOTALL)
 
-    def can_extract(self, tables: list[bytes]) -> bool:
+    def can_extract(self, tables: StreamTables) -> bool:
         """Check if temperature-calibration data is present."""
         if not tables:
             return False
-        combined = b"".join(tables)
+        combined = tables.combined
         return (
             TEMP_CAL_COEFF_SIGNATURE in combined
             or TEMP_CAL_RECORD_SUFFIX.encode("utf-16le") in combined
             or SENSITIVITY_RECORD_SUFFIX.encode("utf-16le") in combined
         )
 
-    def extract(self, tables: list[bytes], metadata: FileMetadata) -> None:
+    def extract(self, tables: StreamTables, metadata: FileMetadata) -> None:
         """Extract the temperature-calibration block from tables."""
         self.log_extraction_attempt(len(tables))
 
         try:
-            combined = b"".join(tables)
+            combined = tables.combined
 
             cal: TemperatureCalibration = {}
 
@@ -548,7 +548,7 @@ class TemperatureCalibrationExtractor(BaseMetadataExtractor):
         n = count // 4
         return [float(x) for x in struct.unpack(f"<{n}f", data[pos : pos + count])]
 
-    def _extract_fixpoints(self, tables: list[bytes]) -> list[TemperatureFixpoint]:
+    def _extract_fixpoints(self, tables: StreamTables) -> list[TemperatureFixpoint]:
         """Extract fixpoint standards in standard order (ascending temperature).
 
         Each standard lives in its own table categorised ``30 75`` .. ``34 75``.
@@ -618,24 +618,24 @@ class ApplicationLicenseExtractor(BaseMetadataExtractor):
         self.parser = parser
         self.pattern_offsets = PatternOffsets()
 
-    def can_extract(self, tables: list[bytes]) -> bool:
+    def can_extract(self, tables: StreamTables) -> bool:
         """Check if application/license info can be extracted."""
         if not tables:
             return False
 
-        combined_data = b"".join(tables)
+        combined_data = tables.combined
 
         # Check for application/license category and field markers
         return bool(
             APP_LICENSE_CATEGORY in combined_data and APP_LICENSE_FIELD in combined_data
         )
 
-    def extract(self, tables: list[bytes], metadata: FileMetadata) -> None:
+    def extract(self, tables: StreamTables, metadata: FileMetadata) -> None:
         """Extract application version and license information."""
         self.log_extraction_attempt(len(tables))
 
         try:
-            combined_data = b"".join(tables)
+            combined_data = tables.combined
             extracted_count = 0
 
             pattern = re.compile(
