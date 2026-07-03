@@ -6,65 +6,36 @@ readme = "README.md"
 authors = [
     { name = "Grayson Bellamy", email = "gbellamy@umd.edu" }
 ]
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE"]
 keywords = ["ngb", "netzsch", "sta", "thermal-analysis", "scientific-data", "binary-parsing", "unofficial"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Chemistry",
     "Topic :: Scientific/Engineering :: Physics",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Operating System :: OS Independent",
+    "Typing :: Typed",
 ]
 requires-python = ">=3.10"
+# Floors are verified: the full test suite passes on exactly these versions
+# (CI runs a --resolution lowest-direct leg to keep them honest).
 dependencies = [
-    "polars>=0.20.0",
-    "pyarrow>=10.0.0",
-    "numpy>=1.20.0",
+    "polars>=1.6",
+    "pyarrow>=14",
+    "numpy>=1.24",
     "scipy>=1.13.1",
 ]
 
 [project.optional-dependencies]
-test = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "pytest-mock>=3.10.0",
-    "pytest-benchmark>=4.0.0",
-    "hypothesis>=6.0.0",
-]
-dev = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "pytest-mock>=3.10.0",
-    "pytest-benchmark>=4.0.0",
-    "hypothesis>=6.0.0",
-    "ruff>=0.1.0",
-    "mypy>=1.5.0",
-    "pre-commit>=3.0.0",
-    "bandit[toml]>=1.7.0",
-    "safety>=2.0.0",
-]
 docs = [
-    "mkdocs>=1.5.0",
-    "mkdocs-material>=9.0.0",
-    "mkdocstrings[python]>=0.20.0",
-]
-build = [
-    "build>=1.0.0",
-    "twine>=4.0.0",
-]
-performance = [
-    "psutil>=5.9.0",
-    "memory_profiler>=0.60.0",
-]
-visualization = [
-    "matplotlib>=3.5.0",
-    "seaborn>=0.11.0",  # Optional for better plot styling
+    "zensical>=0.0.46",
 ]
 
 [project.urls]
@@ -221,7 +192,6 @@ module = [
     "pyarrow.*",
     "numpy.*",
     "psutil.*",
-    "memory_profiler.*",
 ]
 ignore_missing_imports = true
 
@@ -263,10 +233,13 @@ color = true
 
 [dependency-groups]
 dev = [
+    "bandit[toml]>=1.7.0",
+    "hypothesis>=6.155.7",
     "mypy>=1.17.1",
     "pre-commit>=4.3.0",
     "psutil>=6.1.1",
     "pytest>=8.4.1",
+    "pytest-benchmark>=5.2.3",
     "pytest-cov>=6.2.1",
     "ruff>=0.12.8",
     "scipy-stubs>=1.15.3.0",

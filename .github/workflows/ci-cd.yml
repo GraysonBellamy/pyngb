@@ -36,7 +36,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        uv sync --locked --all-extras
+        uv sync --locked
 
     - name: Run linting
       run: |
@@ -61,6 +61,35 @@ jobs:
         use_oidc: true
         fail_ci_if_error: true
 
+  # Installs the lowest versions the floors in pyproject.toml permit and runs
+  # the full suite, so the floors stay honest instead of decorative.
+  floors:
+    name: Lowest dependency floors
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v5
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        enable-cache: true
+
+    - name: Install lowest-direct resolution
+      run: |
+        uv sync --resolution lowest-direct
+
+    - name: Run tests
+      run: |
+        uv run --no-sync pytest -q
+
   performance:
     name: Performance Tests
     runs-on: ubuntu-latest
@@ -84,7 +113,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        uv sync --locked --extra performance
+        uv sync --locked
 
     - name: Run performance benchmarks
       run: |
@@ -119,7 +148,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        uv sync --locked --all-extras
+        uv sync --locked
 
     # Dependency-vulnerability alerting is Dependabot's job; Bandit scans
     # our own code and fails the build on findings.
@@ -148,11 +177,11 @@ jobs:
 
     - name: Install documentation dependencies
       run: |
-        uv sync --locked --all-extras
+        uv sync --locked --extra docs
 
     - name: Build documentation
       run: |
-        uv run mkdocs build
+        uv run zensical build
         # Add .nojekyll file for GitHub Pages
         touch site/.nojekyll
 
@@ -218,7 +247,7 @@ jobs:
 
     - name: Install build dependencies
       run: |
-        uv sync --locked --extra build
+        uv sync --locked --group build
 
     - name: Build package
       run: |
