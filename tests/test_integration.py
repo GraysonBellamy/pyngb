@@ -20,6 +20,7 @@ from pyngb import (
     validate_sta_data,
 )
 from pyngb.constants import BinaryMarkers, PatternConfig
+from pyngb.exceptions import NGBStreamNotFoundError
 from pyngb.validation import QualityChecker
 
 
@@ -462,8 +463,9 @@ class TestErrorRecoveryIntegration:
                 temp_file_path = temp_file.name
 
             try:
-                # Should handle corruption gracefully
-                with pytest.raises(Exception):  # Should raise some kind of error
+                # Every corruption scenario is a broken archive, not an NGB
+                # structure problem, so BadZipFile is the contract
+                with pytest.raises(zipfile.BadZipFile):
                     read_ngb(temp_file_path)
             finally:
                 Path(temp_file_path).unlink(missing_ok=True)
@@ -504,8 +506,9 @@ class TestDataIntegrityValidation:
             temp_file_path = temp_file.name
 
         try:
-            # This will likely fail due to incomplete mock data, but tests the workflow
-            with pytest.raises(Exception):
+            # Streams are in the wrong archive path, so the parser must
+            # report them missing
+            with pytest.raises(NGBStreamNotFoundError):
                 _metadata, _data = read_ngb(temp_file_path, return_metadata=True)
 
         finally:

@@ -42,14 +42,13 @@ class TestNGBExceptions:
 
     def test_exception_chaining(self) -> None:
         """Test that exceptions can be chained."""
-        try:
-            raise ValueError("Original error")
-        except ValueError as e:
-            with pytest.raises(NGBCorruptedFileError) as exc_info:
-                raise NGBCorruptedFileError("Wrapped error") from e
+        original = ValueError("Original error")
 
-            assert str(exc_info.value) == "Wrapped error"
-            assert exc_info.value.__cause__ is e
+        with pytest.raises(NGBCorruptedFileError) as exc_info:
+            raise NGBCorruptedFileError("Wrapped error") from original
+
+        assert str(exc_info.value) == "Wrapped error"
+        assert exc_info.value.__cause__ is original
 
     def test_all_exceptions_importable(self) -> None:
         """Test that all exceptions are properly importable."""
@@ -62,7 +61,8 @@ class TestNGBExceptions:
 
         for exc_class in exceptions:
             assert callable(exc_class)
-            assert isinstance(exc_class, type) and issubclass(exc_class, Exception)
+            assert isinstance(exc_class, type)
+            assert issubclass(exc_class, Exception)
 
             # Test instantiation
             instance = exc_class("test message")

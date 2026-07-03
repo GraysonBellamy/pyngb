@@ -4,6 +4,7 @@ End-to-end workflow tests for pyngb.
 
 import shutil
 import tempfile
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -139,8 +140,8 @@ class TestEndToEndWorkflows:
             tmp_file_path = tmp_file.name
 
         try:
-            # Should handle invalid file gracefully
-            with pytest.raises(Exception):  # Should raise some kind of error
+            # A non-zip payload must fail loudly as such
+            with pytest.raises(zipfile.BadZipFile):
                 read_ngb(tmp_file_path)
         finally:
             Path(tmp_file_path).unlink()

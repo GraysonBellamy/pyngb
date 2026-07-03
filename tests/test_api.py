@@ -5,6 +5,7 @@ This module tests the public API functions including read_ngb.
 """
 
 import json
+import zipfile
 from pathlib import Path
 from unittest.mock import patch
 from typing import Any
@@ -140,7 +141,7 @@ class TestReadNGBData:
             temp_path = f.name
 
         try:
-            with pytest.raises(Exception):  # Should raise some kind of parsing error
+            with pytest.raises(zipfile.BadZipFile):
                 read_ngb(temp_path)
         finally:
             Path(temp_path).unlink(missing_ok=True)

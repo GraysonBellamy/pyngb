@@ -17,6 +17,7 @@ import polars as pl
 import pytest
 
 from pyngb import BatchProcessor, read_ngb
+from pyngb.exceptions import NGBStreamNotFoundError
 from pyngb.validation import QualityChecker
 
 
@@ -181,8 +182,7 @@ class TestEdgeCaseFiles:
         test_file = self.create_edge_case_file("minimal_zip")
 
         try:
-            # Should handle gracefully (may raise exception but shouldn't crash)
-            with pytest.raises(Exception):
+            with pytest.raises(NGBStreamNotFoundError):
                 read_ngb(test_file)
         finally:
             Path(test_file).unlink(missing_ok=True)
@@ -192,8 +192,7 @@ class TestEdgeCaseFiles:
         test_file = self.create_edge_case_file("large_metadata")
 
         try:
-            # Should handle large metadata without memory issues
-            with pytest.raises(Exception):  # Expected to fail with mock data
+            with pytest.raises(NGBStreamNotFoundError):
                 read_ngb(test_file)
         finally:
             Path(test_file).unlink(missing_ok=True)
@@ -203,8 +202,7 @@ class TestEdgeCaseFiles:
         test_file = self.create_edge_case_file("many_streams")
 
         try:
-            # Should handle files with many streams
-            with pytest.raises(Exception):  # Expected to fail with mock data
+            with pytest.raises(NGBStreamNotFoundError):
                 read_ngb(test_file)
         finally:
             Path(test_file).unlink(missing_ok=True)
@@ -214,8 +212,7 @@ class TestEdgeCaseFiles:
         test_file = self.create_edge_case_file("empty_streams")
 
         try:
-            # Should handle empty streams gracefully
-            with pytest.raises(Exception):  # Expected to fail
+            with pytest.raises(NGBStreamNotFoundError):
                 read_ngb(test_file)
         finally:
             Path(test_file).unlink(missing_ok=True)
@@ -225,8 +222,7 @@ class TestEdgeCaseFiles:
         test_file = self.create_edge_case_file("corrupted_zip")
 
         try:
-            # Should handle corruption gracefully
-            with pytest.raises(Exception):  # Expected to fail
+            with pytest.raises(zipfile.BadZipFile):
                 read_ngb(test_file)
         finally:
             Path(test_file).unlink(missing_ok=True)
@@ -497,7 +493,7 @@ class TestBoundaryConditions:
                 z.writestr("tiny.txt", b"x")  # Single byte
 
         try:
-            with pytest.raises(Exception):  # Expected to fail
+            with pytest.raises(NGBStreamNotFoundError):
                 read_ngb(temp_file.name)
         finally:
             Path(temp_file.name).unlink(missing_ok=True)
@@ -515,8 +511,7 @@ class TestBoundaryConditions:
                 z.writestr("wrong_path/unicode_stream.table", unicode_content)
 
         try:
-            # Should handle Unicode content gracefully
-            with pytest.raises(Exception):  # Expected to fail with mock data
+            with pytest.raises(NGBStreamNotFoundError):
                 read_ngb(temp_file.name)
         finally:
             Path(temp_file.name).unlink(missing_ok=True)

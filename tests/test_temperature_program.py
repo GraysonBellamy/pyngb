@@ -169,7 +169,7 @@ class TestTemperatureProgramExtraction:
                             assert isinstance(temp_val, (int, float)), (
                                 f"Temperature not numeric in {stage_key} of {test_file.name}"
                             )
-                            assert temp_val >= -50 and temp_val <= 2000, (
+                            assert -50 <= temp_val <= 2000, (
                                 f"Temperature {temp_val} out of realistic range in {test_file.name}"
                             )
 

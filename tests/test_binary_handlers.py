@@ -49,7 +49,7 @@ class TestFloat64Handler:
 
     def test_parse_misaligned_data_raises(self) -> None:
         handler = Float64Handler()
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="multiple of element size"):
             handler.parse_data(b"\x00\x00\x00")  # not a multiple of 8
 
 

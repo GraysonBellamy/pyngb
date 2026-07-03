@@ -39,7 +39,6 @@ class TestBinaryMarkers:
         markers = BinaryMarkers()
         # Should not be able to modify attributes
         with pytest.raises(AttributeError):
-            markers.START_DATA = b"different_value"  # type: ignore[misc]
             cast(Any, markers).START_DATA = b"different_value"
 
     def test_binary_markers_values(self) -> None:

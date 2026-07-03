@@ -333,7 +333,8 @@ class TestSensitivityGuards:
         values = df["dsc_signal"].to_numpy()  # type: ignore[index]
 
         # In-range values calibrate normally
-        assert np.isfinite(values[0]) and np.isfinite(values[1])
+        assert np.isfinite(values[0])
+        assert np.isfinite(values[1])
         assert values[0] == pytest.approx(1.0 / 7.309, rel=1e-3)
         # The out-of-range value is masked, not published as -24596 mW
         assert np.isnan(values[2])

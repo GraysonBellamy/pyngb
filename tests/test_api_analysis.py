@@ -228,7 +228,7 @@ class TestErrorHandling:
             }
         )
 
-        with pytest.raises(ValueError):  # Should fail due to insufficient data
+        with pytest.raises(ValueError, match="at least 3 data points"):
             add_dtg(empty_table)
 
     def test_single_row_table(self) -> None:

@@ -177,14 +177,7 @@ ignore = [
     "TID252", # Relative imports from parent modules (common in packages)
     "B006",   # Mutable default arguments (common pattern, can be addressed later)
     "B007",   # Loop control variable not used (common in iteration patterns)
-    "B011",   # Assert False (used in tests)
-    "B017",   # pytest.raises(Exception) - allow for broad exception testing
     "PT001",  # Use @pytest.fixture over @pytest.fixture() - allow parentheses for clarity
-    "PT011",  # pytest.raises(Exception) is too broad - allow for now
-    "PT012",  # pytest.raises() should contain single statement - allow for now
-    "PT015",  # Assertion always fails - allow in tests
-    "PT017",  # Assert on exception in except block - common test pattern
-    "PT018",  # Assertion should be broken down - allow complex assertions
     "PT023",  # Use @pytest.mark.slow over @pytest.mark.slow() - allow parentheses for clarity
     "RET504", # Unnecessary assignment before return - allow for clarity
     "SIM105", # Use contextlib.suppress - allow try/except patterns
