@@ -789,3 +789,27 @@ class TestBatchProcessingEdgeCases:
         # Verify all files were processed
         for result in results:
             assert result["status"] == "success"
+
+
+class TestMetadataOnlyParse:
+    """Dataset operations use a stream_1-only parse; it must not drift from
+    the metadata a full parse produces."""
+
+    TEST_DIR = Path(__file__).parent / "test_files"
+
+    def test_parse_metadata_matches_full_parse(self) -> None:
+        from pyngb.core import NGBParser
+
+        parser = NGBParser()
+        for fixture in sorted(self.TEST_DIR.glob("*.ngb-*s3")):
+            full_metadata, _ = parser.parse(fixture)
+            metadata_only = parser.parse_metadata(fixture)
+            assert metadata_only == full_metadata, fixture.name
+
+    def test_dataset_metadata_matches_read_ngb(self) -> None:
+        from pyngb import read_ngb
+
+        fixture = self.TEST_DIR / "Red_Oak_STA_10K_250731_R7.ngb-ss3"
+        via_dataset = NGBDataset([fixture])._get_metadata(fixture)
+        via_read_ngb, _ = read_ngb(fixture, return_metadata=True)
+        assert via_dataset == via_read_ngb

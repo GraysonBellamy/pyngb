@@ -4,6 +4,8 @@ Main NGB parser classes.
 
 import logging
 import zipfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 import polars as pl
@@ -129,6 +131,37 @@ class NGBParser:
         with zip_file.open(name) as stream:
             return stream.read()
 
+    @contextmanager
+    def _open_archive(self, path: str | Path) -> Iterator[zipfile.ZipFile]:
+        """Open an NGB archive, translating common failures to pyngb exceptions.
+
+        Exceptions raised while processing inside the ``with`` block propagate
+        through here, so stream decoding gets the same translation as the
+        archive open itself.
+        """
+        path = Path(path)
+        if not path.exists():
+            raise FileNotFoundError(f"File not found: {path}")
+
+        try:
+            with zipfile.ZipFile(path, "r") as z:
+                yield z
+        except zipfile.BadZipFile as e:
+            logger.error(f"Invalid ZIP archive: {e}")
+            raise
+        except NGBParseError:
+            # Our own exceptions (corruption, resource limits, missing
+            # streams) are already precise; re-raise as-is.
+            raise
+        except (KeyError, ValueError) as e:
+            # Common exceptions during parsing: missing keys, invalid values
+            logger.error(f"Failed to parse NGB file: {e}")
+            raise NGBParseError(f"Parsing failed: {e}") from e
+        except OSError as e:
+            # File I/O errors (IOError is an alias for OSError in Python 3)
+            logger.error(f"I/O error while parsing NGB file: {e}")
+            raise NGBParseError(f"I/O error: {e}") from e
+
     def parse(self, path: str | Path) -> tuple[FileMetadata, pa.Table]:
         """Parse NGB file and return metadata and Arrow table.
 
@@ -160,49 +193,56 @@ class NGBParser:
             Columns: ['time', 'sample_temperature', 'mass', 'dsc_signal', 'purge_flow']
             Temperature range: 25.0 to 800.0
         """
-        path = Path(path)
-        if not path.exists():
-            raise FileNotFoundError(f"File not found: {path}")
-
         metadata: FileMetadata = {}
         data_df = pl.DataFrame()
 
-        try:
-            with zipfile.ZipFile(path, "r") as z:
-                # Validate NGB file structure
-                available_streams = self.validate_ngb_structure(z)
+        with self._open_archive(path) as z:
+            # Validate NGB file structure
+            available_streams = self.validate_ngb_structure(z)
 
-                # stream_1: metadata
-                stream_data = self._read_stream(z, "Streams/stream_1.table")
-                tables = self.binary_parser.split_tables(stream_data)
-                metadata = self.metadata_extractor.extract_metadata(tables)
+            # stream_1: metadata
+            stream_data = self._read_stream(z, "Streams/stream_1.table")
+            tables = self.binary_parser.split_tables(stream_data)
+            metadata = self.metadata_extractor.extract_metadata(tables)
 
-                # stream_2: primary data
-                if "Streams/stream_2.table" in available_streams:
-                    stream_data = self._read_stream(z, "Streams/stream_2.table")
-                    data_df = self.data_processor.process_stream_2(stream_data)
+            # stream_2: primary data
+            if "Streams/stream_2.table" in available_streams:
+                stream_data = self._read_stream(z, "Streams/stream_2.table")
+                data_df = self.data_processor.process_stream_2(stream_data)
 
-                # stream_3: additional data merged into existing df
-                if "Streams/stream_3.table" in available_streams:
-                    stream_data = self._read_stream(z, "Streams/stream_3.table")
-                    data_df = self.data_processor.process_stream_3(stream_data, data_df)
-
-        except zipfile.BadZipFile as e:
-            logger.error(f"Invalid ZIP archive: {e}")
-            raise
-        except NGBStreamNotFoundError:
-            # Re-raise our custom exceptions as-is
-            raise
-        except (KeyError, ValueError) as e:
-            # Common exceptions during parsing: missing keys, invalid values
-            logger.error(f"Failed to parse NGB file: {e}")
-            raise NGBParseError(f"Parsing failed: {e}") from e
-        except OSError as e:
-            # File I/O errors (IOError is an alias for OSError in Python 3)
-            logger.error(f"I/O error while parsing NGB file: {e}")
-            raise NGBParseError(f"I/O error: {e}") from e
+            # stream_3: additional data merged into existing df
+            if "Streams/stream_3.table" in available_streams:
+                stream_data = self._read_stream(z, "Streams/stream_3.table")
+                data_df = self.data_processor.process_stream_3(stream_data, data_df)
 
         # Convert to PyArrow at API boundary for cross-language compatibility
         # and metadata embedding. This is the single conversion point from
         # internal Polars processing to external PyArrow interface.
         return metadata, data_df.to_arrow()
+
+    def parse_metadata(self, path: str | Path) -> FileMetadata:
+        """Extract file metadata without decoding the measurement streams.
+
+        Reads and processes only stream_1, skipping the stream_2/stream_3
+        data decoding that dominates a full parse. Use this for dataset-level
+        operations (summaries, filtering, metadata export) that never touch
+        the measurement data.
+
+        Args:
+            path: Path to the .ngb-ss3 file to parse
+
+        Returns:
+            Metadata dictionary with instrument settings, sample info, etc.
+
+        Raises:
+            FileNotFoundError: If the specified file doesn't exist
+            NGBStreamNotFoundError: If required streams are missing
+            NGBResourceLimitError: If a stream exceeds the configured
+                resource limits
+            zipfile.BadZipFile: If file is not a valid ZIP archive
+        """
+        with self._open_archive(path) as z:
+            self.validate_ngb_structure(z)
+            stream_data = self._read_stream(z, "Streams/stream_1.table")
+            tables = self.binary_parser.split_tables(stream_data)
+            return self.metadata_extractor.extract_metadata(tables)

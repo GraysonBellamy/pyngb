@@ -18,7 +18,9 @@ import pyarrow.parquet as pq
 
 from .api.loaders import read_ngb
 from .constants import FileMetadata
+from .core import NGBParser
 from .exceptions import NGBParseError
+from .util import get_hash
 
 __all__ = [
     "BatchProcessor",
@@ -382,6 +384,7 @@ class NGBDataset:
         """
         self.files = files
         self._metadata_cache: dict[str, FileMetadata] = {}
+        self._parser = NGBParser()
 
     @classmethod
     def from_directory(
@@ -556,6 +559,11 @@ class NGBDataset:
     def _get_metadata(self, file_path: Path) -> FileMetadata:
         """Get metadata for file with caching.
 
+        Uses the parser's metadata-only mode: dataset operations never touch
+        the measurement data, so streams 2/3 are not decoded. The resulting
+        dict has the same shape as ``read_ngb(..., return_metadata=True)``,
+        including the file hash.
+
         Args:
             file_path: Path to NGB file
 
@@ -565,7 +573,14 @@ class NGBDataset:
         cache_key = str(file_path)
 
         if cache_key not in self._metadata_cache:
-            metadata, _ = read_ngb(file_path, return_metadata=True)
+            metadata = self._parser.parse_metadata(file_path)
+            file_hash = get_hash(file_path)
+            if file_hash is not None:
+                metadata["file_hash"] = {
+                    "file": Path(file_path).name,
+                    "method": "BLAKE2b",
+                    "hash": file_hash,
+                }
             self._metadata_cache[cache_key] = metadata
 
         return self._metadata_cache[cache_key]
