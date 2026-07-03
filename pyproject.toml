@@ -110,6 +110,8 @@ omit = [
 ]
 
 [tool.coverage.report]
+# Measured 87% when the gate was introduced; ratchet up as coverage grows.
+fail_under = 86
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",

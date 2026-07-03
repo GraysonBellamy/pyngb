@@ -92,6 +92,13 @@ class BinaryParser:
             # Try fffeff format first (discovered through reverse engineering)
             if value.startswith(b"\xff\xfe\xff") and len(value) >= 4:
                 char_count = value[3]
+                if char_count == 0xFF:
+                    # 0xff may be a length-escape for strings >255 chars; the
+                    # encoding is unknown without a real long-comment file.
+                    logger.warning(
+                        "fffeff string with 0xff length byte; value may be a "
+                        "truncated long string"
+                    )
                 expected_bytes = 4 + (
                     char_count * 2
                 )  # 4 header + char_count UTF-16LE chars
@@ -111,27 +118,22 @@ class BinaryParser:
             if length <= len(value) - 4 and length > 0:
                 string_bytes = value[4 : 4 + length]
 
-                # Try UTF-8 first (as documented)
+                # Strict UTF-8 first: a UTF-16LE payload contains bytes that
+                # are invalid UTF-8, so it falls through to the UTF-16LE
+                # branch instead of being silently stripped to ASCII.
                 try:
-                    decoded = (
-                        string_bytes.decode("utf-8", errors="ignore")
-                        .strip()
-                        .replace("\x00", "")
-                    )
+                    decoded = string_bytes.decode("utf-8").strip().replace("\x00", "")
                     if decoded:
                         return decoded
                 except UnicodeDecodeError:
-                    pass
-
-                # Try UTF-16LE fallback
-                try:
-                    decoded = string_bytes.decode("utf-16le", errors="ignore").strip(
-                        "\x00"
-                    )
-                    if decoded:
-                        return decoded
-                except UnicodeDecodeError:
-                    pass
+                    try:
+                        decoded = string_bytes.decode("utf-16le").strip("\x00")
+                        if decoded:
+                            return decoded
+                    except UnicodeDecodeError:
+                        logger.debug(
+                            "String payload is neither valid UTF-8 nor UTF-16LE"
+                        )
 
         except (struct.error, IndexError):
             pass

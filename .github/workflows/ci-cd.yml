@@ -12,11 +12,12 @@ jobs:
   test:
     permissions:
       contents: read
+      id-token: write  # Codecov tokenless (OIDC) upload
     name: Test Python ${{ matrix.python-version }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
         os: [ubuntu-latest, windows-latest, macos-latest]
       fail-fast: false
 
@@ -29,13 +30,13 @@ jobs:
         python-version: ${{ matrix.python-version }}
 
     - name: Install uv
-      uses: astral-sh/setup-uv@v2
+      uses: astral-sh/setup-uv@v7
       with:
-        version: "latest"
+        enable-cache: true
 
     - name: Install dependencies
       run: |
-        uv sync --all-extras
+        uv sync --locked --all-extras
 
     - name: Run linting
       run: |
@@ -52,11 +53,13 @@ jobs:
 
     - name: Upload coverage to Codecov
       if: matrix.python-version == '3.11' && matrix.os == 'ubuntu-latest'
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v7
       with:
-        file: ./coverage.xml
+        files: ./coverage.xml
         flags: unittests
         name: codecov-umbrella
+        use_oidc: true
+        fail_ci_if_error: true
 
   performance:
     name: Performance Tests
@@ -75,13 +78,13 @@ jobs:
         python-version: "3.11"
 
     - name: Install uv
-      uses: astral-sh/setup-uv@v2
+      uses: astral-sh/setup-uv@v7
       with:
-        version: "latest"
+        enable-cache: true
 
     - name: Install dependencies
       run: |
-        uv sync --extra performance
+        uv sync --locked --extra performance
 
     - name: Run performance benchmarks
       run: |
@@ -110,24 +113,19 @@ jobs:
         python-version: "3.11"
 
     - name: Install uv
-      uses: astral-sh/setup-uv@v2
+      uses: astral-sh/setup-uv@v7
       with:
-        version: "latest"
+        enable-cache: true
 
     - name: Install dependencies
       run: |
-        uv sync --all-extras
+        uv sync --locked --all-extras
 
+    # Dependency-vulnerability alerting is Dependabot's job; Bandit scans
+    # our own code and fails the build on findings.
     - name: Run Bandit Security Scan
       run: |
-        uv run bandit -r src/ -f json -o bandit-report.json || true
         uv run bandit -r src/ -f txt
-
-    - name: Run Safety Check
-      run: |
-        # Use the new scan command - cleaner output without deprecation warnings
-        uv run safety scan --output json --save-as json safety-report.json || true
-        uv run safety scan || echo "Safety scan completed with warnings"
 
   docs:
     name: Build Documentation
@@ -143,10 +141,14 @@ jobs:
       with:
         python-version: "3.11"
 
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        enable-cache: true
+
     - name: Install documentation dependencies
       run: |
-        pip install uv
-        uv sync --all-extras
+        uv sync --locked --all-extras
 
     - name: Build documentation
       run: |
@@ -209,10 +211,14 @@ jobs:
       with:
         python-version: "3.11"
 
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        enable-cache: true
+
     - name: Install build dependencies
       run: |
-        pip install uv
-        uv sync --extra build
+        uv sync --locked --extra build
 
     - name: Build package
       run: |
