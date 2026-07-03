@@ -24,15 +24,14 @@ jobs:
     steps:
     - uses: actions/checkout@v5
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-
+    # python-version must go through setup-uv (UV_PYTHON): the repo's
+    # .python-version (a local-dev pin) otherwise overrides anything
+    # actions/setup-python puts on PATH, and every job silently runs 3.13.
     - name: Install uv
       uses: astral-sh/setup-uv@v7
       with:
         enable-cache: true
+        python-version: ${{ matrix.python-version }}
 
     - name: Install dependencies
       run: |
@@ -59,7 +58,9 @@ jobs:
         flags: unittests
         name: codecov-umbrella
         use_oidc: true
-        fail_ci_if_error: true
+        # Coverage upload is informational; a Codecov outage must not fail
+        # the test job (publish depends on it).
+        fail_ci_if_error: false
 
   # Installs the lowest versions the floors in pyproject.toml permit and runs
   # the full suite, so the floors stay honest instead of decorative.
@@ -72,15 +73,14 @@ jobs:
     steps:
     - uses: actions/checkout@v5
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.10"
-
+    # The floors are verified on 3.10 (see pyproject.toml); UV_PYTHON must
+    # override the repo's .python-version or uv installs 3.13, where
+    # numpy 1.24.0 cannot even build.
     - name: Install uv
       uses: astral-sh/setup-uv@v7
       with:
         enable-cache: true
+        python-version: "3.10"
 
     - name: Install lowest-direct resolution
       run: |
@@ -101,15 +101,11 @@ jobs:
     steps:
     - uses: actions/checkout@v5
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
-
     - name: Install uv
       uses: astral-sh/setup-uv@v7
       with:
         enable-cache: true
+        python-version: "3.11"
 
     - name: Install dependencies
       run: |
@@ -136,15 +132,11 @@ jobs:
     steps:
     - uses: actions/checkout@v5
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
-
     - name: Install uv
       uses: astral-sh/setup-uv@v7
       with:
         enable-cache: true
+        python-version: "3.11"
 
     - name: Install dependencies
       run: |
@@ -165,15 +157,11 @@ jobs:
     steps:
     - uses: actions/checkout@v5
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
-
     - name: Install uv
       uses: astral-sh/setup-uv@v7
       with:
         enable-cache: true
+        python-version: "3.11"
 
     - name: Install documentation dependencies
       run: |
@@ -235,15 +223,11 @@ jobs:
     steps:
     - uses: actions/checkout@v5
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
-
     - name: Install uv
       uses: astral-sh/setup-uv@v7
       with:
         enable-cache: true
+        python-version: "3.11"
 
     - name: Install build dependencies
       run: |
