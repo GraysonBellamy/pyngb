@@ -144,8 +144,10 @@ with open("metadata.json", "w") as f:
 
 ### Working with Pandas
 
+pandas is not a pyngb dependency — install it separately if you want these conversions.
+
 ```python
-import pandas as pd
+import pandas as pd  # requires: pip install pandas
 
 # Convert PyArrow table to Pandas
 df_pandas = table.to_pandas()

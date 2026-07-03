@@ -102,16 +102,38 @@ Normalize data columns to initial sample mass.
 ```python
 def normalize_to_initial_mass(
     table: pa.Table,
-    columns: list[str] = ["mass", "dsc_signal"],
+    columns: list[str] | None = None,
 ) -> pa.Table
 ```
 
 **Parameters:**
 - `table` (pa.Table): Table with embedded metadata
-- `columns` (list[str]): Columns to normalize
+- `columns` (list[str], optional): Columns to normalize (default: `["mass", "dsc_signal"]` where present)
 
 **Returns:**
-- `pa.Table`: Table with normalized columns added
+- `pa.Table`: New table with the specified columns normalized in place (divided by the initial sample mass), units updated (e.g. "mg" → "mg/mg"), and "normalized" appended to their processing history
+
+### apply_dsc_calibration()
+
+Convert the DSC signal from µV to mW using the calibration constants embedded in the file metadata.
+
+```python
+def apply_dsc_calibration(
+    table: pa.Table,
+    temperature_column: str = "sample_temperature",
+    dsc_column: str = "dsc_signal",
+) -> pa.Table
+```
+
+**Parameters:**
+- `table` (pa.Table): Table with embedded metadata containing calibration constants (p0–p5)
+- `temperature_column` (str): Temperature column used to evaluate the calibration polynomial
+- `dsc_column` (str): DSC signal column to calibrate
+
+**Returns:**
+- `pa.Table`: New table with the DSC column converted to mW, units updated, and `calibration_applied` recorded in the column metadata
+
+Samples whose temperature falls outside the calibration's valid range (vanishing sensitivity) are set to NaN with a logged warning. Calling it twice raises `ValueError`.
 
 ## Batch Processing
 
@@ -135,21 +157,21 @@ Process multiple NGB files in parallel.
 ```python
 def process_files(
     self,
-    file_paths: list[str],
+    files: list[str | Path],
     output_format: str = "parquet",
-    output_dir: str | None = None,
+    output_dir: str | Path | None = None,
     skip_errors: bool = True,
-) -> list[dict]
+) -> list[BatchResult]
 ```
 
 **Parameters:**
-- `file_paths` (list[str]): List of file paths to process
+- `files` (list[str | Path]): List of file paths to process
 - `output_format` (str): "parquet", "csv", or "both"
-- `output_dir` (str, optional): Output directory
+- `output_dir` (str | Path, optional): Output directory
 - `skip_errors` (bool): Continue processing if errors occur
 
 **Returns:**
-- `list[dict]`: Processing results with status and metadata
+- `list[BatchResult]`: Processing results with status and metadata
 
 #### process_directory()
 
@@ -158,19 +180,19 @@ Process all NGB files in a directory.
 ```python
 def process_directory(
     self,
-    directory: str,
+    directory: str | Path,
     pattern: str = "*.ngb-ss3",
     output_format: str = "parquet",
-    output_dir: str | None = None,
+    output_dir: str | Path | None = None,
     skip_errors: bool = True,
-) -> list[dict]
+) -> list[BatchResult]
 ```
 
 **Parameters:**
-- `directory` (str): Directory containing NGB files
+- `directory` (str | Path): Directory containing NGB files
 - `pattern` (str): File pattern to match
-- `output_format` (str): Output format
-- `output_dir` (str, optional): Output directory
+- `output_format` (str): "parquet", "csv", or "both"
+- `output_dir` (str | Path, optional): Output directory
 - `skip_errors` (bool): Error handling mode
 
 ## Data Structures

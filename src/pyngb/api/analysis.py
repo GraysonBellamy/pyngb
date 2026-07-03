@@ -245,8 +245,8 @@ def normalize_to_initial_mass(
     >>> normalized_table = normalize_to_initial_mass(table, columns=['mass'])
     >>>
     >>> # Check normalized values
-    >>> df = normalized_table.to_pandas()
-    >>> print(f"Normalized mass: {df['mass'].iloc[0]:.6f}")  # Now in mg/mg units
+    >>> df = pl.from_arrow(normalized_table)
+    >>> print(f"Normalized mass: {df['mass'][0]:.6f}")  # Now in mg/mg units
     """
     # Extract metadata from table schema
     if not table.schema.metadata:
@@ -408,8 +408,8 @@ def apply_dsc_calibration(
     >>> print(f"After: {get_column_units(calibrated_table, 'dsc_signal')}")  # "mW"
     >>>
     >>> # Check calibrated values
-    >>> df = calibrated_table.to_pandas()
-    >>> print(f"Calibrated DSC: {df['dsc_signal'].iloc[100]:.6f} mW")
+    >>> df = pl.from_arrow(calibrated_table)
+    >>> print(f"Calibrated DSC: {df['dsc_signal'][100]:.6f} mW")
     """
     # Check required columns
     column_names = table.column_names
