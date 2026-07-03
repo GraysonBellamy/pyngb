@@ -85,10 +85,14 @@ class TestPatternConfig:
         assert "sample_name" in config.metadata_patterns
         assert "sample_mass" in config.metadata_patterns
 
-        # Test column map
-        assert "8d" in config.column_map
-        assert config.column_map["8d"] == "time"
-        assert config.column_map["8e"] == "sample_temperature"
+        # Test column map (keyed by true channel header IDs)
+        assert config.column_map["8c"] == "time"
+        assert config.column_map["8d"] == "sample_temperature"
+        assert config.column_map["8e"] == "dsc_signal"
+        assert config.column_map["9c"] == "purge_flow_1"
+        assert config.column_map["90"] == "mass"
+        # Channel 87 is a data-less trailing header and must not be mapped
+        assert "87" not in config.column_map
 
         # Test temperature program patterns
         assert "stage_type" in config.temp_prog_patterns

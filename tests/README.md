@@ -116,7 +116,7 @@ class TestMyComponent:
 def test_with_fixture(self, sample_pattern_config):
     """Test using shared fixture."""
     config = sample_pattern_config
-    assert "8d" in config.column_map
+    assert "8c" in config.column_map
 ```
 
 ## Continuous Integration

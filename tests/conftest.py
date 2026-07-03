@@ -48,8 +48,8 @@ def sample_pattern_config() -> PatternConfig:
         "sample_name": (b"\x30\x75", b"\x40\x08"),
     }
     config.column_map = {
-        "8d": "time",
-        "8e": "sample_temperature",
+        "8c": "time",
+        "8d": "sample_temperature",
     }
     return config
 

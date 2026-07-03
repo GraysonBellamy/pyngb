@@ -56,7 +56,14 @@ class DataStreamProcessor:
 
     # --- Stream 2 ---
     def process_stream_2(self, stream_data: bytes) -> pl.DataFrame:
-        """Process primary data stream (stream_2)."""
+        """Process primary data stream (stream_2).
+
+        A channel's header table precedes its data tables, and data tables
+        carry no channel identity of their own. Data accumulated in ``output``
+        therefore always belongs to the channel named by the *most recent*
+        header, and is flushed under that name when the next header (or the
+        end of the stream) is reached.
+        """
         # Split into tables - preserve original splitting behavior
         stream_table = self._split_tables(stream_data)
 
@@ -67,16 +74,15 @@ class DataStreamProcessor:
         col_map = self.config.column_map
         markers = self.parser.markers
 
-        for table in stream_table:
-            # Check for header marker
-            header_slice = table[
-                self.stream_markers.STREAM2_HEADER_POS : self.stream_markers.STREAM2_HEADER_POS
-                + len(self.stream_markers.STREAM2_HEADER)
-            ]
-            if header_slice == self.stream_markers.STREAM2_HEADER:
-                title = table[0:1].hex()
-                title = col_map.get(title, title)
-                if len(output) > 1:
+        def flush_channel() -> None:
+            nonlocal output, output_polars
+            if output:
+                if title is None:
+                    logger.debug(
+                        f"Discarding {len(output)} data values with no preceding "
+                        "channel header"
+                    )
+                else:
                     try:
                         values = self._standardize_column_values(title, output)
                         output_polars = output_polars.with_columns(
@@ -84,7 +90,18 @@ class DataStreamProcessor:
                         )
                     except ShapeError:
                         logger.debug(f"Shape mismatch when adding column '{title}'")
-                output = []
+            output = []
+
+        for table in stream_table:
+            # Check for header marker
+            header_slice = table[
+                self.stream_markers.STREAM2_HEADER_POS : self.stream_markers.STREAM2_HEADER_POS
+                + len(self.stream_markers.STREAM2_HEADER)
+            ]
+            if header_slice == self.stream_markers.STREAM2_HEADER:
+                flush_channel()
+                channel_id = table[0:1].hex()
+                title = col_map.get(channel_id, channel_id)
 
             # Check for data marker
             data_slice = table[
@@ -121,6 +138,10 @@ class DataStreamProcessor:
                 except NGBDataTypeError as e:
                     logger.debug(f"Failed to parse data: {e}")
                     continue
+
+        # Flush the final channel: real files end with data-less trailing
+        # headers, but a stream must not depend on them to emit its last column.
+        flush_channel()
 
         return output_polars
 

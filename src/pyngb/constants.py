@@ -379,15 +379,22 @@ class PatternConfig:
             "corrected_c": b"\x47\x04",
         }
     )
+    # Maps a channel's true header ID (first byte of its header table, hex) to
+    # its public column name. Stream_2 headers precede their data tables;
+    # stream_3 works the same way. Channel 87 is a trailing header that carries
+    # no data and is intentionally unmapped. Unmapped IDs pass through as
+    # hex-string column names (e.g. the all-zero stream_3 channel "31").
     column_map: dict[str, str] = field(
         default_factory=lambda: {
-            "8d": "time",
-            "8e": "sample_temperature",
-            "9c": "dsc_signal",
-            "9d": "purge_flow_1",
-            "9e": "purge_flow_2",
-            "90": "protective_flow",
-            "87": "mass",
+            # stream_2 channels
+            "8c": "time",
+            "8d": "sample_temperature",
+            "8e": "dsc_signal",
+            "9c": "purge_flow_1",
+            "9d": "purge_flow_2",
+            "9e": "protective_flow",
+            "90": "mass",
+            # stream_3 channels
             "30": "furnace_temperature",
             "32": "furnace_power",
             "33": "h_foil_temperature",
