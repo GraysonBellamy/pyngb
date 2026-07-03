@@ -153,14 +153,19 @@ class TestBaselineSubtraction:
         metadata, _ = read_ngb(sample_file, return_metadata=True)
 
         # Test segment identification
-        isothermal, dynamic = subtractor.identify_segments(
+        segments = subtractor.identify_segments(
             sample_df, metadata.get("temperature_program", {})
         )
 
-        assert isinstance(isothermal, list)
-        assert isinstance(dynamic, list)
-        # Should find at least some segments
-        assert len(isothermal) + len(dynamic) > 0
+        assert isinstance(segments, list)
+        assert len(segments) > 0
+        # Segments must partition every row, in order, without gaps
+        assert segments[0].start == 0
+        assert segments[-1].end == sample_df.height
+        from itertools import pairwise
+
+        for prev, nxt in pairwise(segments):
+            assert prev.end == nxt.start
 
     def test_baseline_subtractor_interpolation(
         self, sample_data: Any, baseline_data: Any
@@ -273,6 +278,152 @@ class TestBaselineSubtraction:
             subtractor.validate_temperature_programs(sample_metadata, baseline_metadata)
         except ValueError:
             pytest.fail("Validation should have passed for compatible files")
+
+    def test_row_preservation_boundary_and_tail(self) -> None:
+        """No row may vanish: neither the sample recorded exactly at the
+        program's end nor rows after it (audit NUM-02)."""
+        df = pl.DataFrame(
+            {
+                "time": [0.0, 30.0, 60.0, 90.0, 120.0, 150.0],
+                "sample_temperature": [25.0, 30.0, 35.0, 40.0, 45.0, 50.0],
+                "mass": [10.0] * 6,
+                "dsc_signal": [1.0] * 6,
+            }
+        )
+        metadata = {
+            "temperature_program": {
+                "stage_0": {"temperature": 30.0, "heating_rate": 10.0, "time": 120.0}
+            }
+        }
+
+        result = BaselineSubtractor().process_baseline_subtraction(
+            df, df, metadata, metadata, "time"
+        )
+
+        assert result.height == df.height
+        assert result["time"].to_list() == df["time"].to_list()
+        # Self-subtraction must be exactly zero everywhere, tail included
+        assert result["mass"].to_list() == [0.0] * 6
+        assert result["dsc_signal"].to_list() == [0.0] * 6
+
+    @staticmethod
+    def _heat_cool_pair() -> tuple[pl.DataFrame, pl.DataFrame, dict]:
+        """Sample/baseline pair whose program heats then cools, with the
+        baseline DSC a known function of temperature and sample = baseline + 7."""
+        import numpy as np
+
+        t = np.arange(0, 200.0)
+        temp = np.where(t < 100, 25 + 5 * t, 25 + 5 * 99 - 5 * (t - 99))
+        base_dsc = 0.01 * temp
+
+        def frame(dsc: Any) -> pl.DataFrame:
+            return pl.DataFrame(
+                {
+                    "time": t,
+                    "sample_temperature": temp,
+                    "mass": np.zeros_like(t),
+                    "dsc_signal": dsc,
+                }
+            )
+
+        metadata = {
+            "temperature_program": {
+                "stage_heat": {
+                    "temperature": 520.0,
+                    "heating_rate": 300.0,
+                    "time": 100.0,
+                },
+                "stage_cool": {
+                    "temperature": 25.0,
+                    "heating_rate": -300.0,
+                    "time": 100.0,
+                },
+            }
+        }
+        return frame(base_dsc + 7.0), frame(base_dsc), metadata
+
+    def test_heat_cool_program_on_temperature_axis(self) -> None:
+        """Each dynamic segment must interpolate against the baseline rows of
+        the same program stage; interpolating a temperature axis against the
+        whole heat-then-cool run returns nonsense (audit NUM-01)."""
+        sample, baseline, metadata = self._heat_cool_pair()
+
+        result = BaselineSubtractor().process_baseline_subtraction(
+            sample, baseline, metadata, metadata, "sample_temperature"
+        )
+
+        assert result.height == sample.height
+        residual = (result["dsc_signal"] - 7.0).abs().max()
+        assert residual == pytest.approx(0.0, abs=1e-9)
+
+    def test_no_program_nonmonotonic_axis_falls_back_to_time(self, caplog: Any) -> None:
+        """Without a temperature program the whole run is one segment; a
+        non-monotonic temperature axis must fall back to time, loudly."""
+        import logging
+
+        sample, baseline, _ = self._heat_cool_pair()
+
+        with caplog.at_level(logging.WARNING, logger="pyngb.baseline"):
+            result = BaselineSubtractor().process_baseline_subtraction(
+                sample, baseline, {}, {}, "sample_temperature"
+            )
+
+        assert any("not monotonic" in message for message in caplog.messages)
+        residual = (result["dsc_signal"] - 7.0).abs().max()
+        assert residual == pytest.approx(0.0, abs=1e-9)
+
+    def test_isothermal_hold_does_not_contaminate_dynamic_segment(self) -> None:
+        """Baseline rows from an isothermal hold share temperatures with the
+        start of the ramp; the dynamic segment must not see them (audit NUM-01)."""
+        import numpy as np
+
+        hold_t = np.arange(0, 50.0)
+        ramp_t = np.arange(50, 150.0)
+        t = np.concatenate([hold_t, ramp_t])
+        temp = np.concatenate([np.full(50, 25.0), 25.0 + 2.0 * (ramp_t - 50.0)])
+        # DSC during the hold is wildly different from the ramp value at 25 C
+        base_dsc = np.concatenate([np.full(50, 100.0), 0.01 * temp[50:]])
+
+        def frame(dsc: Any) -> pl.DataFrame:
+            return pl.DataFrame(
+                {
+                    "time": t,
+                    "sample_temperature": temp,
+                    "mass": np.zeros_like(t),
+                    "dsc_signal": dsc,
+                }
+            )
+
+        metadata = {
+            "temperature_program": {
+                "stage_hold": {"temperature": 25.0, "heating_rate": 0.0, "time": 50.0},
+                "stage_ramp": {
+                    "temperature": 223.0,
+                    "heating_rate": 120.0,
+                    "time": 100.0,
+                },
+            }
+        }
+
+        result = BaselineSubtractor().process_baseline_subtraction(
+            frame(base_dsc + 7.0),
+            frame(base_dsc),
+            metadata,
+            metadata,
+            "sample_temperature",
+        )
+
+        residual = (result["dsc_signal"] - 7.0).abs().max()
+        assert residual == pytest.approx(0.0, abs=1e-9)
+
+    def test_real_pair_preserves_row_count(
+        self, sample_file: Any, baseline_file: Any
+    ) -> None:
+        result = subtract_baseline(
+            sample_file, baseline_file, dynamic_axis="sample_temperature"
+        )
+        sample_df = pl.from_arrow(read_ngb(sample_file))
+        assert result.height == sample_df.height
 
     def test_process_baseline_subtraction_preserves_segment_order(self) -> None:
         """Alternating stage types should not reorder the output rows."""
