@@ -1,23 +1,38 @@
 """Property-based tests using Hypothesis.
 
-These tests verify properties that should hold for all inputs,
-not just specific test cases. This helps catch edge cases and
-ensures robustness of the implementation.
+Every property here can actually fail: values are round-tripped through the
+binary parser with exact-equality assertions, corrupted real-instrument data
+must fail loudly with a typed exception, and DTG properties are checked
+against closed-form expectations on valid input instead of being swallowed
+by try/except. The previous vacuous properties (swapped parse_value
+arguments, exception-swallowing DTG checks) are documented in AUDIT
+TEST-02/TEST-05.
 """
 
 from __future__ import annotations
 
+import struct
+import zipfile
+from functools import lru_cache
+from pathlib import Path
+
 import numpy as np
 import polars as pl
-from hypothesis import given, settings, strategies as st
+import pytest
+from hypothesis import HealthCheck, assume, given, settings, strategies as st
 
 from pyngb.analysis import dtg
-from pyngb.binary.parser import BinaryParser
+from pyngb.binary import BinaryParser
+from pyngb.constants import DataType, PatternConfig
+from pyngb.exceptions import NGBParseError
+from pyngb.extractors import DataStreamProcessor
 from pyngb.validation import ValidationResult
 
+FIXTURE = Path(__file__).parent / "test_files" / "Red_Oak_STA_10K_250731_R7.ngb-ss3"
 
-class TestBinaryParserProperties:
-    """Property-based tests for binary parsing."""
+
+class TestSplitTablesProperties:
+    """Structural invariants of the table splitter for arbitrary input."""
 
     @given(st.binary(min_size=0, max_size=10000))
     @settings(max_examples=100, deadline=1000)
@@ -26,7 +41,6 @@ class TestBinaryParserProperties:
         parser = BinaryParser()
         result = parser.split_tables(data)
         assert isinstance(result, list)
-        # All results should be bytes
         assert all(isinstance(table, bytes) for table in result)
 
     @given(st.binary(min_size=0, max_size=1000))
@@ -36,123 +50,225 @@ class TestBinaryParserProperties:
         parser = BinaryParser()
         result = parser.split_tables(data)
         total_length = sum(len(table) for table in result)
-        # Total length should be <= original (due to separator removal)
         assert total_length <= len(data)
 
-    @given(st.binary(min_size=4, max_size=100))
-    @settings(max_examples=100, deadline=1000)
-    def test_parse_value_handles_all_inputs(self, data: bytes) -> None:
-        """parse_value should handle any binary input gracefully."""
+
+class TestParseValueRoundTrip:
+    """parse_value must decode exactly what struct.pack encoded."""
+
+    @given(st.integers(min_value=-(2**31), max_value=2**31 - 1))
+    @settings(max_examples=200, deadline=1000)
+    def test_int32_round_trip(self, value: int) -> None:
         parser = BinaryParser()
-        # Should not crash for any input
-        try:
-            result = parser.parse_value(
-                data,
-                0x08,  # type: ignore[arg-type]
-            )  # Try as int32
-            # Result should be valid type or None
-            assert result is None or isinstance(result, (int, float, str, bytes))
-        except (ValueError, struct.error):
-            # These are acceptable exceptions for invalid data
-            pass
+        result = parser.parse_value(DataType.INT32.value, struct.pack("<i", value))
+        assert isinstance(result, int)
+        assert result == value
 
+    @given(st.floats(width=32, allow_nan=False))
+    @settings(max_examples=200, deadline=1000)
+    def test_float32_round_trip(self, value: float) -> None:
+        parser = BinaryParser()
+        result = parser.parse_value(DataType.FLOAT32.value, struct.pack("<f", value))
+        assert isinstance(result, float)
+        assert result == value
 
-class TestDTGCalculationProperties:
-    """Property-based tests for DTG calculations."""
-
-    @given(
-        st.lists(
-            st.floats(
-                min_value=0, max_value=1000, allow_nan=False, allow_infinity=False
-            ),
-            min_size=10,
-            max_size=100,
-        ),
-        st.lists(
-            st.floats(
-                min_value=0, max_value=100, allow_nan=False, allow_infinity=False
-            ),
-            min_size=10,
-            max_size=100,
-        ),
-    )
-    @settings(max_examples=50, deadline=2000)
-    def test_dtg_output_length(
-        self, time_data: list[float], mass_data: list[float]
-    ) -> None:
-        """DTG output should have same length as input."""
-        # Make arrays same length
-        min_len = min(len(time_data), len(mass_data))
-        time_data = time_data[:min_len]
-        mass_data = mass_data[:min_len]
-
-        if min_len < 2:
-            return  # Skip too small datasets
-
-        time_arr = np.array(time_data)
-        mass_arr = np.array(mass_data)
-
-        try:
-            result = dtg(time_arr, mass_arr, smooth=0)  # type: ignore[arg-type]
-            assert len(result) == len(time_arr)
-        except (ValueError, RuntimeError):
-            # Expected for invalid data
-            pass
+    @given(st.floats(allow_nan=False))
+    @settings(max_examples=200, deadline=1000)
+    def test_float64_round_trip(self, value: float) -> None:
+        parser = BinaryParser()
+        result = parser.parse_value(DataType.FLOAT64.value, struct.pack("<d", value))
+        assert isinstance(result, float)
+        assert result == value
 
     @given(
-        st.lists(
-            st.floats(
-                min_value=0, max_value=1000, allow_nan=False, allow_infinity=False
+        st.text(
+            alphabet=st.characters(
+                blacklist_categories=("Cs",), blacklist_characters="\x00"
             ),
-            min_size=10,
-            max_size=50,
+            min_size=1,
+            max_size=100,
         )
     )
-    @settings(max_examples=50, deadline=2000)
-    def test_dtg_constant_mass_is_zero(self, time_data: list[float]) -> None:
-        """DTG of constant mass should be near zero."""
-        if len(time_data) < 10:
-            return
+    @settings(max_examples=200, deadline=1000)
+    def test_fffeff_string_round_trip(self, text: str) -> None:
+        """NETZSCH fffeff format: prefix + UTF-16LE code-unit count + data."""
+        encoded = text.encode("utf-16le")
+        code_units = len(encoded) // 2
+        assume(code_units <= 255)  # single count byte (AUDIT CORR-08)
+        payload = b"\xff\xfe\xff" + bytes([code_units]) + encoded
 
-        time_arr = np.array(time_data)
-        mass_arr = np.full_like(time_arr, 100.0)  # Constant mass
-
-        try:
-            result = dtg(time_arr, mass_arr, smooth=1)  # type: ignore[arg-type]
-            # DTG should be very close to zero for constant mass
-            assert np.allclose(result, 0.0, atol=1e-6)
-        except (ValueError, RuntimeError):
-            # Expected for invalid data
-            pass
+        parser = BinaryParser()
+        assert parser.parse_value(DataType.STRING.value, payload) == text
 
     @given(
-        st.integers(min_value=10, max_value=100),
-        st.sampled_from([0, 1, 2, 3]),
+        st.text(
+            alphabet=st.characters(
+                blacklist_categories=("Cs",), blacklist_characters="\x00"
+            ),
+            min_size=1,
+            max_size=100,
+        )
     )
-    @settings(max_examples=20, deadline=2000)
-    def test_dtg_smoothing_increases_stability(
-        self, n_points: int, smooth_level: int
+    @settings(max_examples=200, deadline=1000)
+    def test_standard_string_round_trip(self, text: str) -> None:
+        """Standard format: 4-byte length prefix + UTF-8 data."""
+        # The parser strips surrounding whitespace, so only whitespace-free
+        # boundaries round-trip exactly.
+        assume(text == text.strip())
+        encoded = text.encode("utf-8")
+        payload = struct.pack("<I", len(encoded)) + encoded
+
+        parser = BinaryParser()
+        assert parser.parse_value(DataType.STRING.value, payload) == text
+
+    @given(st.binary(min_size=0, max_size=16))
+    @settings(max_examples=100, deadline=1000)
+    def test_wrong_length_payload_returns_none(self, payload: bytes) -> None:
+        """Fixed-width types reject payloads of the wrong size with None."""
+        parser = BinaryParser()
+        if len(payload) != 4:
+            assert parser.parse_value(DataType.INT32.value, payload) is None
+        if len(payload) != 8:
+            assert parser.parse_value(DataType.FLOAT64.value, payload) is None
+
+    @given(st.binary(min_size=1, max_size=1), st.binary(min_size=0, max_size=64))
+    @settings(max_examples=100, deadline=1000)
+    def test_unknown_type_returns_raw_bytes(
+        self, data_type: bytes, payload: bytes
     ) -> None:
-        """Higher smoothing should reduce variance in DTG."""
-        # Create monotonically increasing time
-        time_arr = np.linspace(0, 100, n_points)
-        # Create mass with some noise
-        mass_arr = 100 - 0.5 * time_arr + np.random.normal(0, 0.1, n_points)
+        known = {t.value for t in DataType}
+        assume(data_type not in known)
+        parser = BinaryParser()
+        assert parser.parse_value(data_type, payload) == payload
 
+
+@lru_cache(maxsize=1)
+def _stream_2_bytes() -> bytes:
+    with zipfile.ZipFile(FIXTURE) as z:
+        return z.read("Streams/stream_2.table")
+
+
+def _process(stream: bytes) -> pl.DataFrame:
+    return DataStreamProcessor(PatternConfig(), BinaryParser()).process_stream_2(stream)
+
+
+@pytest.mark.skipif(not FIXTURE.exists(), reason="real fixture not available")
+class TestStreamCorruptionProperties:
+    """Corrupted measurement data must parse cleanly or fail loudly.
+
+    These lock in the Phase 1 loud-corruption contract (AUDIT CORR-02): the
+    only exception type the stream processor may leak is NGBParseError. A
+    silent success is acceptable only as a well-formed DataFrame - truncation
+    at a table boundary is indistinguishable from a file that legitimately
+    records fewer channels.
+    """
+
+    @given(st.data())
+    @settings(
+        max_examples=30,
+        deadline=None,
+        suppress_health_check=[HealthCheck.too_slow],
+    )
+    def test_truncation_parses_or_raises_typed_error(self, data: st.DataObject) -> None:
+        stream = _stream_2_bytes()
+        cut = data.draw(st.integers(min_value=0, max_value=len(stream) - 1))
         try:
-            dtg_smooth0 = dtg(time_arr, mass_arr, smooth=0)  # type: ignore[arg-type]
-            dtg_smooth = dtg(time_arr, mass_arr, smooth=smooth_level)  # type: ignore[arg-type]
+            result = _process(stream[:cut])
+        except NGBParseError:
+            return
+        assert isinstance(result, pl.DataFrame)
 
-            # Higher smoothing should generally reduce variance
-            # (though not guaranteed for all data)
-            var0 = np.var(dtg_smooth0)
-            var_smooth = np.var(dtg_smooth)
+    @given(st.data())
+    @settings(
+        max_examples=30,
+        deadline=None,
+        suppress_health_check=[HealthCheck.too_slow],
+    )
+    def test_byte_flip_parses_or_raises_typed_error(self, data: st.DataObject) -> None:
+        stream = _stream_2_bytes()
+        pos = data.draw(st.integers(min_value=0, max_value=len(stream) - 1))
+        value = data.draw(st.integers(min_value=0, max_value=255))
+        assume(stream[pos] != value)
 
-            # Just verify both are finite
-            assert np.isfinite(var0)
-            assert np.isfinite(var_smooth)
-        except (ValueError, RuntimeError):
-            pass
+        mutated = bytearray(stream)
+        mutated[pos] = value
+        try:
+            result = _process(bytes(mutated))
+        except NGBParseError:
+            return
+        assert isinstance(result, pl.DataFrame)
+
+
+@st.composite
+def time_and_mass(draw: st.DrawFn, min_size: int = 5, max_size: int = 100):
+    """Strictly increasing time plus finite mass, both valid DTG input."""
+    n = draw(st.integers(min_value=min_size, max_value=max_size))
+    deltas = draw(
+        st.lists(
+            st.floats(min_value=0.05, max_value=10.0),
+            min_size=n,
+            max_size=n,
+        )
+    )
+    time = np.cumsum(deltas)
+    mass = np.array(
+        draw(
+            st.lists(
+                st.floats(min_value=0.0, max_value=100.0),
+                min_size=n,
+                max_size=n,
+            )
+        )
+    )
+    return time, mass
+
+
+class TestDTGProperties:
+    """DTG properties on valid input, with no exception swallowing."""
+
+    @given(time_and_mass())
+    @settings(max_examples=50, deadline=2000)
+    def test_output_same_length_and_finite(self, data) -> None:
+        time, mass = data
+        result = dtg(time, mass)
+        assert len(result) == len(time)
+        assert np.isfinite(result).all()
+
+    @given(time_and_mass())
+    @settings(max_examples=50, deadline=2000)
+    def test_constant_mass_gives_zero_dtg(self, data) -> None:
+        time, _ = data
+        mass = np.full_like(time, 100.0)
+        result = dtg(time, mass)
+        assert np.allclose(result, 0.0, atol=1e-6)
+
+    @given(
+        time_and_mass(),
+        st.floats(min_value=0.01, max_value=1.0),
+    )
+    @settings(max_examples=50, deadline=2000)
+    def test_linear_mass_loss_recovers_rate(self, data, rate: float) -> None:
+        """mass = m0 - rate*t must give DTG == rate*60 mg/min everywhere.
+
+        Uses method="gradient": np.gradient with a coordinate array is exact
+        for linear functions even on non-uniform time, and Savitzky-Golay
+        smoothing of the resulting constant preserves it.
+        """
+        time, _ = data
+        mass = 100.0 - rate * time
+        result = dtg(time, mass, method="gradient")
+        assert np.allclose(result, rate * 60.0, rtol=1e-6, atol=1e-8)
+
+    @given(time_and_mass(min_size=6), st.data())
+    @settings(max_examples=50, deadline=2000)
+    def test_duplicate_timestamp_rejected(self, data, drawn: st.DataObject) -> None:
+        """A single duplicated timestamp must be rejected, not smeared (NUM-05)."""
+        time, mass = data
+        k = drawn.draw(st.integers(min_value=1, max_value=len(time) - 1))
+        time = time.copy()
+        time[k] = time[k - 1]
+        with pytest.raises(ValueError, match="strictly increasing"):
+            dtg(time, mass)
 
 
 class TestValidationResultProperties:
@@ -168,7 +284,6 @@ class TestValidationResultProperties:
 
         assert len(result.errors) == len(errors)
         assert result.summary()["error_count"] == len(errors)
-        # If there are errors, result should not be valid
         if errors:
             assert not result.is_valid
 
@@ -206,38 +321,5 @@ class TestValidationResultProperties:
             result.add_error(error)
 
         report = result.report()
-        # All errors should appear in the report
         for error in errors:
             assert error in report
-
-
-class TestDataFrameValidationProperties:
-    """Property-based tests for DataFrame validation."""
-
-    @given(
-        st.integers(min_value=1, max_value=100),
-        st.integers(min_value=1, max_value=10),
-    )
-    @settings(max_examples=30, deadline=2000)
-    def test_dataframe_null_count_property(self, n_rows: int, n_cols: int) -> None:
-        """Null count should match expected for DataFrame."""
-        # Create DataFrame with known null pattern
-        data = {}
-        for i in range(n_cols):
-            # Create column with some nulls
-            col_data = [float(j) if j % 3 != 0 else None for j in range(n_rows)]
-            data[f"col_{i}"] = col_data
-
-        df = pl.DataFrame(data)
-
-        # Check null counts
-        null_counts = df.null_count()
-        for col in df.columns:
-            null_count = null_counts[col][0]
-            # Should have roughly n_rows // 3 nulls
-            assert null_count >= 0
-            assert null_count <= n_rows
-
-
-# Add struct import for parse_value test
-import struct  # noqa: E402
