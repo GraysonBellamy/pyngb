@@ -44,26 +44,6 @@ metadata, table = read_ngb("sample.ngb-ss3", return_metadata=True)
 corrected = read_ngb("sample.ngb-ss3", baseline_file="baseline.ngb-bs3")
 ```
 
-### subtract_baseline()
-
-Standalone baseline subtraction function.
-
-```python
-def subtract_baseline(
-    sample_file: str,
-    baseline_file: str,
-    dynamic_axis: str = "sample_temperature"
-) -> pl.DataFrame
-```
-
-**Parameters:**
-- `sample_file` (str): Path to sample NGB file
-- `baseline_file` (str): Path to baseline NGB file
-- `dynamic_axis` (str): Alignment axis for dynamic segments
-
-**Returns:**
-- `pl.DataFrame`: Baseline-corrected data
-
 ## Analysis Functions
 
 ### add_dtg()

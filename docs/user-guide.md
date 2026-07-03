@@ -34,15 +34,11 @@ print(f"Sample: {metadata_json.get('sample_name', 'Unknown')}")
 Automatically subtract baseline measurements from sample data:
 
 ```python
-# Method 1: Integrated with loading
+# Baseline subtraction integrated with loading
 corrected_table = read_ngb(
     "sample.ngb-ss3",
     baseline_file="baseline.ngb-bs3"
 )
-
-# Method 2: Standalone function
-from pyngb import subtract_baseline
-corrected_df = subtract_baseline("sample.ngb-ss3", "baseline.ngb-bs3")
 
 # Custom dynamic axis for alignment
 corrected_table = read_ngb(

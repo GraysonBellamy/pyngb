@@ -7,8 +7,17 @@ import polars as pl
 import pyarrow as pa
 from typing import Any
 
-from pyngb import get_column_baseline_status, read_ngb, subtract_baseline
+from pyngb import get_column_baseline_status, read_ngb
 from pyngb.baseline import BaselineSubtractor
+
+
+def _subtract(
+    sample: Any, baseline: Any, axis: str = "sample_temperature"
+) -> pl.DataFrame:
+    """Load, subtract, and return a DataFrame via the one public path."""
+    df = pl.from_arrow(read_ngb(sample, baseline_file=baseline, dynamic_axis=axis))
+    assert isinstance(df, pl.DataFrame)
+    return df
 
 
 class TestBaselineSubtraction:
@@ -44,13 +53,12 @@ class TestBaselineSubtraction:
         """Load baseline data."""
         return read_ngb(baseline_file)
 
-    def test_standalone_subtract_baseline(
+    def test_subtract_baseline_with_temperature_axis(
         self, sample_file: Any, baseline_file: Any
     ) -> None:
-        """Test standalone subtract_baseline function."""
-        result = subtract_baseline(sample_file, baseline_file)
+        """Test baseline subtraction with sample temperature axis."""
+        result = _subtract(sample_file, baseline_file, axis="sample_temperature")
 
-        assert isinstance(result, pl.DataFrame)
         assert result.height > 0
         assert result.width > 0
 
@@ -59,35 +67,20 @@ class TestBaselineSubtraction:
         for col in expected_columns:
             assert col in result.columns
 
-    def test_subtract_baseline_with_temperature_axis(
-        self, sample_file: Any, baseline_file: Any
-    ) -> None:
-        """Test baseline subtraction with sample temperature axis."""
-        result = subtract_baseline(
-            sample_file, baseline_file, dynamic_axis="sample_temperature"
-        )
-
-        assert isinstance(result, pl.DataFrame)
-        assert result.height > 0
-
     def test_subtract_baseline_with_furnace_axis(
         self, sample_file: Any, baseline_file: Any
     ) -> None:
         """Test baseline subtraction with furnace temperature axis."""
-        result = subtract_baseline(
-            sample_file, baseline_file, dynamic_axis="furnace_temperature"
-        )
+        result = _subtract(sample_file, baseline_file, axis="furnace_temperature")
 
-        assert isinstance(result, pl.DataFrame)
         assert result.height > 0
 
     def test_subtract_baseline_with_time_axis(
         self, sample_file: Any, baseline_file: Any
     ) -> None:
         """Test baseline subtraction with time axis."""
-        result = subtract_baseline(sample_file, baseline_file, dynamic_axis="time")
+        result = _subtract(sample_file, baseline_file, axis="time")
 
-        assert isinstance(result, pl.DataFrame)
         assert result.height > 0
 
     def test_integrated_read_ngb_with_baseline(
@@ -192,15 +185,13 @@ class TestBaselineSubtraction:
     def test_data_preservation(self, sample_file: Any, baseline_file: Any) -> None:
         """Test that baseline subtraction succeeds and produces reasonable output."""
         # Load subtracted data
-        subtracted = subtract_baseline(sample_file, baseline_file)
+        subtracted = _subtract(sample_file, baseline_file)
 
         # Basic checks - subtracted data should exist and have reasonable structure
-        assert subtracted is not None
         assert len(subtracted) > 0
 
         # Check that key columns exist
-        column_names = subtracted.schema.names()
-        assert "time" in column_names
+        assert "time" in subtracted.columns
 
         # Verify subtraction worked
         assert len(subtracted) > 10, "Should have reasonable number of data points"
@@ -208,27 +199,25 @@ class TestBaselineSubtraction:
     def test_file_not_found_error(self) -> None:
         """Test error handling for missing files."""
         with pytest.raises(FileNotFoundError):
-            subtract_baseline("nonexistent.ngb-ss3", "baseline.ngb-bs3")
+            read_ngb("nonexistent.ngb-ss3", baseline_file="baseline.ngb-bs3")
 
         with pytest.raises(FileNotFoundError):
-            subtract_baseline(
+            read_ngb(
                 "tests/test_files/DF_FILED_STA_21O2_10K_220222_R1.ngb-ss3",
-                "nonexistent.ngb-bs3",
+                baseline_file="nonexistent.ngb-bs3",
             )
 
     def test_no_temperature_program(self, sample_file: Any, baseline_file: Any) -> None:
         """Test handling when no temperature program is available."""
         # This should still work, treating everything as dynamic
-        result = subtract_baseline(sample_file, baseline_file)
-        assert isinstance(result, pl.DataFrame)
+        result = _subtract(sample_file, baseline_file)
         assert result.height > 0
 
     def test_temperature_program_validation_success(
         self, sample_file: Any, baseline_file: Any
     ) -> None:
         """Test that compatible temperature programs pass validation."""
-        result = subtract_baseline(sample_file, baseline_file)
-        assert isinstance(result, pl.DataFrame)
+        result = _subtract(sample_file, baseline_file)
         assert result.height > 0
 
     def test_temperature_program_validation_failure(
@@ -236,7 +225,7 @@ class TestBaselineSubtraction:
     ) -> None:
         """Test that incompatible temperature programs fail validation."""
         with pytest.raises(ValueError, match="Temperature program mismatch"):
-            subtract_baseline(incompatible_sample_file, incompatible_baseline_file)
+            _subtract(incompatible_sample_file, incompatible_baseline_file)
 
     def test_integrated_api_validation_failure(
         self, incompatible_sample_file: Any, incompatible_baseline_file: Any
@@ -419,9 +408,7 @@ class TestBaselineSubtraction:
     def test_real_pair_preserves_row_count(
         self, sample_file: Any, baseline_file: Any
     ) -> None:
-        result = subtract_baseline(
-            sample_file, baseline_file, dynamic_axis="sample_temperature"
-        )
+        result = _subtract(sample_file, baseline_file, axis="sample_temperature")
         sample_df = pl.from_arrow(read_ngb(sample_file))
         assert result.height == sample_df.height
 

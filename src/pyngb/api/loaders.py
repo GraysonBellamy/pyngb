@@ -5,11 +5,14 @@ High-level API functions for loading NGB data.
 from pathlib import Path
 from typing import Literal, overload
 
+import polars as pl
 import pyarrow as pa
 
+from ..baseline import BaselineSubtractor
 from ..constants import FileMetadata
 from ..core import NGBParser
-from ..util import get_hash, set_metadata
+from ..util import get_hash, initialize_table_column_metadata, set_metadata
+from .metadata import mark_baseline_corrected
 
 __all__ = ["main", "read_ngb"]
 
@@ -189,8 +192,6 @@ def read_ngb(
 
     # Handle baseline subtraction if requested
     if baseline_file is not None:
-        from ..baseline import subtract_baseline
-
         # Validate dynamic_axis
         valid_axes = ["time", "sample_temperature", "furnace_temperature"]
         if dynamic_axis not in valid_axes:
@@ -198,11 +199,17 @@ def read_ngb(
                 f"dynamic_axis must be one of {valid_axes}, got '{dynamic_axis}'"
             )
 
-        # Perform baseline subtraction (this will load baseline metadata internally)
-        subtracted_df = subtract_baseline(
-            path,
-            baseline_file,
-            dynamic_axis,  # type: ignore  # We validated it above
+        baseline_metadata, baseline_data = parser.parse(baseline_file)
+
+        sample_df = pl.from_arrow(data)
+        baseline_df = pl.from_arrow(baseline_data)
+        if not isinstance(sample_df, pl.DataFrame) or not isinstance(
+            baseline_df, pl.DataFrame
+        ):
+            raise TypeError("NGB data could not be converted to DataFrame")
+
+        subtracted_df = BaselineSubtractor().process_baseline_subtraction(
+            sample_df, baseline_df, metadata, baseline_metadata, dynamic_axis
         )
 
         # Convert back to PyArrow
@@ -210,9 +217,6 @@ def read_ngb(
 
         # Baseline subtraction changes the meaning of mass/DSC columns, so tag
         # applicable column metadata before either return mode hands the table back.
-        from .metadata import mark_baseline_corrected
-        from ..util import initialize_table_column_metadata
-
         data = initialize_table_column_metadata(data)
         data = mark_baseline_corrected(data, ["mass", "dsc_signal"])
 
@@ -223,8 +227,6 @@ def read_ngb(
     data = set_metadata(data, tbl_meta={"file_metadata": metadata, "type": "STA"})
 
     # Initialize column metadata for all columns
-    from ..util import initialize_table_column_metadata
-
     data = initialize_table_column_metadata(data)
 
     return data

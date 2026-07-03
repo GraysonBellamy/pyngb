@@ -163,8 +163,7 @@ sequenceDiagram
 - Temperature program validation
 
 **Key Classes**:
-- `BaselineSubtractor`
-- `subtract_baseline()` convenience function
+- `BaselineSubtractor` (used by `read_ngb(path, baseline_file=...)`)
 
 #### `pyngb.analysis` - Analysis Functions
 **Responsibility**: Derived quantities and transformations

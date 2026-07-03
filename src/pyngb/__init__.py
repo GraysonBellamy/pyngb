@@ -21,7 +21,7 @@ from .api.metadata import (
     get_column_baseline_status,
     inspect_column_metadata,
 )
-from .baseline import BaselineSubtractor, subtract_baseline
+from .baseline import BaselineSubtractor
 from .batch import (
     BatchProcessor,
     BatchResult,
@@ -115,6 +115,5 @@ __all__ = [
     "process_files",
     "read_ngb",
     "set_column_units",
-    "subtract_baseline",
     "validate_sta_data",
 ]

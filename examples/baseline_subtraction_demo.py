@@ -7,7 +7,7 @@ typically the most appropriate for thermal analysis data.
 """
 
 import polars as pl
-from pyngb import read_ngb, subtract_baseline
+from pyngb import read_ngb
 
 
 def test_baseline_subtraction() -> None:
@@ -35,18 +35,13 @@ def test_baseline_subtraction() -> None:
     baseline_df = pl.from_arrow(baseline_data)
     print(f"   Shape: {baseline_df.shape}")
     if hasattr(baseline_df, "columns"):
-        print(
-            f"   Columns: {list(baseline_df.columns)[:5]}..."
-        )  # Test standalone baseline subtraction
-    print("\n🔬 Testing standalone subtract_baseline() function...")
-    subtracted_df = subtract_baseline(sample_file, baseline_file)
-    print(f"   Result shape: {subtracted_df.shape}")
+        print(f"   Columns: {list(baseline_df.columns)[:5]}...")
 
-    # Test integrated baseline subtraction through read_ngb
-    print("\n🔬 Testing integrated read_ngb() with baseline...")
-    integrated_data = read_ngb(sample_file, baseline_file=baseline_file)
-    integrated_df = pl.from_arrow(integrated_data)
-    print(f"   Result shape: {integrated_df.shape}")
+    # Baseline subtraction through read_ngb
+    print("\n🔬 Testing read_ngb() with baseline...")
+    subtracted_data = read_ngb(sample_file, baseline_file=baseline_file)
+    subtracted_df = pl.from_arrow(subtracted_data)
+    print(f"   Result shape: {subtracted_df.shape}")
 
     # Test different dynamic axis
     print("\n🔬 Testing with time axis...")

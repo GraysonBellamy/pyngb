@@ -1,13 +1,14 @@
 """
-Baseline subtraction functionality for NGB files.
+Baseline subtraction for NGB data.
 
-This module provides functionality to subtract baseline measurements from sample data,
-handling both isothermal and dynamic segments appropriately.
+This module subtracts baseline measurements from sample data, handling
+isothermal and dynamic segments appropriately. It operates purely on parsed
+DataFrames and metadata; loading files and orchestrating the subtraction is
+the API layer's job (``read_ngb(path, baseline_file=...)``).
 """
 
 import logging
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Literal
 
 import numpy as np
@@ -15,7 +16,7 @@ import polars as pl
 
 from .constants import FileMetadata
 
-__all__ = ["BaselineSubtractor", "Segment", "subtract_baseline"]
+__all__ = ["BaselineSubtractor", "Segment"]
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -405,88 +406,3 @@ class BaselineSubtractor:
             )
 
         return result
-
-
-def subtract_baseline(
-    sample_file: str | Path,
-    baseline_file: str | Path,
-    dynamic_axis: Literal[
-        "time", "sample_temperature", "furnace_temperature"
-    ] = "sample_temperature",
-) -> pl.DataFrame:
-    """
-    Subtract baseline data from sample data.
-
-    This function loads both sample (.ngb-ss3) and baseline (.ngb-bs3) files,
-    validates that they have identical temperature programs, identifies isothermal
-    and dynamic segments, and performs appropriate baseline subtraction. For
-    isothermal segments, subtraction is done on the time axis. For dynamic
-    segments, the user can choose the alignment axis; each dynamic segment is
-    interpolated against the baseline rows of the *same* program stage, and
-    falls back to the time axis (with a warning) if the chosen axis is not
-    monotonic over that stage.
-
-    Only the 'mass' and 'dsc_signal' columns are subtracted. All other columns
-    (time, temperatures, flows) are retained from the sample file. The result
-    has exactly one row per sample row — rows recorded outside the temperature
-    program (e.g. a post-program cooling tail) are subtracted on the time axis
-    rather than dropped.
-
-    Parameters
-    ----------
-    sample_file : str or Path
-        Path to the sample file (.ngb-ss3)
-    baseline_file : str or Path
-        Path to the baseline file (.ngb-bs3). Must have identical temperature
-        program to the sample file.
-    dynamic_axis : str, default="sample_temperature"
-        Axis to use for dynamic segment alignment and subtraction.
-        Options: "time", "sample_temperature", "furnace_temperature"
-
-    Returns
-    -------
-    pl.DataFrame
-        DataFrame with baseline-subtracted data
-
-    Raises
-    ------
-    ValueError
-        If temperature programs between sample and baseline are incompatible
-    FileNotFoundError
-        If either file does not exist
-
-    Examples
-    --------
-    >>> # Basic subtraction using sample temperature axis for dynamic segments (default)
-    >>> df = subtract_baseline("sample.ngb-ss3", "baseline.ngb-bs3")
-
-    >>> # Use time axis for dynamic segment alignment
-    >>> df = subtract_baseline(
-    ...     "sample.ngb-ss3",
-    ...     "baseline.ngb-bs3",
-    ...     dynamic_axis="time"
-    ... )
-    """
-    from .api.loaders import read_ngb
-
-    # Load both files
-    sample_metadata, sample_table = read_ngb(sample_file, return_metadata=True)
-    baseline_metadata, baseline_table = read_ngb(baseline_file, return_metadata=True)
-
-    # Convert to Polars DataFrames
-    sample_df = pl.from_arrow(sample_table)
-    baseline_df = pl.from_arrow(baseline_table)
-
-    # Ensure we have DataFrames
-    if not isinstance(sample_df, pl.DataFrame):
-        raise TypeError("Sample data could not be converted to DataFrame")
-    if not isinstance(baseline_df, pl.DataFrame):
-        raise TypeError("Baseline data could not be converted to DataFrame")
-
-    # Create subtractor and process
-    subtractor = BaselineSubtractor()
-    result = subtractor.process_baseline_subtraction(
-        sample_df, baseline_df, sample_metadata, baseline_metadata, dynamic_axis
-    )
-
-    return result
