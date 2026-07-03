@@ -14,7 +14,7 @@ from ..core import NGBParser
 from ..util import get_hash, initialize_table_column_metadata, set_metadata
 from .metadata import mark_baseline_corrected
 
-__all__ = ["main", "read_ngb"]
+__all__ = ["read_ngb"]
 
 
 @overload
@@ -230,21 +230,3 @@ def read_ngb(
     data = initialize_table_column_metadata(data)
 
     return data
-
-
-def main() -> int:
-    """Command-line interface for the NGB parser.
-
-    .. deprecated:: 0.2.0
-        This function has been moved to pyngb.api.cli.main().
-        This wrapper is maintained for backward compatibility.
-
-    Provides a command-line tool for parsing NGB files and converting
-    them to various output formats including Parquet and CSV.
-
-    Returns:
-        Exit code (0 for success, non-zero for error)
-    """
-    from .cli import main as cli_main
-
-    return cli_main()

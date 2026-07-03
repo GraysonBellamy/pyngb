@@ -9,7 +9,12 @@ pyngb: A Python library for parsing NETZSCH STA NGB files.
 from importlib.metadata import PackageNotFoundError, version
 
 from .analysis import dtg, dtg_custom
-from .api.analysis import add_dtg, calculate_table_dtg, normalize_to_initial_mass
+from .api.analysis import (
+    add_dtg,
+    apply_dsc_calibration,
+    calculate_table_dtg,
+    normalize_to_initial_mass,
+)
 from .api.loaders import read_ngb
 from .api.metadata import (
     get_column_units,
@@ -28,10 +33,7 @@ from .batch import (
 )
 from .config import ParsingConfig
 from .constants import (
-    BinaryMarkers,
-    DataType,
     FileMetadata,
-    FileMetadataRequired,
     PatternConfig,
     BaseColumnMetadata,
     BaselinableColumnMetadata,
@@ -63,10 +65,7 @@ __all__ = [
     "BaselineSubtractor",
     "BatchProcessor",
     "BatchResult",
-    "BinaryMarkers",
-    "DataType",
     "FileMetadata",
-    "FileMetadataRequired",
     "NGBBaselineError",
     "NGBCorruptedFileError",
     "NGBDataTypeError",
@@ -86,6 +85,7 @@ __all__ = [
     "__email__",
     "__version__",
     "add_dtg",
+    "apply_dsc_calibration",
     "calculate_table_dtg",
     "dtg",
     "dtg_custom",

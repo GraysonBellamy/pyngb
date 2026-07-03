@@ -16,7 +16,6 @@ __all__ = [  # noqa: RUF022 - order chosen for logical grouping
     "DataType",
     "DataTypeSizes",
     "FileMetadata",
-    "FileMetadataRequired",
     "PatternConfig",
     "PatternOffsets",
     "REF_CRUCIBLE_SIG_FRAGMENT",
@@ -25,17 +24,6 @@ __all__ = [  # noqa: RUF022 - order chosen for logical grouping
     "TemperatureCalibration",
     "TemperatureFixpoint",
 ]
-
-
-class FileMetadataRequired(TypedDict):
-    """Required metadata fields always present after parsing.
-
-    These fields are guaranteed to be populated by the parser
-    and can be relied upon in downstream processing.
-    """
-
-    # No fields are strictly required - the NGB format allows for sparse metadata
-    # All fields are technically optional based on file contents
 
 
 class TemperatureFixpoint(TypedDict, total=False):

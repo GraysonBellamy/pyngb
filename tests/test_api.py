@@ -1,21 +1,20 @@
 """
 Tests for the pyngb API module.
 
-This module tests the public API functions including read_ngb and CLI functionality.
+This module tests the public API functions including read_ngb.
 """
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 from typing import Any
 
 import polars as pl
 import pyarrow as pa
 import pytest
 
-from pyngb.api.loaders import main, read_ngb
+from pyngb.api.loaders import read_ngb
 from pyngb.api.metadata import get_column_units
-from pyngb.exceptions import NGBStreamNotFoundError
 
 
 class TestReadNGBData:
@@ -145,146 +144,6 @@ class TestReadNGBData:
                 read_ngb(temp_path)
         finally:
             Path(temp_path).unlink(missing_ok=True)
-
-
-class TestMainCLI:
-    """Test main CLI function."""
-
-    def test_main_help_argument(self) -> None:
-        """Covered by CLI execution tests; retain minimal smoke check only."""
-        assert callable(main)
-
-    @patch("pyngb.api.loaders.read_ngb")
-    @patch("pyarrow.parquet.write_table")
-    @patch("pathlib.Path.exists")
-    @patch("pathlib.Path.is_file")
-    @patch("pathlib.Path.mkdir")
-    @patch("pathlib.Path.touch")
-    @patch("pathlib.Path.unlink")
-    def test_main_parquet_output(
-        self,
-        mock_unlink: Any,
-        mock_touch: Any,
-        mock_mkdir: Any,
-        mock_is_file: Any,
-        mock_exists: Any,
-        mock_write_table: Any,
-        mock_read_ngb: Any,
-    ) -> None:
-        """Test main function with parquet output."""
-        import sys
-        from unittest.mock import patch
-
-        # Mock file system operations
-        mock_exists.return_value = True
-        mock_is_file.return_value = True
-        mock_mkdir.return_value = None
-        mock_touch.return_value = None
-        mock_unlink.return_value = None
-
-        # Mock the data loading
-        mock_table = MagicMock(spec=pa.Table)
-        mock_read_ngb.return_value = mock_table
-
-        # Mock sys.argv
-        with patch.object(
-            sys, "argv", ["pyngb", "test.ngb-ss3", "-f", "parquet", "-o", "/tmp"]
-        ):
-            result = main()
-
-        assert result == 0
-        mock_read_ngb.assert_called_once_with("test.ngb-ss3")
-        mock_write_table.assert_called_once()
-
-    @patch("pyngb.api.cli.read_ngb")
-    @patch("polars.from_arrow")
-    @patch("pathlib.Path.exists")
-    @patch("pathlib.Path.is_file")
-    @patch("pathlib.Path.mkdir")
-    @patch("pathlib.Path.touch")
-    @patch("pathlib.Path.unlink")
-    def test_main_csv_output(
-        self,
-        mock_unlink: Any,
-        mock_touch: Any,
-        mock_mkdir: Any,
-        mock_is_file: Any,
-        mock_exists: Any,
-        mock_from_arrow: Any,
-        mock_read_ngb: Any,
-    ) -> None:
-        """Test main function with CSV output."""
-        import sys
-        from unittest.mock import patch
-
-        # Mock file system operations
-        mock_exists.return_value = True
-        mock_is_file.return_value = True
-        mock_mkdir.return_value = None
-        mock_touch.return_value = None
-        mock_unlink.return_value = None
-
-        # Mock the data loading and conversion
-        mock_table = MagicMock(spec=pa.Table)
-        mock_read_ngb.return_value = mock_table
-
-        # Mock polars DataFrame (not pandas)
-        mock_polars_df = MagicMock(spec=pl.DataFrame)  # Ensure it's a DataFrame
-        mock_from_arrow.return_value = mock_polars_df
-
-        # Mock sys.argv
-        with patch.object(
-            sys, "argv", ["pyngb", "test.ngb-ss3", "-f", "csv", "-o", "/tmp"]
-        ):
-            result = main()
-
-        assert result == 0
-        mock_read_ngb.assert_called_once_with("test.ngb-ss3")
-        # The actual implementation uses polars write_csv, not pandas to_csv
-        mock_polars_df.write_csv.assert_called_once()
-
-    @patch("pyngb.api.loaders.read_ngb")
-    def test_main_file_not_found(self, mock_read_ngb: Any) -> None:
-        """Test main function with non-existent file."""
-        import sys
-        from unittest.mock import patch
-
-        # Mock file not found error
-        mock_read_ngb.side_effect = FileNotFoundError("File not found")
-
-        # Mock sys.argv
-        with patch.object(sys, "argv", ["pyngb", "nonexistent.ngb-ss3"]):
-            result = main()
-
-        assert result == 1  # Should return error code
-
-    @patch("pyngb.api.loaders.read_ngb")
-    def test_main_parsing_error(self, mock_read_ngb: Any) -> None:
-        """Test main function with parsing error."""
-        import sys
-        from unittest.mock import patch
-
-        # Mock parsing error
-        mock_read_ngb.side_effect = NGBStreamNotFoundError("Stream not found")
-
-        # Mock sys.argv
-        with patch.object(sys, "argv", ["pyngb", "corrupted.ngb-ss3"]):
-            result = main()
-
-        assert result == 1  # Should return error code
-
-    def test_main_verbose_logging(self) -> None:
-        """Test main function with verbose logging."""
-        import sys
-        from unittest.mock import patch
-
-        # Mock sys.argv with verbose flag
-        with patch.object(sys, "argv", ["pyngb", "--help", "-v"]):
-            try:
-                main()
-            except SystemExit as e:
-                # Should still exit normally for help
-                assert e.code == 0
 
 
 @pytest.mark.integration
