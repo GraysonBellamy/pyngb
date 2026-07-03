@@ -419,6 +419,14 @@ REF_CRUCIBLE_SIG_FRAGMENT = (
 # Binary structure constants for metadata extraction
 TEMP_PROG_TYPE_PREFIX = b"\x03\x80\x01"
 
+# Fixed bytes between a record's u16 field id and its float32 value:
+#   <TEMP_PROG_TYPE_PREFIX> <field id u16> | 00 00 01 00 00 00 | 0c 00 |
+#   17 fc ff ff | 04 80 01 | <value f32 LE>
+# The PID (0x0fe7-0x0fe9) and MFC (0x1048) records both store their value
+# behind this exact bridge, so scans can anchor on the full record layout
+# instead of hunting for a plausible float nearby.
+FIELD_VALUE_BRIDGE_F32 = b"\x00\x00\x01\x00\x00\x00\x0c\x00\x17\xfc\xff\xff\x04\x80\x01"
+
 # Control parameter signatures
 CONTROL_SIGNATURES = {
     0x0FE7: "xp",  # proportional gain

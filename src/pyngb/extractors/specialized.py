@@ -13,6 +13,7 @@ from ..binary import BinaryParser
 from ..constants import (
     APP_LICENSE_CATEGORY,
     APP_LICENSE_FIELD,
+    FIELD_VALUE_BRIDGE_F32,
     GAS_TYPES,
     MFC_FIELD_NAMES,
     SENSITIVITY_RECORD_SUFFIX,
@@ -49,6 +50,10 @@ class MFCExtractor(BaseMetadataExtractor):
         self.config = config
         self.parser = parser
         self.pattern_offsets = PatternOffsets()
+        self._signature = TEMP_PROG_TYPE_PREFIX + struct.pack(
+            "<H", self.pattern_offsets.MFC_SIGNATURE
+        )
+        self._range_record = self._signature + FIELD_VALUE_BRIDGE_F32
 
     def can_extract(self, tables: list[bytes]) -> bool:
         """Check if MFC metadata can be extracted."""
@@ -64,7 +69,7 @@ class MFCExtractor(BaseMetadataExtractor):
                 return True
 
         # Check for MFC signatures
-        return bool(self._has_mfc_signature_in_data(combined_data))
+        return self._signature in combined_data
 
     def extract(self, tables: list[bytes], metadata: FileMetadata) -> None:
         """Extract MFC metadata from tables."""
@@ -118,20 +123,6 @@ class MFCExtractor(BaseMetadataExtractor):
         except Exception as e:
             self.log_extraction_failure(e)
 
-    def _has_mfc_signature_in_data(self, data: bytes) -> bool:
-        """Check if data contains MFC signature patterns."""
-        for j in range(len(data) - 4):
-            if data[j : j + 3] == TEMP_PROG_TYPE_PREFIX:
-                sig_bytes = data[j + 3 : j + 5]
-                if len(sig_bytes) == 2:
-                    try:
-                        sig_val = struct.unpack("<H", sig_bytes)[0]
-                        if sig_val == self.pattern_offsets.MFC_SIGNATURE:
-                            return True
-                    except struct.error:
-                        continue
-        return False
-
     def _find_mfc_field_definitions(self, tables: list[bytes]) -> list[dict[str, Any]]:
         """Find MFC field name definitions in tables."""
         field_definitions = []
@@ -153,52 +144,30 @@ class MFCExtractor(BaseMetadataExtractor):
         range_tables = []
 
         for i, table_data in enumerate(tables):
-            if self._has_mfc_signature(table_data):
-                range_value = self._extract_mfc_range_value(table_data)
-                if range_value is not None:
-                    range_tables.append({"table": i, "range": range_value})
+            range_value = self._extract_mfc_range_value(table_data)
+            if range_value is not None:
+                range_tables.append({"table": i, "range": range_value})
 
         return range_tables
 
-    def _has_mfc_signature(self, table_data: bytes) -> bool:
-        """Check if table has MFC signature pattern."""
-        for j in range(len(table_data) - 4):
-            if table_data[j : j + 3] == TEMP_PROG_TYPE_PREFIX:
-                sig_bytes = table_data[j + 3 : j + 5]
-                if len(sig_bytes) == 2:
-                    try:
-                        sig_val = struct.unpack("<H", sig_bytes)[0]
-                        if sig_val == self.pattern_offsets.MFC_SIGNATURE:
-                            return True
-                    except struct.error:
-                        continue
-        return False
-
     def _extract_mfc_range_value(self, table_data: bytes) -> float | None:
-        """Extract MFC range value using structural parsing."""
-        for j in range(len(table_data) - 4):
-            if table_data[j : j + 3] == TEMP_PROG_TYPE_PREFIX:
-                sig_bytes = table_data[j + 3 : j + 5]
-                if len(sig_bytes) == 2:
-                    try:
-                        sig_val = struct.unpack("<H", sig_bytes)[0]
-                        if sig_val == self.pattern_offsets.MFC_SIGNATURE:
-                            # Look for float value after signature
-                            for offset in range(5, min(50, len(table_data) - j)):
-                                test_pos = j + offset
-                                if test_pos + 4 <= len(table_data):
-                                    try:
-                                        float_val = struct.unpack(
-                                            "<f", table_data[test_pos : test_pos + 4]
-                                        )[0]
-                                        # Validate reasonable flow rate value
-                                        if 0.1 <= float_val <= 1000.0:
-                                            return float(float_val)
-                                    except struct.error:
-                                        continue
-                    except struct.error:
-                        continue
-        return None
+        """Read the f32 range value anchored on the full MFC record layout."""
+        pos = table_data.find(self._range_record)
+        if pos == -1:
+            return None
+
+        value_pos = pos + len(self._range_record)
+        if value_pos + 4 > len(table_data):
+            return None
+
+        value = struct.unpack("<f", table_data[value_pos : value_pos + 4])[0]
+        # Validate reasonable flow rate value
+        if not 0.1 <= value <= 1000.0:
+            self.logger.debug(
+                f"MFC range value {value} outside plausible bounds; ignoring"
+            )
+            return None
+        return float(value)
 
     def _build_gas_context_map(self, tables: list[bytes]) -> dict[int, str]:
         """Build gas context map for MFC gas assignment."""
@@ -285,7 +254,7 @@ class PIDParameterExtractor(BaseMetadataExtractor):
         # Check for PID signatures
         for sig_val, _ in self.PID_SIGNATURES:
             sig_bytes = struct.pack("<H", sig_val)
-            pattern = b"\x03\x80\x01" + sig_bytes
+            pattern = TEMP_PROG_TYPE_PREFIX + sig_bytes
             if pattern in combined_data:
                 return True
 
@@ -351,11 +320,7 @@ class PIDParameterExtractor(BaseMetadataExtractor):
         for sig_val, param_name in self.PID_SIGNATURES:
             # Build the signature pattern
             sig_bytes = struct.pack("<H", sig_val)
-            pattern = (
-                b"\x03\x80\x01"
-                + sig_bytes
-                + b"\x00\x00\x01\x00\x00\x00\x0c\x00\x17\xfc\xff\xff\x04\x80\x01"
-            )
+            pattern = TEMP_PROG_TYPE_PREFIX + sig_bytes + FIELD_VALUE_BRIDGE_F32
 
             # Find all occurrences of this pattern
             start = 0
