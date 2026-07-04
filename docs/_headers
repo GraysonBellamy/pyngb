@@ -4,3 +4,5 @@
   X-Frame-Options: SAMEORIGIN
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: geolocation=(), microphone=(), camera=()
+  # Agent discovery (RFC 8288 / RFC 8631): point agents at the API reference.
+  Link: </api-reference/>; rel="service-doc"; type="text/html"
