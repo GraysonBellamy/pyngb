@@ -170,8 +170,6 @@ jobs:
     - name: Build documentation
       run: |
         uv run zensical build
-        # Add .nojekyll file for GitHub Pages
-        touch site/.nojekyll
 
     - name: Upload documentation artifacts
       uses: actions/upload-artifact@v5
@@ -187,12 +185,6 @@ jobs:
 
     permissions:
       contents: read
-      pages: write
-      id-token: write
-
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
     - name: Download documentation artifacts
@@ -201,17 +193,12 @@ jobs:
         name: documentation
         path: ./site
 
-    - name: Setup Pages
-      uses: actions/configure-pages@v4
-
-    - name: Upload to GitHub Pages
-      uses: actions/upload-pages-artifact@v3
+    - name: Deploy to Cloudflare Pages
+      uses: cloudflare/wrangler-action@v3
       with:
-        path: ./site
-
-    - name: Deploy to GitHub Pages
-      id: deployment
-      uses: actions/deploy-pages@v4
+        apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        command: pages deploy site --project-name=pyngb-docs --branch=main
 
   build:
     name: Build Package

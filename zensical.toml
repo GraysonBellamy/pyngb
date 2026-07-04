@@ -2,7 +2,7 @@
 site_name = "pyngb - NETZSCH STA File Parser"
 site_description = "Comprehensive Python library for parsing and analyzing NETZSCH STA NGB files"
 site_author = "Grayson Bellamy"
-site_url = "https://graysonbellamy.github.io/pyngb/"
+site_url = "https://pyngb.graysonbellamy.dev/"
 
 repo_name = "GraysonBellamy/pyngb"
 repo_url = "https://github.com/GraysonBellamy/pyngb"

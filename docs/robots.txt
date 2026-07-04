@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://graysonbellamy.github.io/pyngb/sitemap.xml
+Sitemap: https://pyngb.graysonbellamy.dev/sitemap.xml
