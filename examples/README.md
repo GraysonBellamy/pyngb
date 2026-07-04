@@ -108,6 +108,6 @@ import pyngb
 
 ## Getting Help
 
-- **Documentation**: [Full documentation](https://graysonbellamy.github.io/pyngb/)
+- **Documentation**: [Full documentation](https://pyngb.graysonbellamy.dev/)
 - **Issues**: [Report problems](https://github.com/GraysonBellamy/pyngb/issues)
 - **Discussions**: [Ask questions](https://github.com/GraysonBellamy/pyngb/discussions)

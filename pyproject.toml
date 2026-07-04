@@ -40,7 +40,7 @@ docs = [
 
 [project.urls]
 Homepage = "https://github.com/GraysonBellamy/pyngb"
-Documentation = "https://graysonbellamy.github.io/pyngb/"
+Documentation = "https://pyngb.graysonbellamy.dev/"
 Repository = "https://github.com/GraysonBellamy/pyngb.git"
 Issues = "https://github.com/GraysonBellamy/pyngb/issues"
 Changelog = "https://github.com/GraysonBellamy/pyngb/blob/main/CHANGELOG.md"

@@ -16,7 +16,7 @@ version: 0.2.0
 date-released: 2026-07-03
 license: MIT
 repository-code: "https://github.com/GraysonBellamy/pyngb"
-url: "https://graysonbellamy.github.io/pyngb/"
+url: "https://pyngb.graysonbellamy.dev/"
 keywords:
   - ngb
   - netzsch
