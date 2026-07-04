@@ -78,10 +78,6 @@ toggle.name = "Switch to light mode"
 [project.extra]
 generator = false
 
-[project.extra.analytics]
-provider = "google"
-property = "G-WLVK2ZW663"
-
 [project.extra.analytics.feedback]
 title = "Was this page helpful?"
 
