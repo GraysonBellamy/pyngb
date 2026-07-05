@@ -97,6 +97,11 @@ Thanks for your feedback! Help us improve this page by
 """
 
 [[project.extra.social]]
+icon = "fontawesome/solid/house"
+link = "https://graysonbellamy.dev"
+name = "graysonbellamy.dev"
+
+[[project.extra.social]]
 icon = "fontawesome/brands/github"
 link = "https://github.com/GraysonBellamy/pyngb"
 
