@@ -1,6 +1,6 @@
 [project]
 name = "pyngb"
-version = "0.2.0"
+version = "0.3.0"
 description = "Unofficial parser for NETZSCH STA (Simultaneous Thermal Analysis) NGB instrument binary files. Not affiliated with, endorsed by, or approved by NETZSCH-Gerätebau GmbH."
 readme = "README.md"
 authors = [
@@ -171,7 +171,11 @@ line-ending = "auto"
 max-complexity = 10
 
 [tool.mypy]
-python_version = "3.10"
+# No python_version pin: each environment type-checks against the interpreter
+# it runs under, so stubs always match the installed packages (numpy >= 2.5
+# ships PEP 695 stubs that mypy rejects when pinned to an older target).
+# 3.10 compatibility is enforced by the CI floors job, which runs the suite
+# on 3.10 with lowest-direct resolution.
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false  # Start lenient, can be stricter later

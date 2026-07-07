@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-07-06
+
+A metadata-completeness release driven by a deep investigation of the NGB
+binary format across all test fixtures. One extraction bug is fixed (dropped
+temperature-calibration fixpoints) and several new provenance fields are
+extracted. Breaking changes are marked **breaking**.
+
+### Fixed
+
+- Temperature-calibration fixpoints beyond the fifth are no longer silently
+  dropped. The fixpoint scan now covers categories `30 75` .. `3f 75` instead
+  of stopping at `34 75`; real files carry 6-9 standards, so every fixture
+  previously lost its high-temperature fixpoints (Ag2SO4, CsCl, K2CrO4,
+  BaCO3). All recovered fixpoints were verified against the calibration
+  polynomial round-trip (residual < 3e-5) and ascend in actual temperature.
+
+### Added
+
+- Calibration provenance on both calibration blocks: `temperature_calibration`
+  now also carries `date_measured` (ISO 8601 UTC), `gas`, `crucible_type`,
+  `heating_rate` (K/min), and `comment` from the calibration run that produced
+  it, read from the `f5 01` source table of the external record.
+- New `sensitivity_calibration` metadata block with the same provenance fields
+  plus `record_path` (the external `.ngb-es3` record), backed by the
+  `SensitivityCalibration` TypedDict.
+- Run-environment metadata: `timezone` (Windows timezone name active on the
+  instrument PC) and `utc_offset_minutes` (DST-aware), read from the `59 18`
+  snapshot table. `date_performed` is UTC; these recover the local wall-clock
+  time of the run.
+- `correction_file_path`: the correction file selected in the measurement
+  definition (`70 17` table, field `43 08`). For sample runs this identifies
+  the matching `.ngb-bs3` baseline file.
+- MFC flow setpoints: `purge_1_mfc_flow`, `purge_2_mfc_flow`, and
+  `protective_mfc_flow` (ml/min), read from the `*_LastUsedFlow`
+  device-parameter tables. For MFC channels without a data column in the file
+  these are the only record of the flow. Extracted by the new
+  `RunEnvironmentExtractor` and an extended `MFCExtractor`.
+- `scripts/ngb_deep_inspect.py`: reverse-engineering toolkit with `header`
+  (container header + section directory), `census` (every table and field in
+  a stream), and `crossref` (field comparison across files) subcommands.
+
+### Changed
+
+- **breaking** `sensitivity_record_path` (top-level string) is replaced by
+  `sensitivity_calibration["record_path"]`.
+
 ## [0.2.0] - 2026-07-03
 
 A correctness- and hardening-focused release driven by a full source audit.
