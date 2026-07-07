@@ -199,11 +199,11 @@ DSC calibration constants for signal correction:
 ### Temperature Calibration
 
 The temperature calibration is stored in `stream_1` and surfaced as the
-`temperature_calibration` metadata field plus a top-level
-`sensitivity_record_path`. Unlike the DSC sensitivity calibration, it is captured
-for **traceability/QA only**: the `sample_temperature` channel is already
-temperature-corrected by Proteus, so re-applying these coefficients would
-double-correct the data.
+`temperature_calibration` metadata field plus a sibling
+`sensitivity_calibration` provenance block. Unlike the DSC sensitivity
+calibration, it is captured for **traceability/QA only**: the
+`sample_temperature` channel is already temperature-corrected by Proteus, so
+re-applying these coefficients would double-correct the data.
 
 **Coefficients** — three `float32` values stored as a data array on field `be 04`
 inside an `f7 01` category table:
@@ -215,11 +215,14 @@ be 04 | 00 00 01 00 00 00 | 0c 00 | 17 fc ff ff | 10 | a0 01 | <count u32 LE> | 
 The count is `12` (3 × `float32`), giving `[B0, B1, B2]`.
 
 **Fixpoints** — the phase-transition standards used for the calibration, one per
-table, categorised `30 75` .. `34 75` (ascending temperature). Standards vary per
-calibration (Biphenyl, Benzoeacid, KClO4, In, Sn, …) and are read from the file,
-never hard-coded. The `30 75` category is reused by the sample tables, so a
-fixpoint table is confirmed by the presence of the `44 04` and `47 04` fields.
-Each table holds five scalar fields:
+table, categorised `30 75` .. `3f 75` (ascending temperature; real files carry
+6–9 standards). Standards vary per calibration (Biphenyl, Benzoeacid, KClO4,
+Ag2SO4, CsCl, K2CrO4, BaCO3, …) and are read from the file, never hard-coded.
+The `30 75` category range is reused by the sample tables, the MFC
+device-parameter tables, and the DSC sensitivity fixpoint tables, so a
+temperature fixpoint table is confirmed by the presence of the `44 04` and
+`47 04` fields (the sensitivity fixpoint tables carry `54 04`/`55 04`/`56 04`
+instead of `44 04`). Each table holds five scalar fields:
 
 | Field ID | Type | Name | Description |
 |----------|------|------|-------------|
@@ -237,10 +240,46 @@ corrected_c = measured_c + (1e-3*B0 + 1e-5*B1*T + 1e-8*B2*T²)   # T = measured_
 
 The residual `actual_c - corrected_c` is the calibration fit error.
 
-**Record paths** — the external calibration records, stored as UTF-16LE strings in
-the `f5 01` tables: the temperature record (`.ngb-ts3` →
-`temperature_calibration.record_path`) and the DSC sensitivity record
-(`.ngb-es3` → `sensitivity_record_path`).
+**Record paths and provenance** — each external calibration record has one
+`f5 01` source table, located by its `07 d4` path field suffix: the temperature
+record (`.ngb-ts3` → `temperature_calibration.record_path`) and the DSC
+sensitivity record (`.ngb-es3` → `sensitivity_calibration.record_path`). The
+same table carries the conditions of the calibration run, extracted into both
+blocks:
+
+| Field ID | Type | Name | Description |
+|----------|------|------|-------------|
+| `3e 08` | int32 | `date_measured` | Unix timestamp of the calibration run (→ ISO 8601 UTC) |
+| `31 04` | string | `gas` | Purge gas used |
+| `4c 04` / `33 04` | string | `crucible_type` | Crucible used (`4c 04` in the es3 table, `33 04` in the ts3 table) |
+| `35 04` | float32 | `heating_rate` | Heating rate in K/min |
+| `3d 08` | string | `comment` | Operator comment on the calibration run |
+
+### Run Environment
+
+Two further `stream_1` tables are surfaced as top-level metadata:
+
+**Timezone** — the `59 18` table is a Windows `TIME_ZONE_INFORMATION`-style
+snapshot: `11 35` name (string), `11 34` bias (int32 minutes, UTC = local +
+bias), `11 37` DST bias (int32), `11 38` state (int32; 1 = standard, 2 =
+daylight). Exposed as `timezone` and `utc_offset_minutes`
+(`-(bias + dst_bias)` when daylight time is active, else `-bias`).
+`date_performed` is UTC; this recovers the local wall-clock time of the run.
+
+**Correction file link** — the `70 17` measurement-definition table stores, in
+field `43 08`, the path of the correction file selected for the run (→
+`correction_file_path`). For sample (`.ngb-ss3`) runs this identifies the
+matching baseline (`.ngb-bs3`) file; for correction runs it may reference the
+related sample or a prior correction run.
+
+### MFC Flow Setpoints
+
+The configured gas flows (distinct from the MFC *ranges*) live in `30 75`
+device-parameter tables identified by their UTF-16LE parameter name in field
+`10 62` (e.g. `Purge 1 MFC_MFC400_LastUsedFlow`); the value is the `float32`
+field `10 61` of the same table. Exposed as `purge_1_mfc_flow`,
+`purge_2_mfc_flow`, and `protective_mfc_flow` (ml/min). For MFC channels with
+no data column in `stream_2` these setpoints are the only record of the flow.
 
 ## Column Metadata
 

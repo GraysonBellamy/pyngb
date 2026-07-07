@@ -183,3 +183,6 @@ output/
 .claude/
 .codex
 .codex/
+
+# working notes (format investigation backlog)
+FORMAT_FINDINGS.md

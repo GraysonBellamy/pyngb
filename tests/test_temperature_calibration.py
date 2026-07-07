@@ -22,12 +22,18 @@ REG_FILE = TEST_DIR / "Douglas_Fir_STA_10K_250730_R13.ngb-ss3"
 EXPECTED_COEFFICIENTS = [-43.89777374267578, -811.7273559570312, 247.13131713867188]
 
 # Expected fixpoint standards (name, actual_c, measured_c, corrected_c).
+# All nine standards of the calibration, including the high-temperature ones
+# stored in the 35 75 .. 38 75 tables.
 EXPECTED_FIXPOINTS = [
     ("Biphenyl", 69.2, 69.80000305175781, 69.2015609741211),
     ("Benzoeacid", 122.4, 123.5, 122.4913101196289),
     ("RbNO3(trig>kub)", 164.9, 165.39999389648438, 164.0811004638672),
     ("RbNO3 (III)", 283.9, 287.0, 284.83001708984375),
     ("KClO4", 299.7, 303.0, 300.72344970703125),
+    ("Ag2SO4", 426.2, 428.5, 425.4316101074219),
+    ("CsCl", 476.0, 478.20001220703125, 474.8398132324219),
+    ("K2CrO4", 669.0, 674.4000244140625, 670.0057373046875),
+    ("BaCO3", 807.0, 811.7000122070312, 806.6957397460938),
 ]
 
 
@@ -52,7 +58,7 @@ class TestTemperatureCalibrationRegression:
 
     def test_block_present(self, md: dict) -> None:
         assert "temperature_calibration" in md
-        assert "sensitivity_record_path" in md
+        assert "sensitivity_calibration" in md
 
     def test_coefficients(self, md: dict) -> None:
         coeffs = md["temperature_calibration"]["coefficients"]
@@ -62,7 +68,7 @@ class TestTemperatureCalibrationRegression:
 
     def test_fixpoints(self, md: dict) -> None:
         fixpoints = md["temperature_calibration"]["fixpoints"]
-        assert len(fixpoints) == 5
+        assert len(fixpoints) == len(EXPECTED_FIXPOINTS)
         for fp, (name, actual, measured, corrected) in zip(
             fixpoints, EXPECTED_FIXPOINTS
         ):
@@ -76,9 +82,24 @@ class TestTemperatureCalibrationRegression:
         record = md["temperature_calibration"]["record_path"]
         assert record.endswith(".ngb-ts3")
         assert "Calibrations" in record
-        sensitivity = md["sensitivity_record_path"]
+        sensitivity = md["sensitivity_calibration"]["record_path"]
         assert sensitivity.endswith(".ngb-es3")
         assert "Calibrations" in sensitivity
+
+    def test_calibration_provenance(self, md: dict) -> None:
+        """Both calibration blocks carry the run conditions that produced them."""
+        cal = md["temperature_calibration"]
+        assert cal["date_measured"] == "2025-07-27T19:12:18+00:00"
+        assert cal["gas"] == "NITROGEN"
+        assert cal["crucible_type"] == "PtRh20 85 µl, with lid"
+        assert cal["heating_rate"] == 10.0
+        assert "70 mL/min" in cal["comment"]
+
+        sens = md["sensitivity_calibration"]
+        assert sens["date_measured"] == "2025-07-27T19:12:07+00:00"
+        assert sens["gas"] == "NITROGEN"
+        assert sens["crucible_type"] == "PtRh20 85 µl, with lid"
+        assert sens["heating_rate"] == 10.0
 
 
 @pytest.mark.skipif(not list(TEST_DIR.glob("*.ngb-ss3")), reason="no real test files")
@@ -94,9 +115,10 @@ class TestTemperatureCalibrationStability:
         # Exactly three coefficients.
         assert len(cal["coefficients"]) == 3
 
-        # Exactly five fixpoints, all sane, in ascending actual temperature.
+        # Real calibrations carry 6-9 fixpoints, all sane, in ascending
+        # actual temperature.
         fixpoints = cal["fixpoints"]
-        assert len(fixpoints) == 5
+        assert 6 <= len(fixpoints) <= 16
         actuals = [fp["actual_c"] for fp in fixpoints]
         assert actuals == sorted(actuals)
         for fp in fixpoints:
@@ -107,7 +129,7 @@ class TestTemperatureCalibrationStability:
 
         # Record paths present and correctly typed.
         assert cal["record_path"].endswith(".ngb-ts3")
-        assert md["sensitivity_record_path"].endswith(".ngb-es3")
+        assert md["sensitivity_calibration"]["record_path"].endswith(".ngb-es3")
 
     @pytest.mark.parametrize("path", sorted(TEST_DIR.glob("*.ngb-ss3")))
     def test_corrected_is_measured_plus_polynomial(self, path: Path) -> None:

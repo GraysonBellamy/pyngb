@@ -99,3 +99,42 @@ def test_truncated_record_yields_nothing() -> None:
     table = b"\x00" * 8 + MFC_RANGE_RECORD + b"\x00\x00"  # only 2 of 4 value bytes
 
     assert _extractor()._extract_mfc_range_value(table) is None
+
+
+# Configured flow setpoints (ml/min) read from the *_LastUsedFlow
+# device-parameter tables. These vary per run, unlike the ranges.
+EXPECTED_FLOWS = {
+    "DF_FILED_STA_21O2_10K_220222_R1.ngb-ss3": (35.0, 15.0, 20.0),
+    "Douglas_Fir_STA_10K_250730_R13.ngb-ss3": (50.0, 20.0, 20.0),
+    "Douglas_Fir_STA_Baseline_10K_250730_R13.ngb-bs3": (50.0, 20.0, 20.0),
+    "Douglas_Fir_STA_Baseline_10K_250813_R15.ngb-bs3": (50.0, 20.0, 20.0),
+    "RO_FILED_STA_N2_10K_250129_R29.ngb-ss3": (50.0, 14.0, 20.0),
+    "Red_Oak_STA_10K_250731_R7.ngb-ss3": (50.0, 20.0, 20.0),
+}
+
+
+@pytest.mark.parametrize(
+    "fixture_name",
+    sorted(p.name for p in TEST_DIR.glob("*.ngb-*s3")),
+)
+def test_fixture_flow_setpoints(fixture_name: str) -> None:
+    """Every fixture yields the configured MFC flow setpoints."""
+    tables = _stream1_tables(TEST_DIR / fixture_name)
+    metadata: dict = {}
+    _extractor().extract(tables, metadata)
+
+    expected = EXPECTED_FLOWS.get(fixture_name)
+    if expected is None:
+        pytest.skip(f"no pinned flows for {fixture_name}")
+    purge_1, purge_2, protective = expected
+    assert metadata["purge_1_mfc_flow"] == purge_1
+    assert metadata["purge_2_mfc_flow"] == purge_2
+    assert metadata["protective_mfc_flow"] == protective
+
+
+def test_flow_setpoint_absent_yields_no_field() -> None:
+    """Tables without *_LastUsedFlow parameters produce no flow fields."""
+    tables = StreamTables([b"\x30\x75" + b"\x00" * 64])
+    metadata: dict = {}
+    _extractor()._extract_flow_setpoints(tables, metadata)
+    assert not any(k.endswith("_mfc_flow") for k in metadata)

@@ -20,6 +20,7 @@ __all__ = [  # noqa: RUF022 - order chosen for logical grouping
     "PatternOffsets",
     "REF_CRUCIBLE_SIG_FRAGMENT",
     "SAMPLE_CRUCIBLE_SIG_FRAGMENT",
+    "SensitivityCalibration",
     "StreamMarkers",
     "TemperatureCalibration",
     "TemperatureFixpoint",
@@ -75,11 +76,44 @@ class TemperatureCalibration(TypedDict, total=False):
             ``correction[°C] = 1e-3*B0 + 1e-5*B1*T_exp + 1e-8*B2*T_exp**2``.
         fixpoints: The phase-transition standards used for the calibration.
         record_path: Path to the external temperature-calibration record (.ngb-ts3).
+        date_measured: When the calibration was performed (ISO 8601, UTC).
+        gas: Purge gas used during the calibration run.
+        crucible_type: Crucible used during the calibration run.
+        heating_rate: Heating rate of the calibration run in K/min.
+        comment: Operator comment recorded on the calibration run.
     """
 
     coefficients: list[float]
     fixpoints: list[TemperatureFixpoint]
     record_path: str
+    date_measured: str
+    gas: str
+    crucible_type: str
+    heating_rate: float
+    comment: str
+
+
+class SensitivityCalibration(TypedDict, total=False):
+    """DSC sensitivity-calibration provenance (traceability/QA only).
+
+    The calibration constants themselves (p0-p5) are exposed separately as
+    ``calibration_constants``; this block records where they came from.
+
+    Fields:
+        record_path: Path to the external sensitivity record (.ngb-es3).
+        date_measured: When the calibration was performed (ISO 8601, UTC).
+        gas: Purge gas used during the calibration run.
+        crucible_type: Crucible used during the calibration run.
+        heating_rate: Heating rate of the calibration run in K/min.
+        comment: Operator comment recorded on the calibration run.
+    """
+
+    record_path: str
+    date_measured: str
+    gas: str
+    crucible_type: str
+    heating_rate: float
+    comment: str
 
 
 class FileMetadata(TypedDict, total=False):
@@ -118,10 +152,14 @@ class FileMetadata(TypedDict, total=False):
     licensed_to: str
     temperature_program: dict[str, dict[str, Any]]
     calibration_constants: dict[str, float]
-    # Temperature calibration (traceability/QA only - never applied to the data)
+    # Calibration provenance (traceability/QA only - never applied to the data)
     temperature_calibration: TemperatureCalibration
-    sensitivity_record_path: str
+    sensitivity_calibration: SensitivityCalibration
     file_hash: dict[str, str]
+    # Run environment
+    timezone: str
+    utc_offset_minutes: int
+    correction_file_path: str
     # MFC (Mass Flow Controller) metadata
     purge_1_mfc_gas: str
     purge_2_mfc_gas: str
@@ -129,6 +167,10 @@ class FileMetadata(TypedDict, total=False):
     purge_1_mfc_range: float
     purge_2_mfc_range: float
     protective_mfc_range: float
+    # MFC flow setpoints as configured for the run (ml/min)
+    purge_1_mfc_flow: float
+    purge_2_mfc_flow: float
+    protective_mfc_flow: float
     # Control parameters (PID settings)
     furnace_xp: float
     furnace_tn: float
@@ -448,17 +490,52 @@ TEMP_CAL_COEFF_CATEGORY = b"\xf7\x01"
 TEMP_CAL_COEFF_SIGNATURE = (
     b"\xbe\x04\x00\x00\x01\x00\x00\x00\x0c\x00\x17\xfc\xff\xff\x10\xa0\x01"
 )
-# Fixpoint tables are categorised 30 75 .. 34 75 (one per standard, ascending temp)
-TEMP_CAL_FIXPOINT_CATEGORIES = (
-    b"\x30\x75",
-    b"\x31\x75",
-    b"\x32\x75",
-    b"\x33\x75",
-    b"\x34\x75",
-)
+# Fixpoint tables are categorised 30 75 .. 3f 75 (one per standard, ascending
+# temp). Real files carry 6-9 fixpoints; scanning the full nibble range is safe
+# because a fixpoint table is confirmed by its field ids, not its category alone.
+TEMP_CAL_FIXPOINT_CATEGORIES = tuple(bytes([b, 0x75]) for b in range(0x30, 0x40))
 # External calibration record path suffixes (UTF-16LE in the f5 01 tables)
 TEMP_CAL_RECORD_SUFFIX = ".ngb-ts3"  # temperature calibration record
 SENSITIVITY_RECORD_SUFFIX = ".ngb-es3"  # DSC sensitivity calibration record
+
+# Calibration provenance scalar field ids within the f5 01 calibration-source
+# tables. Each external calibration record (.ngb-ts3 / .ngb-es3) has one such
+# table describing the run that produced it. Fields map to candidate ids tried
+# in order (the ts3 table stores the crucible in 04 33, the es3 table in 04 4c).
+CAL_PROVENANCE_FIELDS: dict[str, tuple[bytes, ...]] = {
+    "date_measured": (b"\x3e\x08",),  # INT32 Unix timestamp
+    "gas": (b"\x31\x04",),  # string
+    "crucible_type": (b"\x4c\x04", b"\x33\x04"),  # string
+    "heating_rate": (b"\x35\x04",),  # FLOAT32, K/min
+    "comment": (b"\x3d\x08",),  # string, operator comment on the calibration run
+}
+
+# Run-environment tables.
+# Timezone snapshot (59 18): Windows TIME_ZONE_INFORMATION-style fields.
+# utc_offset_minutes = -(bias + dst_bias if daylight active else bias).
+TIMEZONE_CATEGORY = b"\x59\x18"
+TIMEZONE_FIELDS: dict[str, bytes] = {
+    "name": b"\x35\x11",  # string, e.g. "Eastern Daylight Time"
+    "bias": b"\x34\x11",  # INT32 minutes (UTC = local + bias)
+    "dst_bias": b"\x37\x11",  # INT32 minutes, additional bias when DST active
+    "state": b"\x38\x11",  # INT32: 1 = standard time, 2 = daylight time
+}
+
+# Linked correction/measurement file (70 17 table, field 43 08). For sample
+# (.ngb-ss3) runs this is the correction file selected in the measurement
+# definition; for correction (.ngb-bs3) runs it may reference the related
+# sample or a prior correction run.
+CORRECTION_LINK_CATEGORY = b"\x70\x17"
+CORRECTION_LINK_FIELD = b"\x43\x08"
+
+# MFC flow setpoints live in 30 75 device-parameter tables identified by their
+# UTF-16LE parameter name (field 10 62); the value is FLOAT32 in field 10 61.
+MFC_FLOW_PARAM_NAMES: dict[str, str] = {
+    "purge_1_mfc_flow": "Purge 1 MFC_MFC400_LastUsedFlow",
+    "purge_2_mfc_flow": "Purge 2 MFC_MFC400_LastUsedFlow",
+    "protective_mfc_flow": "Protective MFC_MFC400_LastUsedFlow",
+}
+MFC_FLOW_VALUE_FIELD = b"\x61\x10"
 
 
 @dataclass(frozen=True, slots=True)

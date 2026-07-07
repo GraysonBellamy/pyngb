@@ -227,8 +227,23 @@ Dictionary containing extracted metadata from NGB files.
   the one calibration that *must* be applied downstream — DSC is stored raw in µV.
 - `temperature_calibration` (dict): Temperature calibration captured for
   traceability/QA **only** (see below).
-- `sensitivity_record_path` (str): Path to the external DSC sensitivity
-  calibration record (`.ngb-es3`).
+- `sensitivity_calibration` (dict): DSC sensitivity-calibration provenance:
+  `record_path` (the external `.ngb-es3` record), `date_measured` (ISO 8601
+  UTC), `gas`, `crucible_type`, `heating_rate` (K/min), and `comment`.
+
+**Run Environment Fields:**
+- `timezone` (str): Windows timezone name active on the instrument PC (e.g.
+  `"Eastern Daylight Time"`). `date_performed` is UTC; this recovers local time.
+- `utc_offset_minutes` (int): UTC offset of the run's local time, DST included.
+- `correction_file_path` (str): Correction file selected in the measurement
+  definition — for sample runs, the matching baseline (`.ngb-bs3`) file.
+
+**MFC Fields:**
+- `purge_1_mfc_gas` / `purge_2_mfc_gas` / `protective_mfc_gas` (str): Gas identity per channel.
+- `purge_1_mfc_range` / `purge_2_mfc_range` / `protective_mfc_range` (float): MFC full-scale range (ml/min).
+- `purge_1_mfc_flow` / `purge_2_mfc_flow` / `protective_mfc_flow` (float):
+  Configured flow setpoint for the run (ml/min). For MFC channels without a
+  data column in the file, this is the only record of the flow.
 
 **Temperature Calibration Structure:**
 
@@ -247,9 +262,14 @@ the data — they are extracted for provenance and quality assurance.
             "weight": 1.0,           # regression weight for this point
             "corrected_c": 69.202,   # measured value after the calibration polynomial
         },
-        # ... five standards total, ascending temperature
+        # ... 6-9 standards total, ascending temperature
     ],
     "record_path": r"C:\NETZSCH\...\Calibrations\K_44_....ngb-ts3",
+    "date_measured": "2025-07-27T19:12:18+00:00",  # when the calibration was run
+    "gas": "NITROGEN",                             # conditions of the calibration run
+    "crucible_type": "PtRh20 85 µl, with lid",
+    "heating_rate": 10.0,                          # K/min
+    "comment": "Swapped crucible positions, 70 mL/min total flowrate",
 }
 ```
 

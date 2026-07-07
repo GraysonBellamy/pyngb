@@ -9,21 +9,31 @@ import re
 import struct
 from typing import Any, ClassVar
 
+from datetime import datetime, timezone
+
 from ..binary import BinaryParser
 from ..constants import (
     APP_LICENSE_CATEGORY,
     APP_LICENSE_FIELD,
+    CAL_PROVENANCE_FIELDS,
+    CORRECTION_LINK_CATEGORY,
+    CORRECTION_LINK_FIELD,
     FIELD_VALUE_BRIDGE_F32,
     GAS_TYPES,
     MFC_FIELD_NAMES,
+    MFC_FLOW_PARAM_NAMES,
+    MFC_FLOW_VALUE_FIELD,
     SENSITIVITY_RECORD_SUFFIX,
     STRING_DATA_TYPE,
     TEMP_CAL_COEFF_SIGNATURE,
     TEMP_CAL_FIXPOINT_CATEGORIES,
     TEMP_CAL_RECORD_SUFFIX,
     TEMP_PROG_TYPE_PREFIX,
+    TIMEZONE_CATEGORY,
+    TIMEZONE_FIELDS,
     PatternConfig,
     PatternOffsets,
+    SensitivityCalibration,
     TemperatureCalibration,
     TemperatureFixpoint,
 )
@@ -34,8 +44,40 @@ __all__ = [
     "CalibrationExtractor",
     "MFCExtractor",
     "PIDParameterExtractor",
+    "RunEnvironmentExtractor",
     "TemperatureCalibrationExtractor",
 ]
+
+
+def _compile_scalar_field(field_id: bytes, parser: BinaryParser) -> re.Pattern[bytes]:
+    """Compile a pattern matching one scalar field record by its u16 id.
+
+    Matches ``<field_id> .. TYPE_PREFIX <dtype> TYPE_SEPARATOR <value> END_FIELD``
+    with the fixed 8-byte bridge between id and TYPE_PREFIX covered by the
+    bounded gap.
+    """
+    markers = parser.markers
+    return re.compile(
+        re.escape(field_id)
+        + rb".{0,12}?"
+        + re.escape(markers.TYPE_PREFIX)
+        + rb"(.)"
+        + re.escape(markers.TYPE_SEPARATOR)
+        + rb"(.+?)"
+        + re.escape(markers.END_FIELD),
+        re.DOTALL,
+    )
+
+
+def _scan_scalar(
+    pattern: re.Pattern[bytes], table: bytes, parser: BinaryParser
+) -> int | float | str | bytes | None:
+    """Return the parsed value of the first match of ``pattern`` in ``table``."""
+    match = pattern.search(table)
+    if not match:
+        return None
+    data_type, value_bytes = match.groups()
+    return parser.parse_value(data_type, value_bytes)
 
 
 class MFCExtractor(BaseMetadataExtractor):
@@ -54,6 +96,7 @@ class MFCExtractor(BaseMetadataExtractor):
             "<H", self.pattern_offsets.MFC_SIGNATURE
         )
         self._range_record = self._signature + FIELD_VALUE_BRIDGE_F32
+        self._flow_value_pattern = _compile_scalar_field(MFC_FLOW_VALUE_FIELD, parser)
 
     def can_extract(self, tables: StreamTables) -> bool:
         """Check if MFC metadata can be extracted."""
@@ -89,6 +132,10 @@ class MFCExtractor(BaseMetadataExtractor):
             mfc_fields = self._map_mfc_fields_to_ranges(
                 field_definitions, range_tables, gas_context_map
             )
+
+            # Step 5: Extract configured flow setpoints from the
+            # *_LastUsedFlow device-parameter tables
+            self._extract_flow_setpoints(tables, metadata)
 
             # Update metadata with extracted MFC fields
             extracted_count = 0
@@ -227,6 +274,28 @@ class MFCExtractor(BaseMetadataExtractor):
             if context_table in gas_context_map:
                 return gas_context_map[context_table]
         return None
+
+    def _extract_flow_setpoints(
+        self, tables: StreamTables, metadata: FileMetadata
+    ) -> None:
+        """Extract the configured MFC flow setpoints (ml/min).
+
+        Each setpoint lives in its own ``30 75`` device-parameter table
+        identified by a UTF-16LE parameter name like
+        ``Purge 1 MFC_MFC400_LastUsedFlow``; the value is the FLOAT32 field
+        ``10 61`` of that table. These are the flows configured for the run -
+        for MFC channels with no data column in stream_2 they are the only
+        record of the flow.
+        """
+        for meta_key, param_name in MFC_FLOW_PARAM_NAMES.items():
+            name_bytes = param_name.encode("utf-16le")
+            for table in tables:
+                if name_bytes not in table:
+                    continue
+                value = _scan_scalar(self._flow_value_pattern, table, self.parser)
+                if isinstance(value, (int, float)) and 0.0 <= value <= 1000.0:
+                    metadata[meta_key] = float(value)  # type: ignore[literal-required]
+                break  # one table per parameter name
 
 
 class PIDParameterExtractor(BaseMetadataExtractor):
@@ -439,12 +508,15 @@ class TemperatureCalibrationExtractor(BaseMetadataExtractor):
     1. ``coefficients`` - the [B0, B1, B2] polynomial stored as a float32 data
        array on field ``be 04`` inside an ``f7 01`` table.
     2. ``fixpoints`` - the phase-transition standards stored in the ``30 75`` ..
-       ``34 75`` tables. Each is one row of the Proteus calibration table:
+       ``3f 75`` tables. Each is one row of the Proteus calibration table:
        ``actual`` vs ``measured`` with a ``weight``, producing a ``corrected``
        value (``corrected = measured + correction(measured)``). Standards vary per
        calibration and are read from the file, never hard-coded.
-    3. record paths - the external temperature-calibration record (``.ngb-ts3``)
-       and the DSC sensitivity record (``.ngb-es3``).
+    3. Calibration provenance - the external record paths (``.ngb-ts3`` for
+       temperature, ``.ngb-es3`` for sensitivity) plus, from each record's
+       ``f5 01`` source table, the calibration date, gas, crucible, and heating
+       rate. The sensitivity provenance is exposed as the separate
+       ``sensitivity_calibration`` metadata block.
 
     IMPORTANT: The ``sample_temperature`` channel stored in NGB files is already
     temperature-corrected by Proteus, so these coefficients must NOT be applied to
@@ -463,6 +535,10 @@ class TemperatureCalibrationExtractor(BaseMetadataExtractor):
         self.parser = parser
         self._compiled_fields: dict[str, re.Pattern[bytes]] = {}
         self._compile_fixpoint_patterns()
+        self._provenance_fields = {
+            fname: [_compile_scalar_field(field_id, parser) for field_id in field_ids]
+            for fname, field_ids in CAL_PROVENANCE_FIELDS.items()
+        }
 
     def _compile_fixpoint_patterns(self) -> None:
         """Compile scalar-field regexes for each fixpoint field id."""
@@ -513,16 +589,23 @@ class TemperatureCalibrationExtractor(BaseMetadataExtractor):
             record_path = self._extract_path(combined, TEMP_CAL_RECORD_SUFFIX)
             if record_path:
                 cal["record_path"] = record_path
+            cal.update(self._extract_provenance(tables, TEMP_CAL_RECORD_SUFFIX))  # type: ignore[typeddict-item]
 
             extracted_count = 0
             if cal:
                 metadata["temperature_calibration"] = cal
                 extracted_count += len(cal)
 
+            sensitivity: SensitivityCalibration = {}
             sensitivity_path = self._extract_path(combined, SENSITIVITY_RECORD_SUFFIX)
             if sensitivity_path:
-                metadata["sensitivity_record_path"] = sensitivity_path
-                extracted_count += 1
+                sensitivity["record_path"] = sensitivity_path
+            sensitivity.update(
+                self._extract_provenance(tables, SENSITIVITY_RECORD_SUFFIX)  # type: ignore[typeddict-item]
+            )
+            if sensitivity:
+                metadata["sensitivity_calibration"] = sensitivity
+                extracted_count += len(sensitivity)
 
             if extracted_count > 0:
                 self.log_extraction_success(extracted_count)
@@ -592,6 +675,44 @@ class TemperatureCalibrationExtractor(BaseMetadataExtractor):
             elif fname != "name" and isinstance(value, (int, float)):
                 row[fname] = float(value)  # type: ignore[literal-required]
         return row
+
+    def _extract_provenance(
+        self, tables: StreamTables, suffix: str
+    ) -> dict[str, str | float]:
+        """Extract date/gas/crucible/heating-rate from a calibration source table.
+
+        Each external calibration record has one ``f5 01`` table whose ``07 d4``
+        path field ends in ``suffix``; the same table carries the provenance
+        scalars. The table is located by the suffix rather than its category so
+        unrelated ``f5 01`` tables (other record types, unused defaults) are
+        never misread.
+        """
+        marker = suffix.encode("utf-16le")
+        table = next((t for t in tables if marker in t), None)
+        if table is None:
+            return {}
+
+        provenance: dict[str, str | float] = {}
+        for fname, patterns in self._provenance_fields.items():
+            value = next(
+                (
+                    v
+                    for pattern in patterns
+                    if (v := _scan_scalar(pattern, table, self.parser)) is not None
+                ),
+                None,
+            )
+            if fname == "date_measured":
+                if isinstance(value, int) and value > 0:
+                    provenance[fname] = datetime.fromtimestamp(
+                        value, tz=timezone.utc
+                    ).isoformat()
+            elif fname == "heating_rate":
+                if isinstance(value, (int, float)) and value > 0:
+                    provenance[fname] = float(value)
+            elif isinstance(value, str) and value.strip():
+                provenance[fname] = value.strip()
+        return provenance
 
     @staticmethod
     def _extract_path(data: bytes, suffix: str) -> str | None:
@@ -701,3 +822,93 @@ class ApplicationLicenseExtractor(BaseMetadataExtractor):
 
         except Exception as e:
             self.log_extraction_failure(e)
+
+
+class RunEnvironmentExtractor(BaseMetadataExtractor):
+    """Extracts run-environment metadata: timezone and the linked correction file.
+
+    Timezone comes from the ``59 18`` snapshot table (Windows
+    TIME_ZONE_INFORMATION-style fields). ``date_performed`` is exported in UTC;
+    the timezone lets consumers recover the local wall-clock time of the run.
+
+    The correction-file link comes from the ``70 17`` measurement-definition
+    table (field ``43 08``). For sample (.ngb-ss3) runs it is the correction
+    file selected in the measurement setup, which lets baseline subtraction
+    verify or auto-discover the matching .ngb-bs3 file.
+    """
+
+    def __init__(self, config: PatternConfig, parser: BinaryParser) -> None:
+        super().__init__("Run Environment")
+        self.config = config
+        self.parser = parser
+        self._tz_fields = {
+            fname: _compile_scalar_field(field_id, parser)
+            for fname, field_id in TIMEZONE_FIELDS.items()
+        }
+        self._correction_pattern = _compile_scalar_field(CORRECTION_LINK_FIELD, parser)
+
+    def can_extract(self, tables: StreamTables) -> bool:
+        """Check if any run-environment table is present."""
+        return any(
+            table.startswith((TIMEZONE_CATEGORY, CORRECTION_LINK_CATEGORY))
+            for table in tables
+        )
+
+    def extract(self, tables: StreamTables, metadata: FileMetadata) -> None:
+        """Extract timezone and correction-file link from tables."""
+        self.log_extraction_attempt(len(tables))
+
+        try:
+            extracted_count = 0
+            extracted_count += self._extract_timezone(tables, metadata)
+            extracted_count += self._extract_correction_link(tables, metadata)
+
+            if extracted_count > 0:
+                self.log_extraction_success(extracted_count)
+            else:
+                self.logger.debug("No run-environment metadata extracted")
+
+        except Exception as e:
+            self.log_extraction_failure(e)
+
+    def _extract_timezone(self, tables: StreamTables, metadata: FileMetadata) -> int:
+        """Read the first timezone snapshot table (written at run start)."""
+        table = next((t for t in tables if t.startswith(TIMEZONE_CATEGORY)), None)
+        if table is None:
+            return 0
+
+        values = {
+            fname: _scan_scalar(pattern, table, self.parser)
+            for fname, pattern in self._tz_fields.items()
+        }
+
+        count = 0
+        name = values.get("name")
+        if isinstance(name, str) and name.strip():
+            metadata["timezone"] = name.strip()
+            count += 1
+
+        bias = values.get("bias")
+        if isinstance(bias, int):
+            # Windows convention: UTC = local + bias, so the offset is -bias;
+            # when daylight time is active the DST bias applies on top.
+            offset = -bias
+            dst_bias = values.get("dst_bias")
+            if values.get("state") == 2 and isinstance(dst_bias, int):
+                offset -= dst_bias
+            metadata["utc_offset_minutes"] = offset
+            count += 1
+        return count
+
+    def _extract_correction_link(
+        self, tables: StreamTables, metadata: FileMetadata
+    ) -> int:
+        """Read the linked correction/measurement file path."""
+        for table in tables:
+            if not table.startswith(CORRECTION_LINK_CATEGORY):
+                continue
+            value = _scan_scalar(self._correction_pattern, table, self.parser)
+            if isinstance(value, str) and value.strip():
+                metadata["correction_file_path"] = value.strip()
+                return 1
+        return 0
