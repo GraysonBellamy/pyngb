@@ -1,0 +1,144 @@
+#!/usr/bin/env python3
+"""Generate golden snapshot files for pyngb's parity test suite.
+
+Usage:
+    uv run python scripts/make_goldens.py parity
+
+The ``parity`` subcommand pins the parsed output of every test fixture —
+full metadata dict, column names/order, Arrow dtypes, row count, and a
+SHA-256 hash per column over canonical little-endian float64 bytes — into
+``tests/goldens/<fixture>.parity.json``. The snapshots are asserted by
+``tests/test_parity_goldens.py`` with zero tolerances and act as the
+byte-identical parity contract for the 0.4.0 backbone rewrite.
+
+The script deliberately uses only the public API (``read_ngb``) so it keeps
+working, unchanged, across the rewrite. Goldens are committed; regenerating
+them requires an explicit justification in the commit that does so.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import sys
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import pyarrow as pa
+
+from pyngb import read_ngb
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+FIXTURE_DIR = REPO_ROOT / "tests" / "test_files"
+GOLDEN_DIR = REPO_ROOT / "tests" / "goldens"
+
+# Frozen list, not a glob: a missing fixture must be an error, never a
+# shorter loop. Mirrored in tests/test_parity_goldens.py on purpose.
+FIXTURES = (
+    "DF_FILED_STA_21O2_10K_220222_R1.ngb-ss3",
+    "Douglas_Fir_STA_10K_250730_R13.ngb-ss3",
+    "Douglas_Fir_STA_Baseline_10K_250730_R13.ngb-bs3",
+    "Douglas_Fir_STA_Baseline_10K_250813_R15.ngb-bs3",
+    "Red_Oak_STA_10K_250731_R7.ngb-ss3",
+    "RO_FILED_STA_N2_10K_250129_R29.ngb-ss3",
+)
+
+
+def blake2b_file(path: Path) -> str:
+    digest = hashlib.blake2b()
+    with path.open("rb") as f:
+        while chunk := f.read(1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def canonical_column_bytes(table: pa.Table, name: str) -> bytes:
+    """Canonical byte representation of a column: little-endian float64."""
+    return np.asarray(table[name].to_numpy(), dtype="<f8").tobytes()
+
+
+def column_stats(table: pa.Table, name: str) -> dict[str, Any]:
+    """Diagnostic stats: not asserted, but make a hash mismatch debuggable."""
+    arr = np.asarray(table[name].to_numpy(), dtype="<f8")
+    return {
+        "first": float(arr[0]) if arr.size else None,
+        "last": float(arr[-1]) if arr.size else None,
+        "min": float(arr.min()) if arr.size else None,
+        "max": float(arr.max()) if arr.size else None,
+        "null_count": table[name].null_count,
+    }
+
+
+def make_parity_golden(fixture: str) -> dict[str, Any]:
+    path = FIXTURE_DIR / fixture
+    if not path.is_file():
+        raise FileNotFoundError(f"Fixture missing: {path}")
+
+    metadata, table = read_ngb(str(path), return_metadata=True)
+
+    fixture_hash = blake2b_file(path)
+    file_hash = metadata.get("file_hash", {})
+    if file_hash.get("hash") != fixture_hash:
+        raise AssertionError(
+            f"{fixture}: metadata file_hash {file_hash.get('hash')!r} does not "
+            f"match independently computed BLAKE2b {fixture_hash!r}"
+        )
+
+    # The golden is compared as parsed JSON objects; a metadata dict that does
+    # not survive a JSON round-trip exactly (non-string keys, non-finite
+    # floats, exotic types) would make that comparison unsound. Fail here,
+    # loudly, at generation time.
+    round_tripped = json.loads(json.dumps(metadata, ensure_ascii=False))
+    if round_tripped != metadata:
+        raise AssertionError(f"{fixture}: metadata is not JSON round-trip exact")
+
+    return {
+        "fixture": fixture,
+        "fixture_blake2b": fixture_hash,
+        "metadata": metadata,
+        "columns": table.column_names,
+        "column_dtypes": {
+            name: str(table.schema.field(name).type) for name in table.column_names
+        },
+        "num_rows": table.num_rows,
+        "column_sha256": {
+            name: hashlib.sha256(canonical_column_bytes(table, name)).hexdigest()
+            for name in table.column_names
+        },
+        "column_stats": {
+            name: column_stats(table, name) for name in table.column_names
+        },
+    }
+
+
+def cmd_parity() -> int:
+    GOLDEN_DIR.mkdir(parents=True, exist_ok=True)
+    for fixture in FIXTURES:
+        golden = make_parity_golden(fixture)
+        out = GOLDEN_DIR / f"{fixture}.parity.json"
+        with out.open("w", encoding="utf-8") as f:
+            json.dump(golden, f, ensure_ascii=False, sort_keys=True, indent=2)
+            f.write("\n")
+        print(
+            f"{out.relative_to(REPO_ROOT)}: "
+            f"{golden['num_rows']} rows, {len(golden['columns'])} columns, "
+            f"{len(golden['metadata'])} metadata keys"
+        )
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest="command", required=True)
+    sub.add_parser("parity", help="regenerate tests/goldens/*.parity.json")
+    args = parser.parse_args(argv)
+
+    if args.command == "parity":
+        return cmd_parity()
+    return 2  # pragma: no cover - argparse enforces the choices
+
+
+if __name__ == "__main__":
+    sys.exit(main())

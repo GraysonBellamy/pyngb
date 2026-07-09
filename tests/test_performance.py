@@ -47,7 +47,7 @@ class TestParsingPerformance:
         result = benchmark(read_ngb, str(real_ngb_file), return_metadata=True)
 
         # Verify result is valid
-        table, metadata = result
+        metadata, table = result
         assert table.num_rows > 0
         assert isinstance(metadata, dict)
 
@@ -231,8 +231,8 @@ def sample_sta_data() -> Any:
 @pytest.fixture
 def real_ngb_file() -> Any:
     """Get a real NGB file for performance testing."""
-    test_files_dir = Path(__file__).parent.parent / "test_files"
-    ngb_files = list(test_files_dir.glob("*.ngb-ss3"))
+    test_files_dir = Path(__file__).parent / "test_files"
+    ngb_files = sorted(test_files_dir.glob("*.ngb-ss3"))
 
     if not ngb_files:
         pytest.skip("No real NGB files available for performance testing")

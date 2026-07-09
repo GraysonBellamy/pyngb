@@ -1,0 +1,282 @@
+{
+  "column_dtypes": {
+    "31": "double",
+    "dsc_signal": "double",
+    "furnace_power": "double",
+    "furnace_temperature": "double",
+    "h_foil_temperature": "double",
+    "mass": "double",
+    "protective_flow": "double",
+    "purge_flow_1": "double",
+    "sample_temperature": "double",
+    "time": "double"
+  },
+  "column_sha256": {
+    "31": "5c54e4eb528c10003de99c52324adb40b1cb021261c8f229412a0fcaf538c0a6",
+    "dsc_signal": "fc1b403e07eb9e670d6ce76274f81b1b16dfacd8c2dcc6325555e84422c20b1a",
+    "furnace_power": "5c1ed2e2d6aadb77fb17ba17975f576195d4563914e15de5f8bd9ef934f5b97f",
+    "furnace_temperature": "fa0a4510d445a0cd9a176c8a2d7d389f97486f5b050b0b96f0f4ecb4a90e2187",
+    "h_foil_temperature": "5c54e4eb528c10003de99c52324adb40b1cb021261c8f229412a0fcaf538c0a6",
+    "mass": "85a38d469b288cabe6bae878eb73be86fe2393f6b76af095fecdbac3ab440311",
+    "protective_flow": "59d311aa5351377931788b1f0d7d20b698afa1f4c9eddd6d70d13d2c843e1399",
+    "purge_flow_1": "3e8f15c8880e028f19c8246e7224040b102a686c9fc02aafcbbb45da21e5387d",
+    "sample_temperature": "565809f3ce53ff0ea46808f3d89eb6e427c34a4f5190c4a66e5bc297aeebdefb",
+    "time": "983d4499b187950f1ea7c9030e5db246de0647349c994ee9ca0e5a8166b8e934"
+  },
+  "column_stats": {
+    "31": {
+      "first": 0.0,
+      "last": 0.0,
+      "max": 0.0,
+      "min": 0.0,
+      "null_count": 0
+    },
+    "dsc_signal": {
+      "first": -8.8516263961792,
+      "last": 12.857059478759766,
+      "max": 15.876774787902832,
+      "min": -20.841222763061523,
+      "null_count": 0
+    },
+    "furnace_power": {
+      "first": 0.0,
+      "last": 32.816001892089844,
+      "max": 46.00899887084961,
+      "min": 0.0,
+      "null_count": 0
+    },
+    "furnace_temperature": {
+      "first": 28.174999237060547,
+      "last": 825.0079956054688,
+      "max": 834.427978515625,
+      "min": 28.17300033569336,
+      "null_count": 0
+    },
+    "h_foil_temperature": {
+      "first": 0.0,
+      "last": 0.0,
+      "max": 0.0,
+      "min": 0.0,
+      "null_count": 0
+    },
+    "mass": {
+      "first": 0.0,
+      "last": -3.0860000000000003,
+      "max": 0.1609999999999996,
+      "min": -3.0860000000000003,
+      "null_count": 0
+    },
+    "protective_flow": {
+      "first": 20.0,
+      "last": 20.0,
+      "max": 20.0,
+      "min": 20.0,
+      "null_count": 0
+    },
+    "purge_flow_1": {
+      "first": 50.0,
+      "last": 50.0,
+      "max": 50.0,
+      "min": 50.0,
+      "null_count": 0
+    },
+    "sample_temperature": {
+      "first": 27.023000717163086,
+      "last": 807.4819946289062,
+      "max": 815.3469848632812,
+      "min": 27.023000717163086,
+      "null_count": 0
+    },
+    "time": {
+      "first": 0.0,
+      "last": 8381.950000001154,
+      "max": 8381.950000001154,
+      "min": 0.0,
+      "null_count": 0
+    }
+  },
+  "columns": [
+    "time",
+    "sample_temperature",
+    "dsc_signal",
+    "purge_flow_1",
+    "protective_flow",
+    "mass",
+    "furnace_temperature",
+    "31",
+    "furnace_power",
+    "h_foil_temperature"
+  ],
+  "fixture": "Red_Oak_STA_10K_250731_R7.ngb-ss3",
+  "fixture_blake2b": "ab51e0a6692a4daca7a86c5fc796140a77f0ca51f98ddb12cdaecf7a3d706d982ba2e94b3871ab09b601cec99b2b340dfea30b0d738e4dd65106a8178af871de",
+  "metadata": {
+    "application_version": "Version 8.0.3  (10.12.2024) 24345.303",
+    "calibration_constants": {
+      "p0": 69.19999694824219,
+      "p1": 678.8131103515625,
+      "p2": 7.053184509277344,
+      "p3": -4.022271156311035,
+      "p4": 5.7613935470581055,
+      "p5": -1.777075171470642
+    },
+    "carrier_type": "DSC/TG Cp P",
+    "comment": "Swapped crucible positions",
+    "correction_file_path": "C:\\NETZSCH\\Proteus80\\data\\Bellamy\\Red Oak\\Red_Oak_STA_Baseline_10K_250731_R7.ngb-bs3",
+    "crucible_mass": 253.516,
+    "crucible_type": "PtRh20 85 µl, with lid",
+    "date_performed": "2025-07-31T15:58:37+00:00",
+    "file_hash": {
+      "file": "Red_Oak_STA_10K_250731_R7.ngb-ss3",
+      "hash": "ab51e0a6692a4daca7a86c5fc796140a77f0ca51f98ddb12cdaecf7a3d706d982ba2e94b3871ab09b601cec99b2b340dfea30b0d738e4dd65106a8178af871de",
+      "method": "BLAKE2b"
+    },
+    "furnace_tn": 5.25,
+    "furnace_tv": 4.0,
+    "furnace_type": "Low Temp Steel K",
+    "furnace_xp": 5.25,
+    "instrument": "STA449F3A-0333-M",
+    "lab": "UMD",
+    "licensed_to": "University of Maryland\nCollege Park\nUSA",
+    "material": "Red Oak",
+    "operator": "Grayson",
+    "project": "Material Flammability",
+    "protective_mfc_flow": 20.0,
+    "protective_mfc_gas": "NITROGEN",
+    "protective_mfc_range": 250.0,
+    "purge_1_mfc_flow": 50.0,
+    "purge_1_mfc_gas": "NITROGEN",
+    "purge_1_mfc_range": 250.0,
+    "purge_2_mfc_flow": 20.0,
+    "purge_2_mfc_gas": "OXYGEN",
+    "purge_2_mfc_range": 252.5,
+    "reference_crucible_mass": 256.2980041503906,
+    "reference_mass": 0.0,
+    "sample_id": "Red Oak",
+    "sample_mass": 4.044,
+    "sample_name": "Red Oak",
+    "sample_tn": 5.25,
+    "sample_tv": 4.0,
+    "sample_xp": 5.25,
+    "sensitivity_calibration": {
+      "comment": "Swapped crucible positions, 70 mL/min total flowrate",
+      "crucible_type": "PtRh20 85 µl, with lid",
+      "date_measured": "2025-07-27T19:12:07+00:00",
+      "gas": "NITROGEN",
+      "heating_rate": 10.0,
+      "record_path": "C:\\NETZSCH\\Proteus80\\_Records\\Calibrations\\L_44_STA449F3A-0333-M_V1_101_4_104_1_4003000003EB03EB_0_1000_292a050d-2f6c-490e-8385-7c743538a5a3_100_.ngb-es3"
+    },
+    "temperature_calibration": {
+      "coefficients": [
+        -43.89777374267578,
+        -811.7273559570312,
+        247.13131713867188
+      ],
+      "comment": "Swapped crucible positions, 70 mL/min total flowrate",
+      "crucible_type": "PtRh20 85 µl, with lid",
+      "date_measured": "2025-07-27T19:12:18+00:00",
+      "fixpoints": [
+        {
+          "actual_c": 69.19999694824219,
+          "corrected_c": 69.2015609741211,
+          "measured_c": 69.80000305175781,
+          "name": "Biphenyl",
+          "weight": 1.0
+        },
+        {
+          "actual_c": 122.4000015258789,
+          "corrected_c": 122.4913101196289,
+          "measured_c": 123.5,
+          "name": "Benzoeacid",
+          "weight": 1.0
+        },
+        {
+          "actual_c": 164.89999389648438,
+          "corrected_c": 164.0811004638672,
+          "measured_c": 165.39999389648438,
+          "name": "RbNO3(trig>kub)",
+          "weight": 1.0
+        },
+        {
+          "actual_c": 283.8999938964844,
+          "corrected_c": 284.83001708984375,
+          "measured_c": 287.0,
+          "name": "RbNO3 (III)",
+          "weight": 1.0
+        },
+        {
+          "actual_c": 299.70001220703125,
+          "corrected_c": 300.72344970703125,
+          "measured_c": 303.0,
+          "name": "KClO4",
+          "weight": 1.0
+        },
+        {
+          "actual_c": 426.20001220703125,
+          "corrected_c": 425.4316101074219,
+          "measured_c": 428.5,
+          "name": "Ag2SO4",
+          "weight": 1.0
+        },
+        {
+          "actual_c": 476.0,
+          "corrected_c": 474.8395690917969,
+          "measured_c": 478.20001220703125,
+          "name": "CsCl",
+          "weight": 1.0
+        },
+        {
+          "actual_c": 669.0,
+          "corrected_c": 670.0057983398438,
+          "measured_c": 674.4000244140625,
+          "name": "K2CrO4",
+          "weight": 1.0
+        },
+        {
+          "actual_c": 807.0,
+          "corrected_c": 806.695556640625,
+          "measured_c": 811.7000122070312,
+          "name": "BaCO3",
+          "weight": 1.0
+        }
+      ],
+      "gas": "NITROGEN",
+      "heating_rate": 10.0,
+      "record_path": "C:\\NETZSCH\\Proteus80\\_Records\\Calibrations\\K_44_STA449F3A-0333-M_V1_101_4_104_1_4003000003EB03EB_0_1000_292a050d-2f6c-490e-8385-7c743538a5a3_100_.ngb-ts3"
+    },
+    "temperature_program": {
+      "stage_0": {
+        "acquisition_rate": 0.0,
+        "heating_rate": 0.0,
+        "temperature": 28.0,
+        "time": 0.0
+      },
+      "stage_1": {
+        "acquisition_rate": 20.0,
+        "heating_rate": 0.0,
+        "temperature": 28.0,
+        "time": 1800.0
+      },
+      "stage_2": {
+        "acquisition_rate": 100.0,
+        "heating_rate": 10.0,
+        "temperature": 825.0,
+        "time": 4781.999816894531
+      },
+      "stage_3": {
+        "acquisition_rate": 20.0,
+        "heating_rate": 0.0,
+        "temperature": 825.0,
+        "time": 1800.0
+      },
+      "stage_4": {
+        "acquisition_rate": 0.0,
+        "heating_rate": 0.0,
+        "temperature": 835.0,
+        "time": 0.0
+      }
+    },
+    "timezone": "Eastern Daylight Time",
+    "utc_offset_minutes": -240
+  },
+  "num_rows": 9171
+}
