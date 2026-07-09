@@ -1,48 +1,102 @@
-"""Command-line interface for pyNGB."""
+"""Command-line interface for pyNGB.
+
+Three subcommands under the ``pyngb`` entry point:
+
+- ``pyngb convert`` — parse NGB files to Parquet/CSV (optionally
+  baseline-subtracted); the workhorse for data export.
+- ``pyngb inspect`` — structural view of the parsed document: container
+  sections, tables, field values, byte coverage, and the unknown-field
+  census; with several files, a cross-file field comparison.
+- ``pyngb validate`` — data-quality checks over the parsed measurement data.
+"""
 
 import argparse
+import json
 import logging
 import sys
 import zipfile
+from collections import defaultdict
 from pathlib import Path
+from typing import Any
 
 import polars as pl
 import pyarrow as pa
 import pyarrow.parquet as pq
 
 from ..exceptions import NGBParseError
+from ..format import DType, Mode, load_document
+from ..format.census import document_census
+from ..format.document import NGBDocument, Table
+from ..validation import QualityChecker
 from .loaders import read_ngb
 
 logger = logging.getLogger(__name__)
 
 
-def create_parser() -> argparse.ArgumentParser:
-    """Create and configure argument parser.
+def build_parser() -> argparse.ArgumentParser:
+    """Create and configure the subcommand argument parser."""
+    parser = argparse.ArgumentParser(
+        prog="pyngb", description="Work with NETZSCH STA NGB files"
+    )
+    sub = parser.add_subparsers(dest="command", required=True)
 
-    Returns:
-        Configured ArgumentParser instance
-    """
-    parser = argparse.ArgumentParser(description="Parse NETZSCH STA NGB files")
-    parser.add_argument("input", nargs="+", help="Input NGB file path(s)")
-    parser.add_argument("-o", "--output", help="Output directory", default=".")
-    parser.add_argument(
+    convert = sub.add_parser("convert", help="Parse NGB files and export Parquet/CSV")
+    convert.add_argument("input", nargs="+", help="Input NGB file path(s)")
+    convert.add_argument("-o", "--output", help="Output directory", default=".")
+    convert.add_argument(
         "-f",
         "--format",
         choices=["parquet", "csv", "both"],
         default="parquet",
         help="Output format",
     )
-    parser.add_argument(
+    convert.add_argument(
         "-v", "--verbose", action="store_true", help="Enable verbose logging"
     )
-    parser.add_argument(
+    convert.add_argument(
         "-b", "--baseline", help="Baseline file path for baseline subtraction"
     )
-    parser.add_argument(
+    convert.add_argument(
         "--dynamic-axis",
         choices=["time", "sample_temperature", "furnace_temperature"],
         default="sample_temperature",
         help="Axis for dynamic segment alignment during baseline subtraction (default: sample_temperature)",
+    )
+
+    inspect = sub.add_parser(
+        "inspect",
+        help="Show document structure: sections, tables, coverage, unknown fields",
+    )
+    inspect.add_argument("input", nargs="+", help="Input NGB file path(s)")
+    inspect.add_argument(
+        "--stream",
+        type=int,
+        default=1,
+        help="Stream number for the table listing / cross-file comparison (default: 1)",
+    )
+    inspect.add_argument(
+        "--values",
+        action="store_true",
+        help="Show decoded field values in the table listing",
+    )
+    inspect.add_argument(
+        "--unknown",
+        action="store_true",
+        help="Show only the unknown-field census (the format-mapping to-do list)",
+    )
+    inspect.add_argument(
+        "--coverage",
+        action="store_true",
+        help="Show only byte-coverage accounting (gap bytes and span kinds)",
+    )
+    inspect.add_argument(
+        "--json", action="store_true", help="Emit machine-readable JSON"
+    )
+
+    validate = sub.add_parser("validate", help="Run data-quality checks on NGB files")
+    validate.add_argument("input", nargs="+", help="Input NGB file path(s)")
+    validate.add_argument(
+        "--json", action="store_true", help="Emit machine-readable JSON"
     )
 
     return parser
@@ -211,40 +265,8 @@ def process_file(
         logger.info(f"Successfully parsed {input_file}")
 
 
-def main(argv: list[str] | None = None) -> int:
-    """Command-line interface for the NGB parser.
-
-    Provides a command-line tool for parsing NGB files and converting
-    them to various output formats including Parquet and CSV.
-
-    Usage:
-        python -m pyngb input.ngb-ss3 [input2.ngb-ss3 ...] [options]
-
-    Examples:
-        # Parse to Parquet (default)
-        python -m pyngb sample.ngb-ss3
-
-        # Parse to CSV with verbose logging
-        python -m pyngb sample.ngb-ss3 -f csv -v
-
-        # Parse many files to both formats in a custom directory
-        python -m pyngb *.ngb-ss3 -f both -o /output/dir
-
-        # Baseline-subtract every input against the same baseline
-        python -m pyngb *.ngb-ss3 -b baseline.ngb-bs3
-
-    Args:
-        argv: Command-line arguments (defaults to sys.argv)
-
-    Returns:
-        Exit code (0 when every file succeeded, 1 otherwise)
-    """
-    parser = create_parser()
-    args = parser.parse_args(argv)
-
-    # Configure logging
-    logging.basicConfig(level=(logging.DEBUG if args.verbose else logging.INFO))
-
+def cmd_convert(args: argparse.Namespace) -> int:
+    """Run the convert subcommand: parse files and write outputs."""
     # Validate shared inputs once; failures here abort the whole run.
     try:
         if args.baseline:
@@ -279,6 +301,226 @@ def main(argv: list[str] | None = None) -> int:
         logger.error(f"{failures} of {len(args.input)} file(s) failed")
         return 1
     return 0
+
+
+def _field_value_repr(field: Any) -> str:
+    """Short human-readable rendering of one field's value."""
+    if field.mode is Mode.ARRAY:
+        return f"array[{field.element_count}]"
+    value = repr(field.value)
+    if len(value) > 80:
+        value = value[:77] + "..."
+    return value
+
+
+def _print_table_listing(doc: NGBDocument, stream: int, values: bool) -> None:
+    tables = doc.tables_of(stream)
+    print(f"{len(tables)} tables in stream_{stream}")
+    for table in tables:
+        ids = " ".join(f"{fid:04x}" for fid in table.fields)
+        if len(ids) > 120:
+            ids = ids[:117] + "..."
+        print(
+            f"  T{table.index:03d} cat={table.category:04x} "
+            f"type={table.type_ref:04x} fields={len(table.fields)} [{ids}]"
+        )
+        if values:
+            for field in table.fields.values():
+                print(
+                    f"    id={field.field_id:04x} {DType(field.dtype).name:<7} "
+                    f"{_field_value_repr(field)}"
+                )
+
+
+def _print_header_view(doc: NGBDocument) -> None:
+    for stream_id in sorted(doc.streams):
+        stream = doc.streams[stream_id]
+        print(f"stream_{stream_id}: {len(stream.raw):,} bytes")
+        for entry in stream.sections:
+            print(
+                f"  section id={entry.section_id} offset=0x{entry.offset:06x} "
+                f"size={entry.size:,}"
+            )
+
+
+def _print_coverage(census: dict[str, Any]) -> None:
+    for stream_id, stream_census in census["streams"].items():
+        spans = ", ".join(
+            f"{kind}={count}" for kind, count in stream_census["spans_by_kind"].items()
+        )
+        print(
+            f"stream_{stream_id}: {stream_census['tables']} tables, "
+            f"gap_bytes={stream_census['gap_bytes']:,} ({spans or 'no spans'}), "
+            f"orphans={stream_census['orphan_fields']}"
+        )
+
+
+def _print_unknown(census: dict[str, Any]) -> None:
+    total = 0
+    for stream_id, entries in census["unknown_fields"].items():
+        for entry in entries:
+            print(f"stream_{stream_id} {entry}")
+            total += 1
+    print(f"{total} unknown category/field/dtype triple(s)")
+
+
+def _table_scalar_values(table: Table) -> list[Any]:
+    return [
+        field.value
+        for field in table.fields.values()
+        if field.mode is Mode.SCALAR and field.value is not None
+    ]
+
+
+def _crossref(
+    docs: dict[str, NGBDocument], stream: int
+) -> dict[str, dict[str, list[Any]]]:
+    """(category/field/dtype) -> per-file scalar values, for field comparison."""
+    grid: dict[str, dict[str, list[Any]]] = defaultdict(lambda: defaultdict(list))
+    for name, doc in docs.items():
+        for table in doc.tables_of(stream):
+            for field in table.fields.values():
+                if field.mode is not Mode.SCALAR or field.value is None:
+                    continue
+                key = (
+                    f"0x{table.category:04x}/0x{field.field_id:04x}/0x{field.dtype:02x}"
+                )
+                grid[key][name].append(field.value)
+    return {key: dict(per_file) for key, per_file in sorted(grid.items())}
+
+
+def _print_crossref(grid: dict[str, dict[str, list[Any]]], n_files: int) -> None:
+    for key, per_file in grid.items():
+        distinct = {json.dumps(vals, default=str) for vals in per_file.values()}
+        varies = "VARIES" if len(distinct) > 1 or len(per_file) < n_files else "const "
+        sample = next(iter(per_file.values()))[:3]
+        sample_repr = repr(sample)
+        if len(sample_repr) > 60:
+            sample_repr = sample_repr[:57] + "..."
+        print(f"{key} {varies} n_files={len(per_file)} sample={sample_repr}")
+    print(f"-- {len(grid)} field keys across {n_files} files")
+
+
+def cmd_inspect(args: argparse.Namespace) -> int:
+    """Run the inspect subcommand: structural views of parsed documents."""
+    docs: dict[str, NGBDocument] = {}
+    failures = 0
+    for input_file in args.input:
+        try:
+            docs[input_file] = load_document(input_file)
+        except (FileNotFoundError, zipfile.BadZipFile, NGBParseError) as e:
+            logger.error(f"Failed to load {input_file}: {e}")
+            failures += 1
+    if not docs:
+        return 1
+
+    if len(docs) > 1:
+        # Cross-file field comparison over the requested stream.
+        grid = _crossref(docs, args.stream)
+        if args.json:
+            print(json.dumps({"stream": args.stream, "fields": grid}, default=str))
+        else:
+            _print_crossref(grid, len(docs))
+        return 1 if failures else 0
+
+    name, doc = next(iter(docs.items()))
+    census = document_census(doc)
+
+    if args.json:
+        payload: dict[str, Any] = {"file": name, **census}
+        print(json.dumps(payload, sort_keys=True))
+        return 1 if failures else 0
+
+    print(f"== {name}")
+    if args.unknown:
+        _print_unknown(census)
+    elif args.coverage:
+        _print_coverage(census)
+    else:
+        _print_header_view(doc)
+        if args.stream in doc.streams:
+            _print_table_listing(doc, args.stream, args.values)
+        else:
+            print(f"stream_{args.stream} not present")
+    return 1 if failures else 0
+
+
+def cmd_validate(args: argparse.Namespace) -> int:
+    """Run the validate subcommand: quality checks over parsed data."""
+    failures = 0
+    reports: list[dict[str, Any]] = []
+    for input_file in args.input:
+        try:
+            metadata, table = read_ngb(input_file, return_metadata=True)
+        except (
+            FileNotFoundError,
+            ValueError,
+            zipfile.BadZipFile,
+            NGBParseError,
+            OSError,
+        ) as e:
+            logger.error(f"Failed to parse {input_file}: {e}")
+            failures += 1
+            reports.append({"file": input_file, "parse_error": str(e)})
+            continue
+
+        result = QualityChecker(table, metadata).full_validation()
+        if not result.is_valid:
+            failures += 1
+        reports.append({"file": input_file, **result.summary()})
+        if not args.json:
+            print(f"== {input_file}")
+            print(result.report())
+
+    if args.json:
+        print(json.dumps(reports, default=str))
+    return 1 if failures else 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Command-line interface for pyngb.
+
+    Usage:
+        pyngb convert FILE... [-o DIR] [-f parquet|csv|both] [-b BASELINE]
+        pyngb inspect FILE... [--stream N] [--values] [--unknown] [--coverage] [--json]
+        pyngb validate FILE... [--json]
+
+    Examples:
+        # Parse to Parquet (default)
+        pyngb convert sample.ngb-ss3
+
+        # Parse to CSV with verbose logging
+        pyngb convert sample.ngb-ss3 -f csv -v
+
+        # Baseline-subtract every input against the same baseline
+        pyngb convert *.ngb-ss3 -b baseline.ngb-bs3
+
+        # Structural inspection and cross-file field comparison
+        pyngb inspect sample.ngb-ss3 --stream 1 --values
+        pyngb inspect a.ngb-ss3 b.ngb-ss3 --stream 1
+
+        # Data-quality checks
+        pyngb validate sample.ngb-ss3 --json
+
+    Args:
+        argv: Command-line arguments (defaults to sys.argv)
+
+    Returns:
+        Exit code (0 when every file succeeded, 1 otherwise)
+    """
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    # Configure logging
+    verbose = getattr(args, "verbose", False)
+    logging.basicConfig(level=(logging.DEBUG if verbose else logging.INFO))
+
+    commands = {
+        "convert": cmd_convert,
+        "inspect": cmd_inspect,
+        "validate": cmd_validate,
+    }
+    return commands[args.command](args)
 
 
 if __name__ == "__main__":

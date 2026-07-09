@@ -29,6 +29,7 @@ class TestCLIExecution:
             sys.executable,
             "-m",
             "pyngb",
+            "convert",
             str(test_file),
             "-o",
             str(output_dir),
@@ -66,6 +67,7 @@ class TestCLIExecution:
             sys.executable,
             "-m",
             "pyngb",
+            "convert",
             str(test_file),
             "-o",
             str(output_dir),
@@ -105,6 +107,7 @@ class TestCLIExecution:
             sys.executable,
             "-m",
             "pyngb",
+            "convert",
             str(test_file),
             "-o",
             str(output_dir),
@@ -140,6 +143,7 @@ class TestCLIExecution:
             sys.executable,
             "-m",
             "pyngb",
+            "convert",
             str(test_file),
             "-o",
             str(output_dir),
@@ -180,6 +184,7 @@ class TestCLIExecution:
             sys.executable,
             "-m",
             "pyngb",
+            "convert",
             *[str(f) for f in test_files],
             "-o",
             str(output_dir),
@@ -206,6 +211,7 @@ class TestCLIExecution:
             sys.executable,
             "-m",
             "pyngb",
+            "convert",
             str(test_file),
             "missing_file.ngb-ss3",
             "-o",
@@ -231,6 +237,7 @@ class TestCLIExecution:
             sys.executable,
             "-m",
             "pyngb",
+            "convert",
             str(bogus),
             "-o",
             str(output_dir),
@@ -252,6 +259,7 @@ class TestCLIExecution:
             sys.executable,
             "-m",
             "pyngb",
+            "convert",
             "nonexistent_file.ngb-ss3",
             "-o",
             str(output_dir),
@@ -278,6 +286,7 @@ class TestCLIExecution:
             sys.executable,
             "-m",
             "pyngb",
+            "convert",
             str(test_file),
             "-o",
             str(invalid_output),
@@ -295,8 +304,23 @@ class TestCLIExecution:
         assert expected_file.exists()
 
     def test_cli_command_execution_help(self) -> None:
-        """Test CLI help command."""
+        """Test CLI help command lists the subcommands."""
         cmd = [sys.executable, "-m", "pyngb", "--help"]
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        # Verify help command succeeded
+        assert result.returncode == 0, f"Help command failed: {result.stderr}"
+
+        # Verify help output lists the subcommands
+        help_text = result.stdout
+        assert "convert" in help_text
+        assert "inspect" in help_text
+        assert "validate" in help_text
+
+    def test_cli_command_execution_convert_help(self) -> None:
+        """Test convert subcommand help."""
+        cmd = [sys.executable, "-m", "pyngb", "convert", "--help"]
 
         result = subprocess.run(cmd, capture_output=True, text=True)
 
@@ -305,7 +329,6 @@ class TestCLIExecution:
 
         # Verify help output contains expected information
         help_text = result.stdout
-        assert "Parse NETZSCH STA NGB files" in help_text
         assert "positional arguments:" in help_text
         assert "options:" in help_text
         assert "parquet" in help_text
@@ -331,6 +354,7 @@ class TestCLIExecution:
             sys.executable,
             "-m",
             "pyngb",
+            "convert",
             str(test_file_copy),
             "-o",
             str(output_dir),
@@ -361,6 +385,7 @@ class TestCLIExecution:
             sys.executable,
             "-m",
             "pyngb",
+            "convert",
             str(test_file),
             "-o",
             str(output_dir),

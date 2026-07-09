@@ -16,9 +16,9 @@ class TestCLIBaselineSubtraction:
         return sys.executable
 
     def test_cli_baseline_subtraction_help(self) -> None:
-        """Test that CLI help includes baseline options."""
+        """Test that convert help includes baseline options."""
         result = subprocess.run(
-            [self.python_exe, "-m", "pyngb", "--help"],
+            [self.python_exe, "-m", "pyngb", "convert", "--help"],
             capture_output=True,
             text=True,
             cwd=Path(__file__).parent.parent,
@@ -42,6 +42,7 @@ class TestCLIBaselineSubtraction:
                     self.python_exe,
                     "-m",
                     "pyngb",
+                    "convert",
                     sample_file,
                     "-b",
                     baseline_file,
@@ -77,6 +78,7 @@ class TestCLIBaselineSubtraction:
                     self.python_exe,
                     "-m",
                     "pyngb",
+                    "convert",
                     sample_file,
                     "-b",
                     baseline_file,
@@ -114,6 +116,7 @@ class TestCLIBaselineSubtraction:
                     self.python_exe,
                     "-m",
                     "pyngb",
+                    "convert",
                     sample_file,
                     "-b",
                     baseline_file,
@@ -150,6 +153,7 @@ class TestCLIBaselineSubtraction:
                     self.python_exe,
                     "-m",
                     "pyngb",
+                    "convert",
                     sample_file,
                     "-b",
                     baseline_file,
@@ -170,7 +174,7 @@ class TestCLIBaselineSubtraction:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             result = subprocess.run(
-                [self.python_exe, "-m", "pyngb", sample_file, "-o", tmpdir],
+                [self.python_exe, "-m", "pyngb", "convert", sample_file, "-o", tmpdir],
                 capture_output=True,
                 text=True,
                 cwd=Path(__file__).parent.parent,
@@ -198,6 +202,7 @@ class TestCLIBaselineSubtraction:
                     self.python_exe,
                     "-m",
                     "pyngb",
+                    "convert",
                     sample_file,
                     "-b",
                     baseline_file,

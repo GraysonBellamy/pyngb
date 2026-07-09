@@ -3,6 +3,9 @@
 Development utilities for the pyngb project. All scripts are run from the
 project root with `uv run` so the virtual environment is active.
 
+Format inspection (structural census, field values, cross-file comparison)
+lives in the CLI itself: see `pyngb inspect --help`.
+
 ## Scripts Overview
 
 ### `benchmarks.py`
@@ -12,17 +15,16 @@ Performance benchmarks for parsing, batch processing, and analysis functions.
 uv run python scripts/benchmarks.py
 ```
 
-### `discover_patterns.py`
-Infers the (category, field) two-byte identifiers for new metadata values you
-know exist inside `Streams/stream_1.table` of an NGB file. Use this when
-adding a new field to `PatternConfig.metadata_patterns`.
+### `make_goldens.py`
+Regenerates the committed golden snapshots in `tests/goldens/`: `parity`
+(public-API parse results per fixture) and `census` (structural census per
+fixture). Regenerate only with justification — the goldens are the rewrite's
+parity contract.
 
-### `inspect_stream1_metadata.py`
-Quick dev utility to inspect stream_1 metadata fields with a general regex.
-
-### `dump_masses.py`
-Dumps mass-related fields from the test fixtures for cross-checking mass
-disambiguation.
+```bash
+uv run python scripts/make_goldens.py parity
+uv run python scripts/make_goldens.py census
+```
 
 ### `process_all_test_files.py`
 Runs `BatchProcessor` over every `.ngb-ss3`/`.ngb-bs3` fixture in
