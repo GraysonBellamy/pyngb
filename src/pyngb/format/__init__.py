@@ -1,0 +1,55 @@
+"""Strict, lossless parsing layer for the NGB binary format.
+
+Layered bottom-up: :mod:`.container` opens the ZIP archive and validates each
+stream's section directory; :mod:`.grammar` holds every byte-level constant
+and tokenizes sections into field records and classified unknown spans.
+
+This package is the 0.4.0 extraction backbone. It is not re-exported from
+the top-level ``pyngb`` namespace yet; the public API switches over at the
+cutover commit.
+"""
+
+from .container import SectionEntry, StreamData, open_ngb, parse_container
+from .grammar import (
+    END_FIELD,
+    ITEM_SIZE,
+    RECORD_ANCHOR,
+    RECORD_HEADER,
+    TABLE_TRAILER,
+    TYPE_PREFIX,
+    DType,
+    FieldToken,
+    Mode,
+    SpanKind,
+    UnknownSpan,
+    decode_array,
+    decode_scalar,
+    decode_string,
+    ref_class_name,
+    ref_type_ref,
+    tokenize,
+)
+
+__all__ = [
+    "END_FIELD",
+    "ITEM_SIZE",
+    "RECORD_ANCHOR",
+    "RECORD_HEADER",
+    "TABLE_TRAILER",
+    "TYPE_PREFIX",
+    "DType",
+    "FieldToken",
+    "Mode",
+    "SectionEntry",
+    "SpanKind",
+    "StreamData",
+    "UnknownSpan",
+    "decode_array",
+    "decode_scalar",
+    "decode_string",
+    "open_ngb",
+    "parse_container",
+    "ref_class_name",
+    "ref_type_ref",
+    "tokenize",
+]
