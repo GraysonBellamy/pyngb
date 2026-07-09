@@ -50,18 +50,10 @@ def set_column_metadata(
         raise ValueError(f"Column '{column}' not found in table")
 
     if replace:
-        # Rebuild the schema with only the new metadata on the target column
-        fields = []
-        for col_name in table.schema.names:
-            if col_name == column:
-                field = table.field(col_name).with_metadata(_encode_metadata(metadata))
-                fields.append(field)
-            else:
-                fields.append(table.field(col_name))
-
-        # Create new schema and cast table
-        schema = pa.schema(fields, metadata=table.schema.metadata)
-        return table.cast(schema)
+        # Schema.set swaps one field and keeps schema-level metadata intact
+        i = table.schema.get_field_index(column)
+        field = table.schema.field(i).with_metadata(_encode_metadata(metadata))
+        return table.cast(table.schema.set(i, field))
     # For merging, manually merge and then replace
     existing = get_column_metadata(table, column) or {}
     merged_metadata = {**existing, **metadata}

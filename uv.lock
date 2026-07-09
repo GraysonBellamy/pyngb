@@ -1517,7 +1517,7 @@ dev = [
 requires-dist = [
     { name = "numpy", specifier = ">=1.24" },
     { name = "polars", specifier = ">=1.6" },
-    { name = "pyarrow", specifier = ">=14" },
+    { name = "pyarrow", specifier = ">=19.0.1" },
     { name = "scipy", specifier = ">=1.13.1" },
     { name = "zensical", marker = "extra == 'docs'", specifier = ">=0.0.46" },
 ]

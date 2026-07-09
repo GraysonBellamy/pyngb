@@ -28,7 +28,7 @@ requires-python = ">=3.10"
 # (CI runs a --resolution lowest-direct leg to keep them honest).
 dependencies = [
     "polars>=1.6",
-    "pyarrow>=14",
+    "pyarrow>=19.0.1",
     "numpy>=1.24",
     "scipy>=1.13.1",
 ]

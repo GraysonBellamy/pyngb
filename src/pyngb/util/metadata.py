@@ -1,9 +1,10 @@
 """PyArrow table and column metadata utilities."""
 
-import json
 from typing import Any
 
 import pyarrow as pa
+
+from .columns import _encode_metadata
 
 
 def set_metadata(
@@ -13,15 +14,10 @@ def set_metadata(
 ) -> pa.Table:
     """Store table- and column-level metadata as json-encoded byte strings.
 
-    Provided by: https://stackoverflow.com/a/69553667/25195764
-
     Table-level metadata is stored in the table's schema.
-    Column-level metadata is stored in the table columns' fields.
-
-    To update the metadata, first new fields are created for all columns.
-    Next a schema is created using the new fields and updated table metadata.
-    Finally a new table is created by replacing the old one's schema, but
-    without copying any data.
+    Column-level metadata is stored in the table columns' fields. New values
+    are merged into any existing metadata; columns absent from the table are
+    ignored. The schema is updated in place via cast, which copies no data.
 
     Args:
         tbl (pyarrow.Table): The table to store metadata in
@@ -35,44 +31,16 @@ def set_metadata(
     Returns:
         pyarrow.Table: The table with updated metadata
     """
-    # Initialize empty dicts if None
-    col_meta = col_meta if col_meta is not None else {}
-    tbl_meta = tbl_meta if tbl_meta is not None else {}
-
-    # Create updated column fields with new metadata
-    if col_meta or tbl_meta:
-        fields = []
-        for col in tbl.schema.names:
-            if col in col_meta:
-                # Get updated column metadata
-                metadata = tbl.field(col).metadata or {}
-                for k, v in col_meta[col].items():
-                    if isinstance(v, bytes):
-                        metadata[k] = v
-                    elif isinstance(v, str):
-                        metadata[k] = v.encode("utf-8")
-                    else:
-                        metadata[k] = json.dumps(v).encode("utf-8")
-                # Update field with updated metadata
-                fields.append(tbl.field(col).with_metadata(metadata))
-            else:
-                fields.append(tbl.field(col))
-
-        # Get updated table metadata
-        tbl_metadata = tbl.schema.metadata or {}
-        for k, v in tbl_meta.items():
-            if isinstance(v, bytes):
-                tbl_metadata[k] = v
-            elif isinstance(v, str):
-                tbl_metadata[k] = v.encode("utf-8")
-            else:
-                tbl_metadata[k] = json.dumps(v).encode("utf-8")
-
-        # Create new schema with updated field metadata and updated table metadata
-        schema = pa.schema(fields, metadata=tbl_metadata)
-
-        # With updated schema build new table (shouldn't copy data)
-        # tbl = pa.Table.from_batches(tbl.to_batches(), schema)
-        tbl = tbl.cast(schema)
-
-    return tbl
+    schema = tbl.schema
+    for col, meta in (col_meta or {}).items():
+        i = schema.get_field_index(col)
+        if i == -1:
+            continue
+        merged = {**(schema.field(i).metadata or {}), **_encode_metadata(meta)}
+        schema = schema.set(i, schema.field(i).with_metadata(merged))
+    if tbl_meta:
+        merged = {**(schema.metadata or {}), **_encode_metadata(tbl_meta)}
+        schema = schema.with_metadata(merged)
+    if schema is tbl.schema:
+        return tbl
+    return tbl.cast(schema)
