@@ -119,7 +119,7 @@ class TestStressConditions:
 
         # Rapid successive operations on a real file must all succeed; the
         # fixtures parse reliably, so anything less is a regression.
-        from pyngb.core.parser import NGBParser
+        from pyngb import read_ngb_metadata
 
         for i in range(30):
             if i % 3 == 0:
@@ -130,10 +130,8 @@ class TestStressConditions:
                 assert metadata
                 assert data.num_rows > 0
             else:
-                parser = NGBParser()
-                metadata, table = parser.parse(str(test_file))
+                metadata = read_ngb_metadata(str(test_file))
                 assert metadata
-                assert table.num_rows > 0
 
 
 class TestEdgeCaseFiles:
@@ -371,36 +369,6 @@ class TestConcurrencyEdgeCases:
         # Every concurrent batch run must succeed and process its one file.
         assert len(results) == 5, f"Batch processes failed. Errors: {errors[:3]}"
         assert all(count == 1 for count in results)
-
-    def test_parser_state_isolation(self, real_test_files: Any) -> None:
-        """Test that parser instances don't share state inappropriately."""
-        if not real_test_files:
-            pytest.skip("No test files available")
-
-        from pyngb.core.parser import NGBParser
-
-        # Create multiple parser instances
-        parsers = [NGBParser() for _ in range(3)]
-
-        # Test that they have independent state
-        for i, parser in enumerate(parsers):
-            # Modify configuration
-            parser.config.column_map[f"test_{i}"] = f"test_column_{i}"
-
-        # Verify configurations are independent
-        for i, parser in enumerate(parsers):
-            assert f"test_{i}" in parser.config.column_map
-            assert parser.config.column_map[f"test_{i}"] == f"test_column_{i}"
-
-            # Other parsers shouldn't have this key
-            for j in range(3):
-                if i != j:
-                    assert (
-                        f"test_{j}" not in parser.config.column_map
-                        or parser.config.column_map[f"test_{j}"] != f"test_column_{j}"
-                    )
-
-        print("✓ Parser state isolation verified")
 
     def test_concurrent_validation(self) -> None:
         """Test concurrent validation operations."""

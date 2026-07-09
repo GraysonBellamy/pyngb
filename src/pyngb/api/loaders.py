@@ -9,12 +9,33 @@ import polars as pl
 import pyarrow as pa
 
 from ..baseline import BaselineSubtractor
+from ..config import ParsingConfig
 from ..constants import FileMetadata
-from ..core import NGBParser
+from ..exceptions import NGBStreamNotFoundError
+from ..format import build_dataframe, build_metadata, load_document
 from ..util import get_hash, initialize_table_column_metadata, set_metadata
 from .metadata import mark_baseline_corrected
 
-__all__ = ["read_ngb"]
+__all__ = ["read_ngb", "read_ngb_metadata"]
+
+
+def _parse(
+    path: str | Path, limits: ParsingConfig | None
+) -> tuple[FileMetadata, pl.DataFrame]:
+    """Parse metadata and measurement data through the document layer.
+
+    Single seam shared by every full-parse path (plain, baseline sample,
+    baseline reference) so the two halves can never diverge.
+
+    Loader policy: streams 1 and 2 are required, stream 3 is optional.
+    """
+    try:
+        doc = load_document(path, streams=(1, 2, 3), limits=limits)
+    except NGBStreamNotFoundError:
+        # Stream 3 is optional; if 1 or 2 is the one missing, this second
+        # request raises again with the accurate message.
+        doc = load_document(path, streams=(1, 2), limits=limits)
+    return build_metadata(doc), build_dataframe(doc)
 
 
 @overload
@@ -24,6 +45,7 @@ def read_ngb(
     return_metadata: Literal[False] = False,
     baseline_file: None = None,
     dynamic_axis: str = "sample_temperature",
+    limits: ParsingConfig | None = None,
 ) -> pa.Table: ...
 
 
@@ -34,6 +56,7 @@ def read_ngb(
     return_metadata: Literal[True],
     baseline_file: None = None,
     dynamic_axis: str = "sample_temperature",
+    limits: ParsingConfig | None = None,
 ) -> tuple[FileMetadata, pa.Table]: ...
 
 
@@ -44,6 +67,7 @@ def read_ngb(
     return_metadata: Literal[False] = False,
     baseline_file: str | Path,
     dynamic_axis: str = "sample_temperature",
+    limits: ParsingConfig | None = None,
 ) -> pa.Table: ...
 
 
@@ -54,6 +78,7 @@ def read_ngb(
     return_metadata: Literal[True],
     baseline_file: str | Path,
     dynamic_axis: str = "sample_temperature",
+    limits: ParsingConfig | None = None,
 ) -> tuple[FileMetadata, pa.Table]: ...
 
 
@@ -63,6 +88,7 @@ def read_ngb(
     return_metadata: bool = False,
     baseline_file: str | Path | None = None,
     dynamic_axis: str = "sample_temperature",
+    limits: ParsingConfig | None = None,
 ) -> pa.Table | tuple[FileMetadata, pa.Table]:
     """
     Read NETZSCH NGB file data with optional baseline subtraction.
@@ -86,6 +112,10 @@ def read_ngb(
     dynamic_axis : str, default "sample_temperature"
         Axis to use for dynamic segment alignment in baseline subtraction.
         Options: "time", "sample_temperature", "furnace_temperature"
+    limits : ParsingConfig or None, default None
+        Resource limits (stream size, array size, table count) enforced while
+        parsing. None uses the defaults, which leave orders of magnitude of
+        headroom over real files.
 
     Returns
     -------
@@ -104,6 +134,8 @@ def read_ngb(
         If required data streams are missing from the NGB file
     NGBCorruptedFileError
         If the file structure is invalid or corrupted
+    NGBResourceLimitError
+        If a stream or data payload exceeds the configured resource limits
     zipfile.BadZipFile
         If the file is not a valid ZIP archive
 
@@ -170,14 +202,15 @@ def read_ngb(
 
     Performance Notes
     -----------------
-    - Fast binary parsing with NumPy optimization
+    - Strict single-pass tokenization with NumPy-backed array decoding
     - Memory-efficient processing with PyArrow
     - Typical parsing time: well under a second per file
     - Includes file hash for integrity verification
 
     See Also
     --------
-    NGBParser : Low-level parser for custom processing
+    read_ngb_metadata : Metadata without decoding the measurement streams
+    load_document : The full parsed document model behind this function
     BatchProcessor : Process multiple files efficiently
     """
     valid_axes = ["time", "sample_temperature", "furnace_temperature"]
@@ -186,8 +219,7 @@ def read_ngb(
             f"dynamic_axis must be one of {valid_axes}, got '{dynamic_axis}'"
         )
 
-    parser = NGBParser()
-    metadata, data = parser.parse(path)
+    metadata, data_df = _parse(path, limits)
 
     # Add file hash to metadata
     file_hash = get_hash(path)
@@ -200,21 +232,14 @@ def read_ngb(
 
     # Handle baseline subtraction if requested
     if baseline_file is not None:
-        baseline_metadata, baseline_data = parser.parse(baseline_file)
-
-        sample_df = pl.from_arrow(data)
-        baseline_df = pl.from_arrow(baseline_data)
-        if not isinstance(sample_df, pl.DataFrame) or not isinstance(
-            baseline_df, pl.DataFrame
-        ):
-            raise TypeError("NGB data could not be converted to DataFrame")
-
-        subtracted_df = BaselineSubtractor().process_baseline_subtraction(
-            sample_df, baseline_df, metadata, baseline_metadata, dynamic_axis
+        baseline_metadata, baseline_df = _parse(baseline_file, limits)
+        data_df = BaselineSubtractor().process_baseline_subtraction(
+            data_df, baseline_df, metadata, baseline_metadata, dynamic_axis
         )
 
-        # Convert back to PyArrow
-        data = subtracted_df.to_arrow()
+    # Convert to PyArrow at the API boundary for cross-language compatibility
+    # and metadata embedding.
+    data = data_df.to_arrow()
 
     if not return_metadata:
         # Attach file-level metadata to the Arrow schema; with
@@ -231,3 +256,40 @@ def read_ngb(
     if return_metadata:
         return metadata, data
     return data
+
+
+def read_ngb_metadata(
+    path: str | Path, *, limits: ParsingConfig | None = None
+) -> FileMetadata:
+    """Extract file metadata without decoding the measurement streams.
+
+    Reads and processes only stream_1, skipping the stream_2/stream_3 data
+    decoding that dominates a full parse. Use this for dataset-level
+    operations (summaries, filtering, metadata export) that never touch the
+    measurement data.
+
+    Unlike :func:`read_ngb`, the returned metadata carries no ``file_hash``
+    key — the hash covers the whole file, which this path deliberately does
+    not read in full.
+
+    Args:
+        path: Path to the .ngb-ss3 file to parse
+        limits: Resource limits enforced while parsing; None uses defaults.
+
+    Returns:
+        Metadata dictionary with instrument settings, sample info, etc.
+
+    Raises:
+        FileNotFoundError: If the specified file doesn't exist
+        NGBStreamNotFoundError: If stream 1 is missing
+        NGBCorruptedFileError: If the container structure is invalid
+        NGBResourceLimitError: If a stream exceeds the configured resource limits
+        zipfile.BadZipFile: If the file is not a valid ZIP archive
+
+    Example:
+        >>> from pyngb import read_ngb_metadata
+        >>> metadata = read_ngb_metadata("experiment.ngb-ss3")
+        >>> print(metadata.get("sample_name"))
+    """
+    doc = load_document(path, streams=(1,), limits=limits)
+    return build_metadata(doc)

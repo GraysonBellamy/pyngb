@@ -4,22 +4,20 @@ Test temperature program extraction functionality.
 This module tests the critical temperature program extraction feature that
 extracts complete heating program stages from NGB files. This addresses
 a recurring issue where only partial temperature programs were extracted.
+Synthetic stage-table units live in test_extract.py; these tests pin the
+behavior end-to-end on the real fixtures through the public API.
 """
 
 import json
 import logging
-import zipfile
 from pathlib import Path
 from typing import Any
 
 import pyarrow.parquet as pq
 import pytest
 
+from pyngb import read_ngb_metadata
 from pyngb.batch import BatchProcessor
-from pyngb.binary.parser import BinaryParser
-from pyngb.constants import PatternConfig
-from pyngb.core.parser import NGBParser
-from pyngb.extractors.manager import MetadataExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -33,148 +31,57 @@ class TestTemperatureProgramExtraction:
         test_dir = Path(__file__).parent / "test_files"
         return list(test_dir.glob("*.ngb-ss3"))
 
-    @pytest.fixture
-    def metadata_extractor(self) -> Any:
-        """Create metadata extractor for testing."""
-        config = PatternConfig()
-        parser = BinaryParser()
-        return MetadataExtractor(config, parser)
+    def test_temperature_program_structure(self, test_files: Any) -> None:
+        """Every fixture yields a well-formed, complete temperature program.
 
-    def test_direct_temperature_program_extraction(
-        self, metadata_extractor: Any, test_files: Any
-    ) -> None:
-        """Test direct temperature program extraction on stream data."""
+        Regression guard: extract_metadata once returned 1 stage while the
+        stream actually recorded 5, so the count is pinned exactly — every
+        shipped fixture records a 5-stage program, and a missing program is
+        itself a failure.
+        """
         if not test_files:
             pytest.skip("No test files available")
 
         for test_file in test_files:
-            with zipfile.ZipFile(test_file, "r") as z:
-                if "Streams/stream_1.table" not in z.namelist():
-                    continue
+            metadata = read_ngb_metadata(str(test_file))
 
-                with z.open("Streams/stream_1.table") as stream:
-                    stream_data = stream.read()
-
-            # Direct extraction on full stream data using binary parser
-            binary_parser = BinaryParser()
-            tables = binary_parser.split_tables(stream_data)
-            metadata = metadata_extractor.extract_metadata(tables)
-
-            # Verify temperature program was extracted
             assert "temperature_program" in metadata, (
                 f"No temperature program in {test_file.name}"
             )
             temp_prog = metadata["temperature_program"]
-
-            # Should have multiple stages for complete programs
             assert isinstance(temp_prog, dict), (
                 f"Temperature program not a dict in {test_file.name}"
             )
-            assert len(temp_prog) > 0, f"Empty temperature program in {test_file.name}"
 
-            # Each stage should have expected fields
+            stage_keys = [k for k in temp_prog if k.startswith("stage_")]
+            assert len(stage_keys) == len(temp_prog), (
+                f"Invalid stage key in {test_file.name}"
+            )
+            assert len(stage_keys) == 5, (
+                f"Expected 5 temperature program stages in {test_file.name}, "
+                f"got {len(stage_keys)}"
+            )
+
             for stage_key, stage in temp_prog.items():
-                assert stage_key.startswith("stage_"), (
-                    f"Invalid stage key {stage_key} in {test_file.name}"
-                )
                 assert isinstance(stage, dict), (
                     f"Stage {stage_key} not a dict in {test_file.name}"
                 )
-
-                # Check required fields exist
-                expected_fields = [
+                for field in (
                     "temperature",
                     "heating_rate",
                     "time",
                     "acquisition_rate",
-                ]
-                for field in expected_fields:
+                ):
                     if field in stage:
                         assert isinstance(stage[field], (int, float)), (
-                            f"Stage {stage_key} field {field} not numeric in {test_file.name}"
+                            f"Stage {stage_key} field {field} not numeric "
+                            f"in {test_file.name}"
                         )
-
-    def test_extract_metadata_method_completeness(
-        self, metadata_extractor: Any, test_files: Any
-    ) -> None:
-        """Test that extract_metadata method returns complete temperature programs."""
-        if not test_files:
-            pytest.skip("No test files available")
-
-        for test_file in test_files:
-            with zipfile.ZipFile(test_file, "r") as z:
-                if "Streams/stream_1.table" not in z.namelist():
-                    continue
-
-                with z.open("Streams/stream_1.table") as stream:
-                    stream_data = stream.read()
-
-            # Method 1: Direct extraction using binary parser
-            parser = BinaryParser()
-            tables = parser.split_tables(stream_data)
-            direct_metadata = metadata_extractor.extract_metadata(tables)
-
-            # Method 2: Full extract_metadata method (same as method 1 now)
-            full_metadata = metadata_extractor.extract_metadata(tables)
-
-            # Compare results
-            if "temperature_program" in direct_metadata:
-                direct_stages = len(direct_metadata["temperature_program"])
-
-                assert "temperature_program" in full_metadata, (
-                    f"extract_metadata missing temperature_program in {test_file.name}"
-                )
-
-                full_stages = len(full_metadata["temperature_program"])
-
-                # CRITICAL: extract_metadata should return same number of stages as direct extraction
-                assert full_stages == direct_stages, (
-                    f"Stage count mismatch in {test_file.name}: extract_metadata({full_stages}) != direct({direct_stages})"
-                )
-
-                # Verify stage data consistency
-                for stage_key in direct_metadata["temperature_program"]:
-                    assert stage_key in full_metadata["temperature_program"], (
-                        f"Missing stage {stage_key} in extract_metadata for {test_file.name}"
+                if "temperature" in stage:
+                    assert -50 <= stage["temperature"] <= 2000, (
+                        f"Temperature {stage['temperature']} out of realistic "
+                        f"range in {test_file.name}"
                     )
-
-    def test_ngb_parser_temperature_program(self, test_files: Any) -> None:
-        """Test that NGBParser returns complete temperature programs."""
-        if not test_files:
-            pytest.skip("No test files available")
-
-        parser = NGBParser()
-
-        for test_file in test_files:
-            try:
-                metadata, _data = parser.parse(str(test_file))
-
-                if "temperature_program" in metadata:
-                    temp_prog = metadata["temperature_program"]
-
-                    # Should have meaningful number of stages
-                    assert len(temp_prog) >= 1, (
-                        f"No temperature program stages in {test_file.name}"
-                    )
-
-                    # Verify data structure
-                    for stage_key, stage in temp_prog.items():
-                        assert isinstance(stage, dict), (
-                            f"Stage {stage_key} not dict in {test_file.name}"
-                        )
-
-                        # At least temperature should be present
-                        if "temperature" in stage:
-                            temp_val = stage["temperature"]
-                            assert isinstance(temp_val, (int, float)), (
-                                f"Temperature not numeric in {stage_key} of {test_file.name}"
-                            )
-                            assert -50 <= temp_val <= 2000, (
-                                f"Temperature {temp_val} out of realistic range in {test_file.name}"
-                            )
-
-            except Exception as e:
-                pytest.fail(f"NGBParser failed on {test_file.name}: {e}")
 
     def test_batch_processing_temperature_program(
         self, test_files: Any, tmp_path: Any
@@ -236,86 +143,6 @@ class TestTemperatureProgramExtraction:
                         f"Stage not dict in {parquet_file.name}"
                     )
 
-    def test_temperature_program_pattern_matching(
-        self, metadata_extractor: Any, test_files: Any
-    ) -> None:
-        """Test that temperature program patterns find the expected number of matches."""
-        if not test_files:
-            pytest.skip("No test files available")
-
-        for test_file in test_files:
-            with zipfile.ZipFile(test_file, "r") as z:
-                if "Streams/stream_1.table" not in z.namelist():
-                    continue
-
-                with z.open("Streams/stream_1.table") as stream:
-                    stream_data = stream.read()
-
-            # Test temperature program extraction using public API
-            parser = BinaryParser()
-            tables = parser.split_tables(stream_data)
-            metadata = metadata_extractor.extract_metadata(tables)
-
-            if "temperature_program" in metadata:
-                temp_prog = metadata["temperature_program"]
-
-                # Verify temperature program structure
-                assert isinstance(temp_prog, dict), (
-                    "Temperature program should be a dict"
-                )
-
-                # Check that stages have reasonable structure
-                stage_keys = [k for k in temp_prog.keys() if k.startswith("stage_")]
-                assert len(stage_keys) >= 1, (
-                    f"No temperature program stages found in {test_file.name}"
-                )
-
-                # Verify stage content
-                for stage_key in stage_keys:
-                    stage = temp_prog[stage_key]
-                    assert isinstance(stage, dict), (
-                        f"Stage {stage_key} should be a dict"
-                    )
-
-    def test_temperature_program_regression(self, test_files: Any) -> None:
-        """Regression test for the specific issue of extract_metadata returning fewer stages than direct extraction."""
-        if not test_files:
-            pytest.skip("No test files available")
-
-        # This test specifically checks the bug that was fixed:
-        # extract_metadata was only returning 1 stage while direct extraction returned 5
-
-        config = PatternConfig()
-        parser = BinaryParser()
-        extractor = MetadataExtractor(config, parser)
-
-        for test_file in test_files:
-            with zipfile.ZipFile(test_file, "r") as z:
-                if "Streams/stream_1.table" not in z.namelist():
-                    continue
-
-                with z.open("Streams/stream_1.table") as stream:
-                    stream_data = stream.read()
-
-            # Test extract_metadata method (regression test)
-            tables = parser.split_tables(stream_data)
-            metadata = extractor.extract_metadata(tables)
-
-            # The fixed bug returned 1 stage instead of 5, so the count must
-            # be pinned exactly: every shipped fixture records a 5-stage
-            # program, and a missing program is itself a failure.
-            assert "temperature_program" in metadata, (
-                f"No temperature program extracted from {test_file.name}"
-            )
-            temp_prog = metadata["temperature_program"]
-            assert isinstance(temp_prog, dict)
-
-            stage_count = len([k for k in temp_prog.keys() if k.startswith("stage_")])
-            assert stage_count == 5, (
-                f"Expected 5 temperature program stages in {test_file.name}, "
-                f"got {stage_count}"
-            )
-
 
 class TestTemperatureProgramSpecificFiles:
     """Test temperature program extraction on specific known files."""
@@ -340,9 +167,7 @@ class TestTemperatureProgramSpecificFiles:
 
         test_file = test_files[0]
 
-        # Use NGBParser (full pipeline test)
-        parser = NGBParser()
-        metadata, _data = parser.parse(str(test_file))
+        metadata = read_ngb_metadata(str(test_file))
 
         # Should have temperature program
         assert "temperature_program" in metadata, (

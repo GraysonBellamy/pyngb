@@ -7,16 +7,11 @@ every shipped fixture.
 """
 
 import json
-import zipfile
 from pathlib import Path
 
 import pytest
 
 from pyngb import read_ngb
-from pyngb.binary import BinaryParser
-from pyngb.constants import PatternConfig
-from pyngb.extractors.base import StreamTables
-from pyngb.extractors.specialized import RunEnvironmentExtractor
 
 TEST_DIR = Path(__file__).parent / "test_files"
 
@@ -66,12 +61,6 @@ def _metadata(path: Path) -> dict:
     return json.loads(table.schema.metadata[b"file_metadata"])
 
 
-def _stream1_tables(path: Path) -> StreamTables:
-    parser = BinaryParser()
-    with zipfile.ZipFile(path) as z:
-        return StreamTables(parser.split_tables(z.read("Streams/stream_1.table")))
-
-
 @pytest.mark.parametrize(
     "fixture_name",
     sorted(p.name for p in TEST_DIR.glob("*.ngb-*s3")),
@@ -97,10 +86,3 @@ def test_fixture_correction_link(fixture_name: str) -> None:
         pytest.skip(f"no pinned link for {fixture_name}")
     link = md["correction_file_path"]
     assert link.replace("\\", "/").rsplit("/", 1)[-1] == expected
-
-
-def test_empty_tables_extract_nothing() -> None:
-    extractor = RunEnvironmentExtractor(PatternConfig(), BinaryParser())
-    metadata: dict = {}
-    extractor.extract(StreamTables([b"\x00" * 64]), metadata)
-    assert metadata == {}

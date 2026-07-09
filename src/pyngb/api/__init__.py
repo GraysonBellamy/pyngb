@@ -8,7 +8,7 @@ from .analysis import (
     calculate_table_dtg,
     normalize_to_initial_mass,
 )
-from .loaders import read_ngb
+from .loaders import read_ngb, read_ngb_metadata
 from .metadata import (
     add_column_processing_step,
     get_column_baseline_status,
@@ -37,6 +37,7 @@ __all__ = [
     "mark_baseline_corrected",
     "normalize_to_initial_mass",
     "read_ngb",
+    "read_ngb_metadata",
     "set_column_source",
     "set_column_units",
 ]

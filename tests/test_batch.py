@@ -728,12 +728,12 @@ class TestMetadataOnlyParse:
     TEST_DIR = Path(__file__).parent / "test_files"
 
     def test_parse_metadata_matches_full_parse(self) -> None:
-        from pyngb.core import NGBParser
+        from pyngb import read_ngb, read_ngb_metadata
 
-        parser = NGBParser()
         for fixture in sorted(self.TEST_DIR.glob("*.ngb-*s3")):
-            full_metadata, _ = parser.parse(fixture)
-            metadata_only = parser.parse_metadata(fixture)
+            full_metadata, _ = read_ngb(fixture, return_metadata=True)
+            full_metadata.pop("file_hash", None)
+            metadata_only = read_ngb_metadata(fixture)
             assert metadata_only == full_metadata, fixture.name
 
     def test_dataset_metadata_matches_read_ngb(self) -> None:

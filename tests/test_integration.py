@@ -15,11 +15,9 @@ import pytest
 from pyngb import (
     BatchProcessor,
     NGBDataset,
-    NGBParser,
     read_ngb,
     validate_sta_data,
 )
-from pyngb.constants import BinaryMarkers, PatternConfig
 from pyngb.exceptions import NGBStreamNotFoundError
 from pyngb.validation import QualityChecker
 
@@ -291,43 +289,23 @@ class TestBatchProcessingIntegration:
 class TestAdvancedUseCases:
     """Integration tests for advanced usage scenarios."""
 
-    def test_custom_parser_configuration(self) -> None:
-        """Test using custom parser configuration."""
-        # Create custom configuration
-        custom_config = PatternConfig()
+    def test_document_layer_integration(self) -> None:
+        """The public document layer composes with the extraction functions."""
+        from pyngb import load_document
+        from pyngb.format import build_dataframe, build_metadata
 
-        # Modify configuration
-        custom_config.column_map["custom_id"] = "custom_column"
-        custom_config.metadata_patterns["custom_field"] = (b"\x99\x99", b"\x88\x88")
+        test_dir = Path(__file__).parent / "test_files"
+        real_files = list(test_dir.glob("*.ngb-ss3"))
+        if not real_files:
+            pytest.skip("No real test files available")
 
-        # Create parser with custom config
-        parser = NGBParser(custom_config)
+        doc = load_document(real_files[0])
+        metadata = build_metadata(doc)
+        frame = build_dataframe(doc)
 
-        # Verify configuration is applied
-        assert parser.config.column_map["custom_id"] == "custom_column"
-        assert "custom_field" in parser.config.metadata_patterns
-
-    def test_parser_component_integration(self) -> None:
-        """Test direct interaction with parser components."""
-        from pyngb.binary import BinaryParser
-        from pyngb.extractors import DataStreamProcessor
-        from pyngb.extractors.manager import MetadataExtractor
-
-        config = PatternConfig()
-
-        # Create components
-        binary_parser = BinaryParser()
-        metadata_extractor = MetadataExtractor(config, binary_parser)
-        data_processor = DataStreamProcessor(config, binary_parser)
-
-        # Test that components work together
-        assert hasattr(metadata_extractor, "extract_metadata")
-        assert hasattr(data_processor, "process_stream_2")
-
-        # Test with mock data
-        test_data = b"mock binary data"
-        tables = binary_parser.split_tables(test_data)
-        assert isinstance(tables, list)
+        assert isinstance(metadata, dict)
+        assert frame.height > 0
+        assert doc.tables_of(1)
 
     def test_concurrent_processing_safety(self) -> None:
         """Test thread safety and concurrent processing."""
@@ -478,31 +456,18 @@ class TestDataIntegrityValidation:
     def test_metadata_data_consistency(self) -> None:
         """Test consistency between metadata and actual data."""
         # This test would be better with real files, but we'll create a realistic mock
+        from support.ngb_builder import build_scalar, build_stream, build_table
+        from pyngb.format import DType
+
         with tempfile.NamedTemporaryFile(suffix=".ngb-ss3", delete=False) as temp_file:
             with zipfile.ZipFile(temp_file.name, "w") as z:
-                import struct
-
-                from pyngb.constants import BinaryMarkers
-
-                markers = BinaryMarkers()
-
-                # Create metadata indicating 15.5 mg sample mass
-                metadata_content = (
-                    b"\x30\x75"  # Sample category
-                    + b"padding" * 5
-                    + b"\x9e\x0c"  # Sample mass field
-                    + b"padding" * 3
-                    + markers.TYPE_PREFIX
-                    + b"\x05"  # Float64 type
-                    + markers.TYPE_SEPARATOR
-                    + struct.pack("<d", 15.5)  # 15.5 as float64 bytes
-                    + markers.END_FIELD
+                # Well-formed stream content, but under the wrong archive path
+                stream1 = build_stream(
+                    1,
+                    body=build_table(0x7530, [build_scalar(0x0C9E, DType.F64, 15.5)]),
                 )
-                z.writestr("wrong_path/stream_1.table", metadata_content)
-
-                # Create basic data stream in wrong location
-                data_content = b"minimal data stream"
-                z.writestr("wrong_path/stream_2.table", data_content)
+                z.writestr("wrong_path/stream_1.table", stream1)
+                z.writestr("wrong_path/stream_2.table", build_stream(2, body=b""))
             temp_file_path = temp_file.name
 
         try:
@@ -531,17 +496,18 @@ class TestDataIntegrityValidation:
             # Method 2: read_ngb (metadata mode)
             metadata, table2 = read_ngb(str(test_file), return_metadata=True)
 
-            # Method 3: Direct parser usage
-            parser = NGBParser()
-            metadata3, table3 = parser.parse(str(test_file))
+            # Method 3: metadata-only fast path
+            from pyngb import read_ngb_metadata
 
-            # All should yield consistent results
-            assert table1.num_rows == table2.num_rows == table3.num_rows
-            assert table1.num_columns == table2.num_columns == table3.num_columns
-            assert table1.column_names == table2.column_names == table3.column_names
+            metadata3 = read_ngb_metadata(str(test_file))
 
-            # Metadata should be consistent (though table1 has embedded metadata)
-            # Allow for small differences due to embedded vs separate metadata
+            # Both full-parse modes should yield consistent results
+            assert table1.num_rows == table2.num_rows
+            assert table1.num_columns == table2.num_columns
+            assert table1.column_names == table2.column_names
+
+            # Metadata should be consistent (read_ngb adds file_hash on top
+            # of what the metadata-only path extracts)
             assert abs(len(metadata) - len(metadata3)) <= 2, (
                 f"Metadata length difference too large: {len(metadata)} vs {len(metadata3)}"
             )
@@ -640,7 +606,8 @@ class TestRegressionProtection:
 
         required_functions = [
             "read_ngb",
-            "NGBParser",
+            "read_ngb_metadata",
+            "load_document",
             "BatchProcessor",
             "NGBDataset",
             "validate_sta_data",
@@ -654,48 +621,24 @@ class TestRegressionProtection:
     def test_import_structure_stability(self) -> None:
         """Test that import structure remains stable."""
         # These imports should continue to work
-        from pyngb import read_ngb
-        from pyngb.batch import BatchProcessor, NGBDataset
-        from pyngb.constants import PatternConfig
-        from pyngb.core import NGBParser
+        from pyngb import Field, NGBDocument, Table, load_document, read_ngb
+        from pyngb.api.loaders import read_ngb_metadata
+        from pyngb.batch import BatchProcessor, NGBDataset, process_files
+        from pyngb.format import build_dataframe, build_metadata
         from pyngb.validation import QualityChecker, validate_sta_data
 
         # All should be callable/instantiable
         assert callable(read_ngb)
+        assert callable(read_ngb_metadata)
+        assert callable(load_document)
+        assert callable(build_metadata)
+        assert callable(build_dataframe)
         assert callable(BatchProcessor)
         assert callable(NGBDataset)
         assert callable(validate_sta_data)
         assert callable(QualityChecker)
-        assert callable(NGBParser)
-        assert callable(PatternConfig)
-
-        # Test basic instantiation
-        parser = NGBParser()
-        config = PatternConfig()
-        markers = BinaryMarkers()
-
-        assert parser is not None
-        assert config is not None
-        assert markers is not None
-
-    def test_backwards_compatibility_scenarios(self) -> None:
-        """Test scenarios that should remain backwards compatible."""
-        # Test old-style usage patterns
-
-        # Pattern 1: Direct parser instantiation
-        from pyngb.core.parser import NGBParser
-
-        parser = NGBParser()
-        assert hasattr(parser, "parse")
-
-        # Pattern 2: Configuration customization
-        from pyngb.constants import PatternConfig
-
-        config = PatternConfig()
-        config.column_map["new_id"] = "new_column"
-        assert "new_id" in config.column_map
-
-        # Pattern 3: Batch processing
-        from pyngb.batch import process_files
-
         assert callable(process_files)
+
+        # The document-model types are exported for annotations
+        for cls in (NGBDocument, Table, Field):
+            assert isinstance(cls, type)

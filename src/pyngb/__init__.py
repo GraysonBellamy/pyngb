@@ -15,7 +15,7 @@ from .api.analysis import (
     calculate_table_dtg,
     normalize_to_initial_mass,
 )
-from .api.loaders import read_ngb
+from .api.loaders import read_ngb, read_ngb_metadata
 from .api.metadata import (
     get_column_units,
     set_column_units,
@@ -34,13 +34,11 @@ from .batch import (
 from .config import ParsingConfig
 from .constants import (
     FileMetadata,
-    PatternConfig,
     BaseColumnMetadata,
     BaselinableColumnMetadata,
     TemperatureCalibration,
     TemperatureFixpoint,
 )
-from .core.parser import NGBParser
 from .exceptions import (
     NGBCorruptedFileError,
     NGBDataTypeError,
@@ -48,6 +46,7 @@ from .exceptions import (
     NGBResourceLimitError,
     NGBStreamNotFoundError,
 )
+from .format import Field, NGBDocument, Table, load_document
 from .validation import QualityChecker, ValidationResult, validate_sta_data
 
 try:
@@ -63,17 +62,18 @@ __all__ = [
     "BaselineSubtractor",
     "BatchProcessor",
     "BatchResult",
+    "Field",
     "FileMetadata",
     "NGBCorruptedFileError",
     "NGBDataTypeError",
     "NGBDataset",
+    "NGBDocument",
     "NGBParseError",
-    "NGBParser",
     "NGBResourceLimitError",
     "NGBStreamNotFoundError",
     "ParsingConfig",
-    "PatternConfig",
     "QualityChecker",
+    "Table",
     "TemperatureCalibration",
     "TemperatureFixpoint",
     "ValidationResult",
@@ -89,12 +89,14 @@ __all__ = [
     # Metadata functions
     "get_column_units",
     "inspect_column_metadata",
+    "load_document",
     "mark_baseline_corrected",
     "normalize_to_initial_mass",
     # Other functions
     "process_directory",
     "process_files",
     "read_ngb",
+    "read_ngb_metadata",
     "set_column_units",
     "validate_sta_data",
 ]

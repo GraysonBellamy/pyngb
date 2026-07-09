@@ -2,95 +2,24 @@
 Test configuration and fixtures for pyngb tests.
 """
 
-import tempfile
-import zipfile
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from pyngb.constants import BinaryMarkers, PatternConfig
+from support.ngb_builder import minimal_ngb
 
 
 @pytest.fixture()
-def sample_binary_data() -> bytes:
-    """Create sample binary data for testing."""
-    # Create a simple binary sequence with markers
-    markers = BinaryMarkers()
-    data = (
-        b"header_data"
-        + markers.START_DATA
-        + b"\x05"
-        + b"\x00\x00\x00\x00\x00\x00\xf0\x3f"
-        + markers.END_DATA
-        + b"footer"
-    )
-    return data
+def sample_ngb_file(tmp_path: Path) -> str:
+    """Create a sample NGB file for integration tests.
 
-
-@pytest.fixture()
-def sample_metadata_patterns() -> dict[str, tuple[bytes, bytes]]:
-    """Create sample metadata patterns for testing."""
-    return {
-        "test_field": (b"\x75\x17", b"\x59\x10"),
-        "sample_id": (b"\x30\x75", b"\x98\x08"),
-    }
-
-
-@pytest.fixture()
-def sample_pattern_config() -> PatternConfig:
-    """Create a sample PatternConfig for testing."""
-    config = PatternConfig()
-    # Override with minimal test patterns
-    config.metadata_patterns = {
-        "instrument": (b"\x75\x17", b"\x59\x10"),
-        "sample_name": (b"\x30\x75", b"\x40\x08"),
-    }
-    config.column_map = {
-        "8c": "time",
-        "8d": "sample_temperature",
-    }
-    return config
-
-
-@pytest.fixture()
-def sample_ngb_file() -> str:
-    """Create a sample NGB file for integration tests."""
-    with tempfile.NamedTemporaryFile(suffix=".ngb-ss3", delete=False) as temp_file:
-        with zipfile.ZipFile(temp_file.name, "w") as z:
-            # Create minimal stream data
-            markers = BinaryMarkers()
-
-            # Stream 1 - metadata
-            stream1_data = (
-                b"\x75\x17"
-                + b"padding"
-                + b"\x59\x10"
-                + b"more_padding"
-                + markers.TYPE_PREFIX
-                + b"\x1f"
-                + markers.TYPE_SEPARATOR
-                + b"\x0c\x00\x00\x00Test Instrument\x00"
-                + markers.END_FIELD
-            )
-            z.writestr("Streams/stream_1.table", stream1_data)
-
-            # Stream 2 - data
-            stream2_data = (
-                b"\x8d\x17"
-                + b"padding"
-                + markers.TABLE_SEPARATOR
-                + b"\x8d\x75"
-                + markers.START_DATA
-                + b"\x05"
-                + b"\x00\x00\x00\x00\x00\x00\x00\x00"
-                + b"\x00\x00\x00\x00\x00\x00\xf0\x3f"
-                + markers.END_DATA
-            )
-            z.writestr("Streams/stream_2.table", stream2_data)
-
-        return temp_file.name
+    A strict-grammar synthetic archive (streams 1 and 2, every dtype, a
+    time channel with two segments) that parses through the full public
+    API. See :func:`support.ngb_builder.minimal_ngb`.
+    """
+    return str(minimal_ngb(tmp_path / "sample.ngb-ss3"))
 
 
 @pytest.fixture()

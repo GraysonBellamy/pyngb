@@ -16,9 +16,8 @@ from collections.abc import Callable
 import polars as pl
 import pyarrow.parquet as pq
 
-from .api.loaders import read_ngb
+from .api.loaders import read_ngb, read_ngb_metadata
 from .constants import FileMetadata
-from .core import NGBParser
 from .exceptions import NGBParseError
 from .util import get_hash
 
@@ -391,7 +390,6 @@ class NGBDataset:
         """
         self.files = files
         self._metadata_cache: dict[str, FileMetadata] = {}
-        self._parser = NGBParser()
 
     @classmethod
     def from_directory(
@@ -583,7 +581,7 @@ class NGBDataset:
         cache_key = str(file_path)
 
         if cache_key not in self._metadata_cache:
-            metadata = self._parser.parse_metadata(file_path)
+            metadata = read_ngb_metadata(file_path)
             file_hash = get_hash(file_path)
             if file_hash is not None:
                 metadata["file_hash"] = {

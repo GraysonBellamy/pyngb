@@ -8,9 +8,10 @@ and tokenizes sections into field records and classified unknown spans;
 and :mod:`.channels` produce FileMetadata and the measurement frame from a
 document.
 
-This package is the 0.4.0 extraction backbone. It is not re-exported from
-the top-level ``pyngb`` namespace yet; the public API switches over at the
-cutover commit.
+This package is the 0.4.0 extraction backbone. The document layer
+(:func:`load_document`, :class:`NGBDocument`, :class:`Table`,
+:class:`Field`) is re-exported from the top-level ``pyngb`` namespace;
+the byte-level grammar surface lives here only.
 """
 
 from .channels import build_dataframe

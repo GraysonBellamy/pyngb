@@ -21,8 +21,7 @@ import numpy as np
 import pyarrow as pa
 import pytest
 
-from pyngb import read_ngb
-from pyngb.core import NGBParser
+from pyngb import read_ngb, read_ngb_metadata
 
 FIXTURE_DIR = Path(__file__).parent / "test_files"
 GOLDEN_DIR = Path(__file__).parent / "goldens"
@@ -83,7 +82,7 @@ def _parse_metadata_only(path: Path) -> dict[str, Any]:
     ``test_metadata_only_parity`` are permanent, only this body changes when
     the implementation moves.
     """
-    return dict(NGBParser().parse_metadata(path))
+    return dict(read_ngb_metadata(path))
 
 
 @pytest.mark.parametrize("fixture", FIXTURES)
