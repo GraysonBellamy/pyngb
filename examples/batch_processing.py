@@ -26,7 +26,9 @@ import polars as pl
 from pyngb import BatchProcessor, NGBDataset, process_directory
 
 
-def demonstrate_batch_processor() -> bool:
+def demonstrate_batch_processor(
+    files: Sequence[str | Path], output_dir: Path
+) -> list[Any]:
     """Demonstrate BatchProcessor class usage."""
 
     print("\n🔧 Method 1: BatchProcessor Class")
@@ -93,7 +95,7 @@ def demonstrate_batch_processor() -> bool:
     return results
 
 
-def demonstrate_convenience_function() -> bool:
+def demonstrate_convenience_function(input_dir: str | Path) -> list[Any]:
     """Demonstrate process_directory convenience function."""
 
     print("\n⚡ Method 2: Convenience Function")
@@ -330,7 +332,7 @@ def main() -> bool:
 
     # Method 2: Convenience function (if input directory provided)
     if args.input_dir:
-        _ = demonstrate_convenience_function(args.input_dir, output_dir)
+        _ = demonstrate_convenience_function(args.input_dir)
 
     # Method 3: Dataset management
     demonstrate_dataset_management(files_to_process, output_dir)

@@ -1,155 +1,92 @@
-# pyNGB Test Suite
+# pyngb Test Suite
 
-This directory contains comprehensive unit tests for the pyNGB library.
+Tests for the pyngb library. The suite is anchored on two things: **six real
+NGB fixtures** in `test_files/` (2022- and 2025-vintage Proteus runs,
+including two baselines) and a **synthetic byte builder** that constructs
+grammar-valid NGB files from scratch.
 
-## Test Structure
+## Layout
 
-- `conftest.py` - Pytest configuration and shared fixtures
-- `test_exceptions.py` - Tests for custom exception classes
-- `test_constants.py` - Tests for constants, enums, and configurations
-- `test_binary_handlers.py` - Tests for binary data type handlers
-- `test_binary_parser.py` - Tests for low-level binary parsing
-- `test_api.py` - Tests for high-level API functions
-- `test_integration.py` - Integration and end-to-end tests
+- `conftest.py` — shared fixtures; `sample_ngb_file` is a builder-generated
+  minimal NGB file
+- `test_files/` — the six real fixtures (their presence is itself asserted,
+  so a missing fixture fails loudly instead of silently skipping)
+- `goldens/` — committed snapshots, two families per fixture:
+  - `*.parity.json` — full metadata, column names/dtypes, per-column
+    SHA-256 hashes, row counts. Pinned from pre-rewrite (0.3.x) output;
+    guarantees parse results never drift. Zero tolerances — floats compare
+    bitwise.
+  - `*.census.json` — the tokenizer's own view: records by dtype, span
+    kinds, byte coverage, type_refs, unknown-field census. A format-drift
+    tripwire: files from a new Proteus version fail loudly and the diff is
+    the mapping to-do list.
+- `support/ngb_builder.py` — builds grammar-valid NGB bytes (fields, tables,
+  section directories, whole files) plus corruption helpers. Its own test
+  asserts builder↔tokenizer duality: `tokenize(build(x))` reproduces `x`.
+
+## Test families
+
+| Files | What they cover |
+|-------|-----------------|
+| `test_container.py`, `test_tokenizer.py`, `test_document.py` | The format layer bottom-up: section directory, record grammar walk, table/document assembly |
+| `test_field_map.py`, `test_extract.py`, `test_channels.py` | Declarative maps, metadata extraction, channel assembly |
+| `test_parity_goldens.py` | Parity snapshots through BOTH parse paths (`read_ngb` and `read_ngb_metadata`); fails (never skips) on missing goldens |
+| `test_format_structural.py` | All fixtures × streams: byte coverage with every gap byte classified, census goldens, table-open invariants |
+| `test_format_properties.py`, `test_property_based.py` | Hypothesis: build/tokenize round-trips (bitwise float equality), random-bytes and mutation fuzzing (any outcome other than a result or `NGBParseError` is a bug), coverage accounting |
+| `test_corruption.py` | Corruption matrix: truncations, count overruns, directory corruption, oversized declarations → structured exceptions (types + attributes asserted, never message prose); each case first proves the uncorrupted input parses |
+| Extraction pins: `test_temperature_program.py`, `test_temperature_calibration.py`, `test_reference_mass.py`, `test_reference_crucible_mass.py`, `test_run_environment.py`, `test_application_license.py`, `test_channel_attribution.py`, `test_column_metadata.py` | Field-level golden values on the real fixtures |
+| `test_api.py`, `test_api_analysis.py`, `test_integration.py`, `test_workflows.py` | Public API surface and end-to-end flows |
+| `test_cli_*.py` | `convert` / `inspect` / `validate` subcommands, incl. baseline and metadata flows |
+| `test_batch.py`, `test_baseline.py`, `test_dtg.py`, `test_dsc_calibration.py`, `test_validation*.py` | Batch, baseline subtraction, analysis, validation |
+| `test_performance.py` | Parse-time ceilings (marked `slow`) |
+| `test_stress_and_edge_cases.py`, `test_exceptions.py`, `test_constants.py`, `test_util.py` | Edge cases and contracts |
 
 ## Running Tests
 
-### Option 1: Using pytest (recommended)
+```bash
+# Full suite with coverage (CI gate: fail_under = 86)
+uv run pytest --cov=pyngb
+
+# Skip slow tests (performance, stress)
+uv run pytest -m "not slow"
+
+# One file / one test, verbose
+uv run pytest tests/test_tokenizer.py -v
+uv run pytest tests/test_parity_goldens.py::test_full_parse_parity -v
+
+# Show any skips (there should be none unexpected)
+uv run pytest -rs
+```
+
+The other CI gates, runnable locally:
 
 ```bash
-# Install test dependencies
-uv sync --extra dev
-
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=src --cov-report=html
-
-# Run only fast tests (skip slow integration tests)
-pytest -m "not slow"
-
-# Run specific test file
-pytest tests/test_exceptions.py
-
-# Run with verbose output
-pytest -v
+uv run ruff check src/ tests/ && uv run ruff format --check src/ tests/
+uv run mypy src/pyngb --ignore-missing-imports
+uv run bandit -r src/
+uv sync --resolution lowest-direct && uv run pytest   # dependency floors
 ```
 
-### Option 2: Using the simple test runner
-
-If pytest is not available, you can run basic tests with:
+## Regenerating goldens
 
 ```bash
-python run_tests.py
+uv run python scripts/make_goldens.py parity   # public-API snapshots
+uv run python scripts/make_goldens.py census   # tokenizer-view snapshots
 ```
 
-This will run a subset of critical tests without requiring pytest.
+Golden diffs must always be intentional: a parity diff means parsed output
+changed (explain why in the commit); a census diff means the tokenizer's
+view of the fixtures changed. Never regenerate to make a red test green
+without understanding the diff.
 
-## Test Categories
+## Writing new tests
 
-### Unit Tests
-- Test individual components in isolation
-- Fast execution (< 1 second per test)
-- Mock external dependencies
-- Cover edge cases and error conditions
-
-### Integration Tests
-- Test complete workflows end-to-end
-- May take longer to execute
-- Use realistic mock data
-- Test component interactions
-
-### Performance Tests
-- Marked with `@pytest.mark.slow`
-- Test parsing of larger datasets
-- Memory usage validation
-- Skip by default in CI/development
-
-## Test Data
-
-The tests use:
-- **Mock binary data**: Realistic NGB file structures created in memory
-- **Fixtures**: Reusable test components and data
-- **Parameterized tests**: Multiple inputs for thorough coverage
-
-## Coverage Goals
-
-- **Exceptions**: 100% coverage (simple classes)
-- **Constants**: 90%+ coverage (configuration testing)
-- **Binary parsing**: 85%+ coverage (core functionality)
-- **API functions**: 90%+ coverage (user-facing code)
-- **Integration**: Key workflows covered
-
-## Writing New Tests
-
-### Test Naming Convention
-- Files: `test_<module_name>.py`
-- Classes: `Test<ComponentName>`
-- Functions: `test_<specific_behavior>`
-
-### Example Test Structure
-```python
-class TestMyComponent:
-    """Test MyComponent class."""
-
-    def test_basic_functionality(self):
-        """Test basic usage scenario."""
-        component = MyComponent()
-        result = component.do_something()
-        assert result is not None
-
-    def test_error_handling(self):
-        """Test error conditions."""
-        component = MyComponent()
-        with pytest.raises(SpecificError):
-            component.do_invalid_thing()
-
-    def test_edge_cases(self):
-        """Test edge cases and boundary conditions."""
-        # Test with empty input, null values, etc.
-        pass
-```
-
-### Using Fixtures
-```python
-def test_with_fixture(self, sample_pattern_config):
-    """Test using shared fixture."""
-    config = sample_pattern_config
-    assert "8c" in config.column_map
-```
-
-## Continuous Integration
-
-Tests are designed to:
-- Run quickly in CI environments
-- Not require external dependencies
-- Provide clear failure messages
-- Support parallel execution
-
-## Debugging Tests
-
-```bash
-# Run single test with debugging
-pytest tests/test_api.py::TestLoadNGBData::test_basic -v -s
-
-# Show local variables on failure
-pytest --tb=long
-
-# Run with Python debugger
-pytest --pdb
-```
-
-## Mock Data Strategy
-
-Instead of requiring real NGB files, tests create minimal mock data that:
-- Contains the essential binary structures
-- Exercises the parsing logic
-- Is fast to create and parse
-- Covers various data scenarios
-
-This approach ensures tests are:
-- Self-contained
-- Fast to execute
-- Easy to understand
-- Robust against data file changes
+- Files `test_<area>.py`, classes `Test<Component>`, functions
+  `test_<behavior>`.
+- Synthetic inputs come from `tests.support.ngb_builder` — don't hand-craft
+  NGB bytes inline.
+- Corruption tests assert exception **types and structured attributes**
+  (`stream`, `offset`, `declared`, …), not message text.
+- Values extracted from the real fixtures get pinned exactly (no
+  tolerances); if a fixture value is legitimately supposed to change, the
+  golden regeneration explains it.

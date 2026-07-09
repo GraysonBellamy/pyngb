@@ -136,26 +136,30 @@ def test_large_file_processing():
 pyngb/
 ├── src/pyngb/              # Main package
 │   ├── api/               # High-level user interface
-│   │   ├── loaders.py     # File loading functions
-│   │   └── analysis.py    # Analysis functions (DTG, etc.)
-│   ├── core/              # Core parsing logic
-│   │   └── parser.py      # Main parser coordination
-│   ├── binary/            # Low-level binary parsing
-│   │   ├── parser.py      # Binary structure parsing
-│   │   └── handlers.py    # Data type handlers
-│   ├── extractors/        # Data extraction modules
-│   │   ├── metadata.py    # Metadata extraction
-│   │   └── streams.py     # Data stream processing
-│   ├── analysis/          # Analysis algorithms
-│   │   └── dtg.py         # DTG calculation
+│   │   ├── loaders.py     # read_ngb / read_ngb_metadata
+│   │   ├── analysis.py    # Table-level analysis (DTG, normalization, …)
+│   │   ├── metadata.py    # Column-metadata helpers
+│   │   └── cli.py         # convert / inspect / validate subcommands
+│   ├── format/            # NGB format layer (strictly layered, top→bottom)
+│   │   ├── extract.py     # build_metadata: document → FileMetadata
+│   │   ├── channels.py    # build_dataframe: document → data columns
+│   │   ├── census.py      # coverage / unknown-field accounting
+│   │   ├── document.py    # NGBDocument / Table / Field assembly
+│   │   ├── maps.py        # ALL declarative format knowledge
+│   │   ├── grammar.py     # record grammar constants + tokenizer
+│   │   └── container.py   # ZIP + section-directory parsing
+│   ├── analysis/          # Analysis algorithms (dtg.py)
+│   ├── validation/        # Data-quality validators (QualityChecker, …)
+│   ├── util/              # Hashing, column helpers
+│   ├── baseline.py        # Baseline subtraction
 │   ├── batch.py           # Batch processing
-│   ├── validation.py      # Data validation
-│   ├── constants.py       # Configuration constants
-│   ├── exceptions.py      # Custom exceptions
-│   └── util.py           # Utility functions
-├── tests/                 # Test suite
+│   ├── config.py          # ParsingConfig (resource limits)
+│   ├── constants.py       # FileMetadata + column-metadata TypedDicts
+│   └── exceptions.py      # Custom exceptions
+├── tests/                 # Test suite (see tests/README.md)
 ├── docs/                  # Documentation
-└── examples/             # Usage examples
+├── scripts/               # Goldens generator, benchmarks
+└── examples/              # Usage examples
 ```
 
 ## Contribution Workflow
@@ -257,21 +261,31 @@ git push origin feature/new-analysis-method
 
 ## Common Development Tasks
 
-### Adding New Data Type Handler
+### Adding a New Metadata Field
+
+All format knowledge is declarative (`src/pyngb/format/maps.py`). For a
+simple scalar field, add one `MetaField` entry — locate the
+`(category, field_id)` pair with `pyngb inspect --unknown` / `--values`:
 
 ```python
-# In src/pyngb/binary/handlers.py
-class NewDataTypeHandler(DataTypeHandler):
-    def can_handle(self, data_type: bytes) -> bool:
-        return data_type == b'\x42'  # Your data type marker
-
-    def parse(self, data: bytes) -> list:
-        # Your parsing logic
-        return parsed_data
-
-# Register in appropriate place
-registry.register(NewDataTypeHandler())
+# In src/pyngb/format/maps.py, inside FIELD_MAP:
+MetaField("new_field", 0x1772, 0x0842, _clean_str),
 ```
+
+then add the key to the `FileMetadata` TypedDict in `constants.py` and pin
+the extracted value in a test. For a structured extraction (multiple fields,
+cross-table logic), write one plain function in `src/pyngb/format/extract.py`
+and append it to the `_EXTRACTORS` tuple:
+
+```python
+def extract_new_block(doc: NGBDocument, metadata: FileMetadata) -> None:
+    table = doc.first(1, category=0x1234, with_fields=(0x0842,))
+    if table is not None:
+        metadata["new_field"] = table.value(0x0842)
+```
+
+Regenerate the parity goldens (`uv run python scripts/make_goldens.py parity`)
+and explain the diff in your PR — golden changes must always be intentional.
 
 ### Adding New Analysis Function
 
@@ -303,7 +317,7 @@ def new_analysis(
 ### Adding New Validation Check
 
 ```python
-# In src/pyngb/validation.py
+# In src/pyngb/validation/ — one module per validator family
 def validate_new_condition(df: pl.DataFrame) -> list[str]:
     """Validate new data condition."""
     issues = []
@@ -314,6 +328,8 @@ def validate_new_condition(df: pl.DataFrame) -> list[str]:
 
     return issues
 ```
+
+Wire it into `QualityChecker` so `pyngb validate` picks it up.
 
 ## Release Process
 
@@ -336,6 +352,6 @@ Be respectful and constructive in all interactions. We're building tools for the
 
 ## Recognition
 
-Contributors are listed in `CONTRIBUTORS.md` and in release notes. Significant contributions may be acknowledged in academic presentations.
+Contributors are acknowledged in release notes. Significant contributions may be acknowledged in academic presentations.
 
 Thank you for contributing to pyngb! 🚀

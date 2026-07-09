@@ -1,414 +1,485 @@
 ---
-description: Reverse-engineered reference for the NETZSCH STA NGB binary format — container layout, stream sections, type codes, and metadata encoding.
+description: Reverse-engineered reference for the NETZSCH STA NGB binary format — container layout, section directory, record grammar, data types, table object model, and stream contents.
 ---
 
 # NGB Binary Format Reference
 
 ## Overview
 
-NETZSCH STA NGB files are proprietary binary files containing thermal analysis data. This document describes the reverse-engineered binary format to aid in maintaining and extending the parser.
+NETZSCH STA NGB files are proprietary binary files containing thermal analysis
+data. This document describes the reverse-engineered format as pyngb parses it:
+a ZIP container of streams, each stream a sectioned blob of serialized objects,
+every object a **table** of **fields** following one uniform record grammar.
 
-⚠️ **Disclaimer**: This format documentation is based on reverse engineering and may not be complete or accurate for all NGB file versions. This is an unofficial implementation not affiliated with NETZSCH-Gerätebau GmbH.
+Everything here was verified empirically against six real fixtures (two
+Proteus vintages, 2022 and 2025, including two baseline files) during the
+2026-07 format investigation — 25,075 grammar records across all streams with
+zero counter-examples. Numbers quoted below (record censuses, span sizes) come
+from those fixtures via `scripts/make_goldens.py census`; regenerate them with
+`pyngb inspect` if the fixture set changes.
 
-## File Structure
+⚠️ **Disclaimer**: This format documentation is based on reverse engineering
+and may not be complete or accurate for all NGB file versions. This is an
+unofficial implementation not affiliated with NETZSCH-Gerätebau GmbH.
 
-### Container Format
+Byte-level constants live in [`pyngb.format.grammar`][grammar] and
+[`pyngb.format.container`][container]; all declarative field knowledge lives in
+[`pyngb.format.maps`][maps]. If this document and the code disagree, the code
+(pinned by golden tests) wins.
+
+[grammar]: https://github.com/GraysonBellamy/pyngb/blob/main/src/pyngb/format/grammar.py
+[container]: https://github.com/GraysonBellamy/pyngb/blob/main/src/pyngb/format/container.py
+[maps]: https://github.com/GraysonBellamy/pyngb/blob/main/src/pyngb/format/maps.py
+
+## Container
 
 NGB files are ZIP archives containing binary streams:
 
 ```
 file.ngb-ss3
 ├── Streams/
-│   ├── stream_1.table    # File metadata and settings
-│   ├── stream_2.table    # Measurement data
-│   └── stream_3.table    # Additional data (optional)
-└── [other files]         # May contain additional resources
+│   ├── stream_1.table    # metadata: sample, program, calibrations, MFC, …
+│   ├── stream_2.table    # primary measurement channels
+│   ├── stream_3.table    # additional measurement channels (optional)
+│   ├── stream_4.table    # end-of-run snapshot (not parsed)
+│   ├── stream_5.table    # furnace usage histograms (not parsed)
+│   └── stream_6.table    # embedded plot previews (not parsed)
+├── Props.xml             # stream/section manifest
+└── [Content_Types].xml
 ```
 
-### Stream Organization
+`.ngb-ss3` is a sample run; `.ngb-bs3` is a baseline (correction) run with the
+same structure. `read_ngb` requires streams 1 and 2 and uses stream 3 when
+present; `read_ngb_metadata` reads stream 1 only; `load_document` models any
+requested stream, including 4–6.
 
-- **Stream 1** (Metadata): File-level metadata, calibration constants, temperature programs
-- **Stream 2** (Data): Time-series measurement data (time, temperature, mass, DSC, etc.)
-- **Stream 3+** (Auxiliary): Additional streams may contain derived data or settings
+### Stream header and section directory
 
-## Binary Markers
+Every `stream_N.table` starts with two magic strings and a section directory:
 
-### Core Markers
+| Offset | Content |
+|--------|---------|
+| 0x02 | `"Netzsch TA file"` |
+| 0x1C | `"_db_format_1"` |
+| 0x50 | section directory: consecutive 14-byte entries |
 
-| Marker Name | Hex Bytes | Purpose |
-|------------|-----------|---------|
-| `START_DATA` | `00 00 08 80 07` | Marks the beginning of a data array block |
-| `END_TABLE` | `FF FE FF 00 00` | Marks the end of a complete table |
-| `TABLE_SEPARATOR` | `FF FE FF 04` | Separates multiple tables within a stream |
-| `TEMP_PROG_TYPE_PREFIX` | `03 80 01` | Prefix for temperature program entries |
-
-### String Encoding Markers
-
-| Marker Name | Hex Bytes | Purpose |
-|------------|-----------|---------|
-| `STRING_DATA_TYPE` | `1F` | Indicates string data follows |
-| `FFFEFF_PATTERN` | `FF FE FF` | Alternative string encoding marker |
-
-### Metadata Markers
-
-| Marker Name | Hex Bytes | Purpose |
-|------------|-----------|---------|
-| `APP_LICENSE_CATEGORY` | `00 03` | Application license category marker |
-| `APP_LICENSE_FIELD` | `18 FC` | License field identifier |
-
-## String Encoding
-
-NGB files use multiple string encoding schemes:
-
-### 1. Standard String (4-byte length prefix)
+Each directory entry:
 
 ```
-[4 bytes: length (little-endian int32)][N bytes: UTF-8 data]
+ff ff | <section id u16 LE> | <offset u32 LE> | <size u32 LE>
 ```
 
-**Example**:
-```
-0C 00 00 00 48 65 6C 6C 6F 20 57 6F 72 6C 64 21
-│           │
-│           └─ "Hello World!" (12 bytes UTF-8)
-└─ Length: 12 (0x0000000C)
-```
+2022-vintage files terminate the directory with an all-zero entry
+(`ff ff 00 00 00 00 00 00 00 00 00 00 00 00`); 2025-vintage directories simply
+stop (the next bytes are not `ff ff`-prefixed).
 
-### 2. UTF-16LE String
+Invariants — checked by `parse_container`, violations raise
+`NGBCorruptedFileError`:
 
-```
-[4 bytes: length (little-endian int32)][N*2 bytes: UTF-16LE data]
-```
+- every entry is prefixed `ff ff`;
+- offsets are strictly increasing and sections are contiguous
+  (each section starts where the previous one ends);
+- the last section ends exactly at end-of-file;
+- a **main section** whose id equals the stream number exists.
 
-**Example**:
-```
-18 00 00 00 48 00 65 00 6C 00 6C 00 6F 00 21 00
-│           │
-│           └─ "Hello!" (6 characters = 12 bytes UTF-16LE)
-└─ Length: 24 (0x00000018) - byte count, not char count
-```
+Each stream also carries a small **section 1** (~480–580 bytes): a
+table-of-contents of class records for the stream (stream 1 folds it into its
+main section). The measurement content is entirely in the main section.
 
-### 3. FFFEFF Format (Special)
+## Record grammar
+
+The streams are MFC `CArchive`-style object serialization, not loose byte
+soup. Every field of every table in every stream follows one grammar:
 
 ```
-[FF FE FF][length byte][string data][00 00]
+18 fc ff ff 03 80 01            RECORD_HEADER
+<field_id u16 LE>
+00 00 01 00 00 00               FIELD_BRIDGE
+0c 00                           FIELD_KIND (u16, always 0x000C)
+17 fc ff ff                     TYPE_PREFIX
+<dtype u8>                      one of the nine data types below
+80 01 <scalar payload>          SCALAR mode …
+  — or —
+a0 01 <count u32 LE> <payload>  ARRAY mode
+01 00 00 00 02 00 01 00 00      END_FIELD
 ```
 
-This format is used for specific metadata fields. The length byte indicates the string length, and the format ends with null terminators.
+Two rules with teeth:
 
-## Data Types
+- **Array counts are element counts**, not byte counts: the payload occupies
+  `count × ITEM_SIZE[dtype]` bytes.
+- A scalar's extent is fully determined by its dtype (fixed `ITEM_SIZE`, or
+  the string/REF headers below), so `END_FIELD` is *verified at the computed
+  position*, never searched for. Record anchors occurring inside array
+  payloads are therefore harmless — a linear walk never sees them.
 
-### Type IDs
+### String encoding
 
-| Type ID (Hex) | Format | Description | Size |
-|--------------|--------|-------------|------|
-| `0B` | `float64[]` | Array of double-precision floats | 8 bytes per value |
-| `0A` | `float32[]` | Array of single-precision floats | 4 bytes per value |
-| `08` | `int32` | 32-bit signed integer | 4 bytes |
-| `09` | `int64` | 64-bit signed integer | 8 bytes |
-| `1F` | `string` | Variable-length string | Variable |
-
-### Data Array Format
-
-Arrays are stored with a header and data section:
+String payloads (dtype `1f`) come in two forms:
 
 ```
-[START_DATA marker][Type ID][4 bytes: element count][data elements]
+ff fe ff | <char_count u8> | <char_count × 2 bytes UTF-16LE>
 ```
 
-**Example - Float64 Array**:
-```
-00 00 08 80 07  0B  03 00 00 00  [24 bytes of float64 data]
-│               │   │            │
-│               │   │            └─ 3 float64 values (3 * 8 = 24 bytes)
-│               │   └─ Element count: 3
-│               └─ Type: 0x0B (float64[])
-└─ START_DATA marker
-```
-
-## Metadata Patterns
-
-### Column Identification
-
-Columns in the data stream are identified by hex IDs. Common IDs:
-
-| Hex ID | Column Name | Units | Description |
-|--------|------------|-------|-------------|
-| `0x0154` | `time` | raw minutes, exposed as seconds | Elapsed time |
-| `0x02bc` | `sample_temperature` | °C | Sample temperature |
-| `0x00e1` | `furnace_temperature` | °C | Furnace temperature |
-| `0x0167` | `mass` | mg | Sample mass |
-| `0x02c1` | `dsc_signal` | μV | DSC signal |
-
-### Crucible Mass Patterns
-
-**Sample Crucible**:
-```
-Signature: 07 00 0C 00  s  a  m  p  l  e  _  c  r  u  c  i  b  l  e
-           │           │
-           │           └─ "sample_crucible" string
-           └─ Type and length markers
-```
-
-**Reference Crucible**:
-```
-Signature: 13 00 12 00  r  e  f  e  r  e  n  c  e  _  c  r  u  c  i  b  l  e
-```
-
-### Temperature Program Format
-
-Temperature programs describe heating/cooling segments:
+or a length-prefixed form:
 
 ```
-[TEMP_PROG_TYPE_PREFIX][Type byte][Start temp][End temp][Rate][...]
+<byte_len u32 LE> | <byte_len bytes>     UTF-8, falling back to UTF-16LE
 ```
 
-**Fields**:
-- Type: `0x01` = heating, `0x02` = cooling, `0x03` = isothermal
-- Temperatures: float64 (°C)
-- Heating/cooling rate: float64 (°C/min)
-- Stage duration: raw minutes, converted to seconds in pyngb metadata
+Decoding is strict in both encodings; an undecodable payload yields `None`
+rather than mangled text.
 
-## File Metadata Fields
+### Data types
 
-### Common Metadata
+Nine dtypes are observed across all fixtures and streams (`DType` enum;
+counts are strict-grammar records summed over all six fixtures, all streams):
 
-| Field Name | Type | Description |
-|-----------|------|-------------|
-| `instrument` | string | Instrument model (e.g., "STA 449 F3 Jupiter") |
-| `sample_name` | string | Sample identifier |
-| `operator` | string | Operator name |
-| `sample_mass` | float | Initial sample mass (mg) |
-| `reference_mass` | float | Reference mass (mg) |
-| `crucible_mass` | float | Crucible mass (mg) |
-| `date` | string | Measurement date (ISO format) |
-| `time` | string | Measurement time |
+| dtype | Type | Item size | Records | Notes |
+|-------|------|-----------|---------|-------|
+| `0x02` | u16 | 2 | 4,525 | |
+| `0x03` | i32 | 4 | 6,668 | plus the 66 END_FIELD-less "bare records" below |
+| `0x04` | f32 | 4 | 2,694 | |
+| `0x05` | f64 | 8 | 828 | |
+| `0x10` | u8 / byte array | 1 | 1,749 | arrays decode as raw `bytes` |
+| `0x14` | packed 8-byte record | 8 | 492 | opaque; e.g. `eb03eb03…` tokens matching calibration record filenames |
+| `0x1a` | object reference (REF) | variable | 4,518 | table-open records; exactly one per table |
+| `0x1f` | string | variable | 3,589 | |
+| `0x48` | 16-byte hash/GUID | 16 | 12 | stream 6 only |
 
-### Calibration Constants
+Numeric arrays decode via `np.frombuffer` and widen to f64
+(`.astype('<f8')`); scalars decode with precompiled `struct.Struct`s.
 
-DSC calibration constants for signal correction:
+### Non-record spans
 
-| Field Name | Type | Description |
-|-----------|------|-------------|
-| `tau` | float | Time constant (τ) |
-| `sensitivity` | float | DSC sensitivity |
-| `E` | float | Calibration constant E |
+The tokenizer (`pyngb.format.grammar.tokenize`) is a strict linear walk that
+is **total**: every byte of a section is either part of a decoded
+`FieldToken` or covered by an explicit `UnknownSpan` — nothing is silently
+skipped. Grammar records cover 95–97% of section bytes on every fixture
+stream; the residue is exactly these enumerable forms (`SpanKind`):
 
-**Formula**: `DSC_corrected = (DSC_raw + τ * dDSC/dt) / Sensitivity + E`
+| Kind | Size | Count (all fixtures) | Meaning |
+|------|------|----------------------|---------|
+| `prologue` | 64 B | 66 (one per section) | section preamble, starts `02 00 00 80`; 6 observed variants differing in 2 bytes |
+| `preamble` | 47 B | 4,518 (one per table) | record variant with mode bytes `00 01`; not yet semantically decoded |
+| `table_trailer` | 3 B | 20,557 | `00 03 00` sequence closing each table |
+| `bare_record` | 28 B | 66 (11 per fixture, both vintages) | i32 scalar record with **no** END_FIELD, directly after a table trailer; field ids `0x0FDE`/`0x1165` |
+| `malformed` | variable | 0 in healthy files | grammar violation; tokenizer resyncs to the next record anchor |
+| `truncated` | variable | 0 in healthy files | array whose declared extent overruns the section; the walk stops (a broken length forfeits resync trust) |
 
-### Temperature Calibration
+The tokenizer itself never raises on corruption — severity policy lives in
+the consumers (see [Corruption semantics](#corruption-semantics-and-coverage)).
+Its only exception is `NGBResourceLimitError` for an array whose declared
+payload exceeds `max_array_size_mb`, checked *before* any allocation.
 
-The temperature calibration is stored in `stream_1` and surfaced as the
-`temperature_calibration` metadata field plus a sibling
-`sensitivity_calibration` provenance block. Unlike the DSC sensitivity
-calibration, it is captured for **traceability/QA only**: the
-`sample_temperature` channel is already temperature-corrected by Proteus, so
-re-applying these coefficients would double-correct the data.
+## Table object model
 
-**Coefficients** — three `float32` values stored as a data array on field `be 04`
-inside an `f7 01` category table:
+Fields are grouped into **tables**. A table opens with a REF record (dtype
+`0x1a`) and closes with END_FIELD + the `00 03 00` trailer:
+
+- The open record's **field_id is the table's category** (u16).
+- Its payload starts with either a class back-reference (`01 80` = class
+  index 1, etc.) or — first table of a stream — an inline class definition
+  `ff ff <schema u16> <name_len u16> <name>` (observed name: `CDbTable`).
+- The payload ends `02 00 00 80 <type_ref u16> 00 00`; the **type_ref**
+  identifies the table's kind. Class-definition records for non-table
+  classes have no type_ref.
+- After the open record comes one `preamble` span, then the field records.
+
+Two identity rules matter for extraction:
+
+- **Field ids never repeat within a table** (`Table.fields` is a dict keyed
+  by field id).
+- **Categories DO repeat across tables**: `0x7530` alone is used by the
+  sample table, temperature/sensitivity fixpoint tables, MFC
+  device-parameter tables, and accessory records. Tables are identified by
+  field membership and type_ref, never by category alone.
+
+Known type_refs (the full per-fixture set is pinned by the census goldens):
+
+| type_ref | Table kind |
+|----------|-----------|
+| `0x2B22` | channel header (streams 2/3) |
+| `0x2B23` | channel segment values (streams 2/3) |
+| `0x0Bxx` | stream-1 metadata table families |
+| others | structural/device tables, ignored by extraction |
+
+## Stream 1: metadata catalog
+
+Extraction resolves each metadata key against the document with one rule:
+**the first stream-1 table of the category that carries the field wins**
+(stream order is semantic). The declarative map (`FIELD_MAP` in
+`pyngb.format.maps`):
+
+| Metadata key | Category | Field | Conversion |
+|--------------|----------|-------|------------|
+| `instrument` | `0x1775` | `0x1059` | string |
+| `project` | `0x1772` | `0x083C` | string |
+| `date_performed` | `0x1772` | `0x083E` | Unix → ISO 8601 UTC |
+| `lab` | `0x1772` | `0x0834` | string |
+| `operator` | `0x1772` | `0x0835` | string |
+| `comment` | `0x1772` | `0x083D` | string |
+| `crucible_type` | `0x177E` | `0x0840` | string |
+| `furnace_type` | `0x177A` | `0x0840` | string |
+| `carrier_type` | `0x1779` | `0x0840` | string |
+| `sample_id` | `0x7530` | `0x0898` | string |
+| `sample_name` | `0x7530` | `0x0840` | string |
+| `material` | `0x7530` | `0x0962` | string |
+| `sample_mass` | `0x7530` | `0x0C9E` | positive float |
+
+The remaining structures are procedural (each one function in
+`pyngb.format.extract`, all warn-and-continue):
+
+### Temperature program
+
+Stage tables are the stream-1 tables carrying **all five** stage fields;
+stage N is the Nth such table in stream order (exposed as `stage_0`,
+`stage_1`, …):
+
+| Field | Key |
+|-------|-----|
+| `0x083F` | `stage_type` |
+| `0x0E17` | `temperature` (°C) |
+| `0x0E13` | `heating_rate` (°C/min) |
+| `0x0E14` | `acquisition_rate` |
+| `0x0E15` | `time` — stored in minutes, exposed in **seconds** (×60) |
+
+### PID settings
+
+Tables carrying all three of `0x0FE7` (xp), `0x0FE8` (tn), `0x0FE9` (tv):
+the first occurrence in stream order is the **furnace** controller
+(`furnace_xp/tn/tv`), the second is the **sample** controller
+(`sample_xp/tn/tv`).
+
+### Crucible masses
+
+Two category-`0x177E` tables each carry field `0x0C9E` (f64). The
+**preceding table** discriminates them: a trailing `0x0C83` (f32) field marks
+the *sample* crucible; a trailing `0x10C4` (u16) field marks the *reference*
+crucible. In all observed files the reference crucible comes first in stream
+order. `reference_mass` is recovered as the last numeric scalar of the table
+preceding the reference-crucible table.
+
+### DSC calibration constants
+
+From the first category-`0x01F5` table yielding them: `p0`=`0x044F`,
+`p1`=`0x0450`, `p2`=`0x0451`, `p3`=`0x0452`, `p4`=`0x0453`, `p5`=`0x04C3`.
+
+These feed `apply_dsc_calibration`: sensitivity
+`y = (P2 + P3·z + P4·z² + P5·z³)·exp(−z²)` with `z = (T − P0)/P1`, converting
+the DSC signal µV → mW.
+
+### Temperature calibration
+
+Surfaced as the `temperature_calibration` metadata block plus a sibling
+`sensitivity_calibration` provenance block. Captured for **traceability/QA
+only**: the `sample_temperature` channel is already temperature-corrected by
+Proteus, so re-applying these coefficients would double-correct the data.
+
+**Coefficients** — three f32 values stored as a dtype-`0x10` byte array on
+field `0x04BE` of the category-`0x01F7` table (12 bytes = 3 × f32 LE),
+giving `[B0, B1, B2]`.
+
+**Fixpoints** — the phase-transition standards used for the calibration, one
+table per standard, categories `0x7530`–`0x753F` (ascending temperature; real
+files carry 6–9 standards — Biphenyl, Benzoeacid, KClO4, Ag2SO4, CsCl,
+K2CrO4, BaCO3, …). Because those categories are shared with sample/MFC/DSC
+tables, a *temperature* fixpoint table is confirmed by carrying **both**
+`0x0444` and `0x0447` (DSC sensitivity fixpoint tables carry
+`0x0454`/`0x0455`/`0x0456` instead of `0x0444`):
+
+| Field | Key | Description |
+|-------|-----|-------------|
+| `0x0443` | `name` | standard name |
+| `0x0444` | `actual_c` | literature transition temperature (°C) |
+| `0x0445` | `measured_c` | raw measured transition temperature (°C) |
+| `0x0446` | `weight` | regression weight (1.0 in observed files) |
+| `0x0447` | `corrected_c` | measured value after the calibration polynomial |
+
+**Relationship** (verified by round-trip on all fixtures, residual < 1e-3):
 
 ```
-be 04 | 00 00 01 00 00 00 | 0c 00 | 17 fc ff ff | 10 | a0 01 | <count u32 LE> | <data>
+corrected_c = measured_c + (1e-3·B0 + 1e-5·B1·T + 1e-8·B2·T²)   # T = measured_c
 ```
 
-The count is `12` (3 × `float32`), giving `[B0, B1, B2]`.
-
-**Fixpoints** — the phase-transition standards used for the calibration, one per
-table, categorised `30 75` .. `3f 75` (ascending temperature; real files carry
-6–9 standards). Standards vary per calibration (Biphenyl, Benzoeacid, KClO4,
-Ag2SO4, CsCl, K2CrO4, BaCO3, …) and are read from the file, never hard-coded.
-The `30 75` category range is reused by the sample tables, the MFC
-device-parameter tables, and the DSC sensitivity fixpoint tables, so a
-temperature fixpoint table is confirmed by the presence of the `44 04` and
-`47 04` fields (the sensitivity fixpoint tables carry `54 04`/`55 04`/`56 04`
-instead of `44 04`). Each table holds five scalar fields:
-
-| Field ID | Type | Name | Description |
-|----------|------|------|-------------|
-| `43 04` | string | `name` | Standard name |
-| `44 04` | float | `actual_c` | Actual (literature) temperature (°C) |
-| `45 04` | float | `measured_c` | Raw measured transition temperature (°C) |
-| `46 04` | float | `weight` | Regression weight (1.0 in observed files) |
-| `47 04` | float | `corrected_c` | Measured value after the calibration polynomial |
-
-**Relationship** (verified by round-trip on all sample files, residual `< 1e-3`):
-
-```
-corrected_c = measured_c + (1e-3*B0 + 1e-5*B1*T + 1e-8*B2*T²)   # T = measured_c
-```
-
-The residual `actual_c - corrected_c` is the calibration fit error.
+The residual `actual_c − corrected_c` is the calibration fit error.
 
 **Record paths and provenance** — each external calibration record has one
-`f5 01` source table, located by its `07 d4` path field suffix: the temperature
-record (`.ngb-ts3` → `temperature_calibration.record_path`) and the DSC
-sensitivity record (`.ngb-es3` → `sensitivity_calibration.record_path`). The
-same table carries the conditions of the calibration run, extracted into both
-blocks:
+category-`0x01F5` source table, located by the suffix of its path string
+field: `.ngb-ts3` → `temperature_calibration.record_path`, `.ngb-es3` →
+`sensitivity_calibration.record_path`. The same table carries the conditions
+of the calibration run, extracted into both blocks:
 
-| Field ID | Type | Name | Description |
-|----------|------|------|-------------|
-| `3e 08` | int32 | `date_measured` | Unix timestamp of the calibration run (→ ISO 8601 UTC) |
-| `31 04` | string | `gas` | Purge gas used |
-| `4c 04` / `33 04` | string | `crucible_type` | Crucible used (`4c 04` in the es3 table, `33 04` in the ts3 table) |
-| `35 04` | float32 | `heating_rate` | Heating rate in K/min |
-| `3d 08` | string | `comment` | Operator comment on the calibration run |
+| Field | Key | Description |
+|-------|-----|-------------|
+| `0x083E` | `date_measured` | Unix timestamp of the calibration run (→ ISO 8601 UTC) |
+| `0x0431` | `gas` | purge gas used |
+| `0x044C` / `0x0433` | `crucible_type` | crucible used (`0x044C` in the es3 table, `0x0433` in the ts3 table) |
+| `0x0435` | `heating_rate` | heating rate in K/min |
+| `0x083D` | `comment` | operator comment on the calibration run |
 
-### Run Environment
+### Run environment
 
-Two further `stream_1` tables are surfaced as top-level metadata:
+**Timezone** — the category-`0x1859` table is a Windows
+`TIME_ZONE_INFORMATION`-style snapshot: `0x1135` name (string), `0x1134` bias
+(i32 minutes, UTC = local + bias), `0x1137` DST bias (i32), `0x1138` state
+(i32; 1 = standard, 2 = daylight). Exposed as `timezone` and
+`utc_offset_minutes` (`−(bias + dst_bias)` when daylight time is active, else
+`−bias`). `date_performed` is UTC; this recovers the local wall-clock time of
+the run. Files carry several snapshots; the first (run start) is used.
 
-**Timezone** — the `59 18` table is a Windows `TIME_ZONE_INFORMATION`-style
-snapshot: `11 35` name (string), `11 34` bias (int32 minutes, UTC = local +
-bias), `11 37` DST bias (int32), `11 38` state (int32; 1 = standard, 2 =
-daylight). Exposed as `timezone` and `utc_offset_minutes`
-(`-(bias + dst_bias)` when daylight time is active, else `-bias`).
-`date_performed` is UTC; this recovers the local wall-clock time of the run.
+**Correction file link** — the category-`0x1770` measurement-definition table
+stores, in field `0x0843`, the path of the correction file selected for the
+run (→ `correction_file_path`). For sample (`.ngb-ss3`) runs this identifies
+the matching baseline (`.ngb-bs3`) file; for correction runs it may reference
+the related sample or a prior correction run.
 
-**Correction file link** — the `70 17` measurement-definition table stores, in
-field `43 08`, the path of the correction file selected for the run (→
-`correction_file_path`). For sample (`.ngb-ss3`) runs this identifies the
-matching baseline (`.ngb-bs3`) file; for correction runs it may reference the
-related sample or a prior correction run.
+### MFC gas metadata
 
-### MFC Flow Setpoints
+Three structures per MFC channel (Purge 1, Purge 2, Protective):
 
-The configured gas flows (distinct from the MFC *ranges*) live in `30 75`
-device-parameter tables identified by their UTF-16LE parameter name in field
-`10 62` (e.g. `Purge 1 MFC_MFC400_LastUsedFlow`); the value is the `float32`
-field `10 61` of the same table. Exposed as `purge_1_mfc_flow`,
-`purge_2_mfc_flow`, and `protective_mfc_flow` (ml/min). For MFC channels with
-no data column in `stream_2` these setpoints are the only record of the flow.
+- **Ranges** — name tables (a string field holding `Purge 1` etc.) pair by
+  ordinal with range tables carrying field `0x1048` (valid range 0.1–1000)
+  → `purge_1_mfc_range`, `purge_2_mfc_range`, `protective_mfc_range`.
+- **Gases** — the nearest *preceding* table whose category high byte is
+  `0x1B` and which carries a known gas string (`NITROGEN`, `OXYGEN`, `ARGON`,
+  `HELIUM`, `CARBON_DIOXIDE`) → `purge_1_mfc_gas`, ….
+- **Flow setpoints** (distinct from the ranges) — category-`0x7530`
+  device-parameter tables identified by their UTF-16LE parameter name in
+  field `0x1062` (e.g. `Purge 1 MFC_MFC400_LastUsedFlow`); the value is the
+  f32 field `0x1061` of the same table (0–1000 ml/min) →
+  `purge_1_mfc_flow`, `purge_2_mfc_flow`, `protective_mfc_flow`. For MFC
+  channels with no data column in stream 2 these setpoints are the only
+  record of the flow.
 
-## Column Metadata
+### Application and license
 
-Each data column can have metadata:
+Strings of the category-`0x0300` table: the first matching
+`Version N.N.N` → `application_version`; the longest multiline string →
+`licensed_to`.
+
+## Streams 2 and 3: measurement channels
+
+Data streams hold one **channel header table** per channel followed by that
+channel's **segment value tables** — a type_ref state machine, not byte
+positions, drives assembly:
+
+- **Header table** — type_ref `0x2B22`. The category's **low byte is the
+  channel id** (header categories are `<ch> 17` in stream 2 and `<ch> 75` in
+  stream 3 — the latter collide with segment categories and are
+  disambiguated purely by type_ref).
+- **Segment value tables** — type_ref `0x2B23`, categories `0x7530`,
+  `0x7531`, … (segment ordinals). Each carries **exactly one data array**:
+  field `0x0F40` (f64) for f64 channels (time `8c`, mass `90`) or field
+  `0x0F3D` (f32) for f32 channels (temperatures, DSC, flows). Segment arrays
+  concatenate in stream order to form the channel.
+- The `time` channel is stored in minutes and exposed in seconds (×60).
+- Channel `0x87` is a data-less trailer header (intentionally unmapped);
+  other unmapped channel ids pass through as hex column names.
+- Structural ~90-byte tables with other type_refs are ignored.
+
+Channel id → column name (`CHANNEL_MAP`):
+
+| id | Column | id | Column |
+|----|--------|----|--------|
+| `0x8C` | `time` | `0x30` | `furnace_temperature` |
+| `0x8D` | `sample_temperature` | `0x32` | `furnace_power` |
+| `0x8E` | `dsc_signal` | `0x33` | `h_foil_temperature` |
+| `0x90` | `mass` | `0x34` | `uc_module` |
+| `0x9C` | `purge_flow_1` | `0x35` | `environmental_pressure` |
+| `0x9D` | `purge_flow_2` | `0x36`–`0x38` | `environmental_acceleration_x/y/z` |
+| `0x9E` | `protective_flow` | | |
+
+Channel presence varies by configuration: the 2022 fixture has all three MFC
+flow channels; the 2025 fixtures lack `0x9D` (`purge_flow_2`) — its flow
+setpoint metadata is then the only record of that flow.
+
+## Streams 4, 5, 6: modeled but not extracted
+
+`load_document` tokenizes these fully (dtypes `0x14`/`0x48` surface as raw
+bytes); no metadata or data is extracted from them yet. What they contain
+(see `FORMAT_FINDINGS.md` for the extraction backlog):
+
+- **stream_4** (~34 KB): end-of-run snapshot of the same table families as
+  stream 1 — measurement-end timestamp, run counter, acquisition PC FQDN.
+- **stream_5** (~12 KB): temperature-band residence histograms — furnace
+  usage/wear telemetry.
+- **stream_6** (~215–283 KB): two embedded Windows EMF vector images (the
+  Proteus plot previews) inside `0x10E4` byte arrays, plus 16-byte dtype-`0x48`
+  hash records with counts.
+
+## Corruption semantics and coverage
+
+Severity policy lives in the consumers, not the tokenizer:
+
+- **Data streams (2/3)**: any `malformed` or `truncated` span fails hard —
+  `build_dataframe` raises `NGBCorruptedFileError` before assembly, as do
+  data-before-header and segment-length mismatches.
+- **Metadata streams (1, 4–6)**: grammar violations log a warning and become
+  spans; extraction proceeds (every `FileMetadata` field is optional by
+  contract).
+- **Container integrity failures** (bad magic, broken directory,
+  non-contiguous sections, missing main section) raise
+  `NGBCorruptedFileError` regardless of stream.
+- **Resource limits** (`ParsingConfig`: `max_stream_size_mb` checked against
+  the ZIP member's declared size before decompression,
+  `max_array_size_mb` before array allocation, `max_tables_per_stream`)
+  raise `NGBResourceLimitError`.
+
+Corruption exceptions carry structured attributes (`stream`, `offset`,
+`table_index`, `declared`, `available` / `limit`) rather than encoding
+details in prose.
+
+To explore a file's structure, coverage, and unknown fields:
+
+```bash
+pyngb inspect file.ngb-ss3                # per-table listing
+pyngb inspect file.ngb-ss3 --coverage     # byte accounting: records vs spans
+pyngb inspect file.ngb-ss3 --unknown      # unmapped (category, field) census
+pyngb inspect a.ngb-ss3 b.ngb-ss3         # cross-file field comparison
+```
+
+`NGBDocument.unknown_fields()` gives the same unmapped-field census
+programmatically — it is the systematic to-do list for future extraction.
+
+## Column metadata
+
+Each data column in the output table carries metadata:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `units` | string | Measurement units |
-| `processing_history` | list[string] | Processing steps applied |
-| `baseline_subtracted` | bool | Whether baseline correction applied |
-| `source` | string | Data source identifier |
+| `units` | string | measurement units |
+| `processing_history` | list[string] | processing steps applied |
+| `source` | string | data source identifier |
+| `baseline_subtracted` | bool | mass/DSC only |
+| `calibration_applied` | bool | DSC only |
 
-## Parsing Algorithm
+## Discovery methodology
 
-### High-Level Algorithm
+This format was reverse-engineered by hex-dump analysis, cross-file
+comparison, and validation against instrument software output. The single
+most useful step was recognizing the uniform record grammar: once every byte
+is either a record or a classified span, unknown fields become an enumerable
+census instead of a search problem.
 
-```python
-def parse_ngb_file(file_path):
-    # 1. Open ZIP archive
-    with ZipFile(file_path) as zf:
-        # 2. Read stream files
-        streams = [zf.read(f"Streams/stream_{i}.table") for i in range(1, 4)]
+To validate parsing correctness: cross-check against NETZSCH software
+exports, check physical validity (temperature ranges, mass values), and
+compare across files (`pyngb inspect` multi-file mode diffs scalar fields
+across runs).
 
-        # 3. Parse binary streams
-        for stream in streams:
-            tables = split_tables(stream)  # Split on TABLE_SEPARATOR
-
-            for table in tables:
-                # 4. Extract data arrays
-                arrays = extract_data_arrays(table)
-
-                # 5. Parse metadata
-                metadata = extract_metadata(table)
-
-        # 6. Construct PyArrow table
-        return build_table(arrays, metadata)
-```
-
-### Table Splitting
-
-```python
-def split_tables(stream: bytes) -> list[bytes]:
-    """Split stream on TABLE_SEPARATOR markers."""
-    separator = b'\xFF\xFE\xFF\x04'
-    tables = stream.split(separator)
-    return [t for t in tables if t]  # Remove empty tables
-```
-
-### Data Extraction
-
-```python
-def extract_data_arrays(table: bytes) -> dict:
-    """Extract all data arrays from a table."""
-    arrays = {}
-    pos = 0
-
-    while (start_pos := table.find(START_DATA, pos)) != -1:
-        type_id = table[start_pos + 5]
-        count = int.from_bytes(table[start_pos+6:start_pos+10], 'little')
-
-        # Extract based on type
-        if type_id == 0x0B:  # float64[]
-            data_size = count * 8
-            data_start = start_pos + 10
-            values = struct.unpack(f'<{count}d',
-                                  table[data_start:data_start+data_size])
-            arrays[...] = values
-
-        pos = start_pos + 10 + data_size
-
-    return arrays
-```
-
-## Discovery Methodology
-
-This binary format was reverse-engineered using:
-
-1. **Hex Dump Analysis**: Manual inspection of files in hex editors
-2. **Pattern Recognition**: Identifying repeated byte sequences
-3. **Cross-File Comparison**: Comparing multiple NGB files
-4. **Trial and Error**: Testing different interpretations
-5. **Validation**: Checking parsed values against instrument software output
-
-### Key Insights
-
-- **ZIP Container**: Recognized standard ZIP signatures
-- **Marker Patterns**: Identified repeated sequences before data blocks
-- **Length Prefixes**: Common pattern in binary formats
-- **Little-Endian**: Standard for Windows-based instruments
-- **String Encodings**: Multiple formats found through trial-and-error
-
-## Limitations and Unknowns
-
-### Known Limitations
-
-1. **Version Compatibility**: Format may vary across NETZSCH software versions
-2. **Undocumented Fields**: Many byte sequences remain unidentified
-3. **Conditional Logic**: Some patterns appear only in specific configurations
-4. **Proprietary Extensions**: Vendor-specific features may exist
-
-### Unknowns
-
-- Complete list of all possible column hex IDs
-- All temperature program segment types
-- Meaning of some metadata fields
-- Versioning scheme (if any)
-
-## Validation Strategy
-
-To validate parsing correctness:
-
-1. **Cross-Check**: Compare with NETZSCH software export (CSV/text)
-2. **Physical Validity**: Check temperature ranges, mass values
-3. **Conservation**: Verify mass loss calculations
-4. **Metadata Consistency**: Check sample mass matches data
-5. **Multiple Files**: Test across different experiments/instruments
-
-## Contributing
+## Contributing format knowledge
 
 If you discover new patterns or corrections:
 
-1. Document the pattern with hex dumps
-2. Provide test files (if possible)
-3. Explain the discovery methodology
-4. Verify against multiple files
+1. Locate the field with `pyngb inspect --unknown` / `--values` and document
+   the `(category, field_id, dtype)` triple and observed values.
+2. Verify against multiple files (both vintages if possible).
+3. Provide test files if possible, and add the mapping to
+   `pyngb.format.maps` with a golden-test pin.
 
 ## References
 
-- NETZSCH Proteus software documentation (limited)
 - ZIP format specification (RFC 1951, RFC 1952)
 - IEEE 754 floating-point standard
 - UTF-8 and UTF-16LE encoding standards
+- MFC `CArchive` serialization format (the record grammar's ancestry)

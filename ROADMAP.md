@@ -34,11 +34,10 @@ class NGBDataSchema(BaseModel):
 ```python
 # For batch processing of multiple files
 import asyncio
-from pyngb import AsyncNGBParser
+from pyngb import read_ngb_async  # hypothetical
 
 async def process_many_files(files: list[str]):
-    parser = AsyncNGBParser()
-    tasks = [parser.parse_async(f) for f in files]
+    tasks = [read_ngb_async(f) for f in files]
     results = await asyncio.gather(*tasks)
     return results
 ```

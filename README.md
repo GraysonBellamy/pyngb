@@ -11,7 +11,7 @@ A high-performance Python library for parsing NETZSCH STA (Simultaneous Thermal 
 
 ## Features
 
-- **Fast Binary Parsing**: Optimized parsing with NumPy and PyArrow (typically well under a second per file)
+- **Strict Binary Parsing**: a record-grammar tokenizer parses every byte of the file — no pattern-match guessing (tens of milliseconds per file)
 - **Complete Metadata**: Extract instrument settings, sample info, and experimental conditions
 - **Baseline Correction**: Automatic baseline subtraction with validation
 - **DTG Analysis**: Derivative thermogravimetry calculation with smoothing options
@@ -58,10 +58,14 @@ The CLI is available as the `pyngb` console script (or equivalently `python -m p
 
 ```bash
 # Convert single file
-pyngb sample.ngb-ss3
+pyngb convert sample.ngb-ss3
 
 # Batch processing with baseline correction
-pyngb *.ngb-ss3 -b baseline.ngb-bs3 -f parquet -o ./processed/
+pyngb convert *.ngb-ss3 -b baseline.ngb-bs3 -f parquet -o ./processed/
+
+# Inspect file structure / run data-quality checks
+pyngb inspect sample.ngb-ss3
+pyngb validate sample.ngb-ss3
 
 # Get help
 pyngb --help

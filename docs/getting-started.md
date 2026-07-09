@@ -94,41 +94,54 @@ if "mass" in df.columns:
 
 pyngb includes a powerful CLI for batch processing and automation. It is
 installed as the `pyngb` console script; `python -m pyngb` is equivalent and
-used in the examples below.
+used in the examples below. The CLI is organized into three subcommands:
+`convert` (parse and export), `inspect` (show file structure), and
+`validate` (data-quality checks).
 
 ### Basic Usage
 
 ```bash
 # Convert single file to Parquet (default)
-python -m pyngb sample.ngb-ss3
+python -m pyngb convert sample.ngb-ss3
 
 # Convert to CSV
-python -m pyngb sample.ngb-ss3 --format csv
+python -m pyngb convert sample.ngb-ss3 --format csv
 
 # Convert to both formats
-python -m pyngb sample.ngb-ss3 --format both
+python -m pyngb convert sample.ngb-ss3 --format both
 
 # Specify output directory
-python -m pyngb sample.ngb-ss3 --output ./processed_data/
+python -m pyngb convert sample.ngb-ss3 --output ./processed_data/
 ```
 
 ### Batch Processing
 
 ```bash
 # Process all NGB files in current directory
-python -m pyngb *.ngb-ss3
+python -m pyngb convert *.ngb-ss3
 
 # Process files with verbose output
-python -m pyngb *.ngb-ss3 --verbose
+python -m pyngb convert *.ngb-ss3 --verbose
 
 # Process with custom output location
-python -m pyngb experiments/*.ngb-ss3 --output ./results/ --format both
+python -m pyngb convert experiments/*.ngb-ss3 --output ./results/ --format both
+```
+
+### Inspect and Validate
+
+```bash
+# Show a file's structure (tables, coverage, unknown fields)
+python -m pyngb inspect sample.ngb-ss3
+
+# Run data-quality checks
+python -m pyngb validate sample.ngb-ss3
 ```
 
 ### Get Help
 
 ```bash
-python -m pyngb --help
+python -m pyngb --help            # lists the subcommands
+python -m pyngb convert --help    # per-subcommand options
 ```
 
 ## Data Export Options

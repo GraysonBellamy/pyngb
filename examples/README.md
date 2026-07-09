@@ -46,9 +46,6 @@ python examples/basic_parsing.py
 
 # Batch processing example
 python examples/batch_processing.py --input-dir ./data/ --output-dir ./results/
-
-# Interactive notebook
-jupyter notebook examples/jupyter_notebook.ipynb
 ```
 
 ## Example Categories

@@ -5,6 +5,80 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - Unreleased
+
+The parsing backbone is rewritten from the ground up: per-field regex
+hunting over raw stream bytes is replaced by a strict record-grammar
+tokenizer and a queryable document layer. Every byte of every stream section
+is now either a decoded record or an explicitly classified span — nothing is
+silently skipped, and unknown fields are an enumerable census instead of a
+search problem. **Parsed output is byte-identical to 0.3.0 on all six test
+fixtures**, pinned by parity goldens with zero tolerances through both parse
+paths. The public API is redesigned around the new model; this is a breaking
+release with no compatibility shims. Breaking changes are marked
+**breaking**.
+
+### Added
+
+- `read_ngb_metadata(path, *, limits=None)`: the metadata-only fast path
+  (stream 1 only; replaces `NGBParser.parse_metadata`). Used by
+  `NGBDataset`/batch metadata operations.
+- Public document layer: `load_document(path, *, streams=None, limits=None)`
+  returns an `NGBDocument` — every table and field of every stream
+  (including the otherwise-unread streams 4–6) with query helpers
+  (`find`/`first`/`by_category`), byte-coverage accounting, and
+  `unknown_fields()`, the census of everything pyngb does not yet map.
+  `NGBDocument`, `Table`, and `Field` are exported from the package root.
+- `pyngb inspect FILE... [--stream N] [--values] [--unknown] [--coverage]
+  [--json]`: document structure, byte coverage, and unknown-field census;
+  with multiple files it cross-references scalar fields and reports
+  differences. `pyngb validate FILE... [--json]`: data-quality checks with
+  a non-zero exit code on invalid files.
+- `limits: ParsingConfig | None` keyword on `read_ngb`, `read_ngb_metadata`,
+  and `load_document` (replaces reaching `ParsingConfig` in through
+  `NGBParser`).
+- Container integrity checks: the section directory of every stream is
+  parsed and validated (entry framing, section contiguity, EOF closure,
+  main-section presence) before any content parsing; violations raise
+  `NGBCorruptedFileError`.
+- Structured attributes on corruption/limit exceptions
+  (`stream`, `offset`, `table_index`, `declared`, `available`, `limit`)
+  instead of prose-only messages.
+- All nine observed data types are decoded (u16, i32, f32, f64, u8/bytes,
+  packed-8, object-ref, string, hash-16); array element counts are validated
+  against declared sizes before allocation.
+
+### Changed
+
+- **breaking:** the CLI is subcommand-based. `pyngb convert FILE...` replaces
+  the bare `pyngb FILE...` invocation (all flags unchanged under `convert`);
+  `pyngb inspect` and `pyngb validate` are new. A bare `pyngb FILE...` is
+  now an error.
+- **breaking:** structural corruption in data streams (malformed or
+  truncated records) now always raises `NGBCorruptedFileError` before
+  channel assembly. Metadata-stream grammar violations warn and continue —
+  every `FileMetadata` field remains optional.
+- Performance on the largest fixture (398 KB, medians): full parse ~30 ms
+  (was ~30 ms), metadata-only ~18 ms (was ~12 ms) — within the review budget;
+  parity, not speed, was the goal of this release.
+
+### Removed
+
+- **breaking:** `NGBParser` and `PatternConfig`. Call sites become function
+  calls: `NGBParser().parse(path)` → `read_ngb(path, return_metadata=True)`,
+  `NGBParser().parse_metadata(path)` → `read_ngb_metadata(path)`.
+- **breaking:** the `pyngb.binary`, `pyngb.extractors`, and `pyngb.core`
+  subpackages and their contents (`BinaryParser`, `DataTypeRegistry` and all
+  data-type handlers, `MetadataExtractor`, `DataStreamProcessor`,
+  `StreamTables`), plus the marker/pattern constants (`BinaryMarkers`,
+  `StreamMarkers`, `DataType`, `DataTypeSizes`, `BinaryProcessing`,
+  `PatternOffsets`). The record grammar in `pyngb.format` is the single
+  extraction substrate.
+- **breaking:** the reverse-engineering helper scripts
+  (`ngb_deep_inspect.py`, `discover_patterns.py`,
+  `inspect_stream1_metadata.py`, `dump_masses.py`) — superseded by
+  `pyngb inspect` and the document layer.
+
 ## [0.3.0] - 2026-07-06
 
 A metadata-completeness release driven by a deep investigation of the NGB

@@ -1,12 +1,28 @@
 ---
-description: pyngb internal architecture — layered design, the binary parsing pipeline, table-builder pattern, and how NGB streams become Polars and PyArrow tables.
+description: pyngb internal architecture — the strictly layered format package, tokenizer-to-document pipeline, declarative extraction, and how NGB streams become Polars and PyArrow tables.
 ---
 
 # pyNGB Architecture
 
 ## Overview
 
-pyNGB uses a layered architecture with clear separation of concerns. The library is designed to parse proprietary NETZSCH STA (Simultaneous Thermal Analysis) NGB binary files and convert them into structured, analyzable data formats.
+pyNGB parses proprietary NETZSCH STA (Simultaneous Thermal Analysis) NGB
+binary files into structured, analyzable data. Since 0.4.0 the backbone is a
+**strict record-grammar tokenizer**: each stream is parsed once, in full, into
+a queryable document, and every extraction rule is a lookup over that document.
+
+Three invariants shape the design:
+
+1. **One grammar, one tokenizer — total.** Every byte of a stream section is
+   either a decoded record or an explicit, classified `UnknownSpan`; nothing
+   is silently skipped.
+2. **Severity policy lives in consumers, not the tokenizer.** Data streams
+   hard-error on malformed spans; metadata streams warn and proceed (every
+   metadata field is optional by contract).
+3. **Declarative format knowledge.** All byte constants live in one module
+   (`grammar`), all field mappings in another (`maps`); adding a metadata
+   field means adding a map entry or one plain function, never touching the
+   tokenizer.
 
 ## System Architecture
 
@@ -15,336 +31,226 @@ pyNGB uses a layered architecture with clear separation of concerns. The library
 ```mermaid
 graph TB
     subgraph "Public API Layer"
-        A[read_ngb]
-        B[CLI Interface]
+        A[read_ngb / read_ngb_metadata]
+        B[CLI: convert · inspect · validate]
         C[Batch Processing API]
+        L[load_document]
     end
 
-    subgraph "Core Layer"
-        D[NGBParser]
-        E[ExtractorManager]
+    subgraph "Extraction Layer"
+        E[extract.py — build_metadata]
+        F[channels.py — build_dataframe]
+        G[census.py — document_census]
     end
 
-    subgraph "Processing Layer"
-        F[Metadata Extractors]
-        G[Validation Module]
-        H[Baseline Subtraction]
-        I[Analysis Functions]
+    subgraph "Document Layer"
+        D[document.py — NGBDocument / Table / Field]
+        M[maps.py — declarative format knowledge]
     end
 
-    subgraph "Binary Layer"
-        J[BinaryParser]
-        K[DataTypeHandlers]
+    subgraph "Tokenizer Layer"
+        T[grammar.py — tokenize, decode]
     end
 
-    subgraph "Configuration"
-        N[ParsingConfig]
+    subgraph "Container Layer"
+        K[container.py — open_ngb, section directory]
     end
 
-    A --> D
+    A --> E
+    A --> F
     B --> A
+    B --> G
     C --> A
-    D --> E
-    D --> J
-    E --> F
-    J --> K
-    D --> N
+    L --> D
+    A --> L
+    E --> D
+    F --> D
+    G --> D
+    E --> M
+    F --> M
+    D --> T
+    T --> K
 ```
 
+The `pyngb.format` package is **strictly layered**: each module imports only
+from layers below it. `ParsingConfig` (resource limits) threads through every
+layer as the optional `limits=` argument.
+
+## The `pyngb.format` package
+
+| Module | Responsibility |
+|--------|----------------|
+| `container.py` | ZIP opening with error translation, pre-decompression `max_stream_size_mb` check, magic validation, section-directory parsing with hard integrity checks (contiguity, EOF, main section present). Returns `StreamData` per stream. |
+| `grammar.py` | Single source of byte-level truth: record header/END_FIELD constants, `DType`/`Mode` enums, `ITEM_SIZE`, string decoders, scalar/array decoding, and `tokenize()` — the strict linear walk emitting `FieldToken | UnknownSpan`. Never raises on corruption (only `NGBResourceLimitError` on oversized declared arrays). |
+| `document.py` | Assembles tokens into `Table` objects (category, type_ref, unique-keyed fields) and the queryable `NGBDocument` (`find`/`first`/`by_category`/`unknown_fields`/`defects`). `load_document()` is the public entry point. |
+| `maps.py` | ALL declarative format knowledge: `FIELD_MAP` (metadata key ↔ category/field), `CHANNEL_MAP`, type_ref constants, named field-id groups (PID, stages, calibration, MFC, …). Frozen module-level tables — source edits are the extension point. |
+| `extract.py` | `build_metadata(doc) -> FileMetadata`: applies `FIELD_MAP`, then eight plain extractor functions in a tuple, each wrapped in a warn-and-continue net. Adding one function to the tuple = adding an extraction domain. |
+| `channels.py` | `build_dataframe(doc) -> pl.DataFrame`: a type_ref state machine over streams 2/3 — channel header tables open channels, segment-value tables append data arrays. Gates hard on any malformed/truncated span in a data stream. |
+| `census.py` | `document_census(doc)`: per-stream record/span/coverage accounting and the unknown-field census; powers `pyngb inspect` and the structural test goldens. |
+
+See [Binary Format](binary-format.md) for the grammar itself, the table
+object model, and the field catalog that `maps.py` mirrors.
+
 ## Data Flow
-
-### File Parsing Pipeline
-
-1. **Input**: NGB file (ZIP archive containing binary streams)
-2. **Extraction**: Unzip and read binary streams
-3. **Binary Parsing**: Convert binary data to structured values
-4. **Metadata Extraction**: Parse file and column metadata from streams
-5. **Table Construction**: Build PyArrow Table with data and metadata
-6. **Validation** (optional): Quality checks on parsed data
-7. **Output**: PyArrow Table with embedded metadata
-
-### Detailed Flow
 
 ```mermaid
 sequenceDiagram
     participant User
     participant read_ngb
-    participant NGBParser
-    participant BinaryParser
-    participant Extractors
-    participant Validators
+    participant container as open_ngb
+    participant tokenizer as tokenize
+    participant document as NGBDocument
+    participant extract as build_metadata
+    participant channels as build_dataframe
 
     User->>read_ngb: read_ngb("file.ngb-ss3")
-    read_ngb->>NGBParser: parse()
-    NGBParser->>NGBParser: Open ZIP archive
-    NGBParser->>BinaryParser: Parse streams
-    BinaryParser-->>NGBParser: Raw data tables
-    NGBParser->>Extractors: Extract metadata
-    Extractors-->>NGBParser: Metadata dict
-    NGBParser->>NGBParser: Build PyArrow Table
-    NGBParser-->>read_ngb: Table + Metadata
-    read_ngb->>Validators: validate (optional)
-    Validators-->>read_ngb: ValidationResult
-    read_ngb-->>User: PyArrow Table
+    read_ngb->>container: streams 1,2,3 (retry 1,2 if 3 absent)
+    container-->>read_ngb: StreamData (validated sections)
+    read_ngb->>tokenizer: each main section
+    tokenizer-->>document: FieldTokens + UnknownSpans
+    document-->>read_ngb: NGBDocument
+    read_ngb->>extract: build_metadata(doc)
+    extract-->>read_ngb: FileMetadata
+    read_ngb->>channels: build_dataframe(doc)
+    channels-->>read_ngb: Polars DataFrame
+    read_ngb-->>User: PyArrow Table (+ metadata)
 ```
 
-## Module Organization
-
-### Core Modules
-
-#### `pyngb.core.parser` - NGBParser
-**Responsibility**: Main orchestrator for file parsing
-- Opens and validates NGB ZIP archives
-- Coordinates binary parsing and metadata extraction
-- Constructs final PyArrow tables
-
-**Key Classes**:
-- `NGBParser`: Main parsing class
-
-#### `pyngb.binary.parser` - BinaryParser
-**Responsibility**: Low-level binary data parsing
-- Pattern matching for binary markers
-- Type-specific data extraction
-- String encoding/decoding (UTF-8, UTF-16LE)
-
-**Key Classes**:
-- `BinaryParser`: Binary stream parser
-- `DataTypeRegistry`: Handler registration and dispatch
-
-#### `pyngb.binary.handlers` - DataTypeHandlers
-**Responsibility**: Type-specific binary parsing
-- Float64/Float32 array parsing
-- String extraction and decoding
-- Extensible handler protocol
-
-**Key Classes**:
-- `Float64Handler`
-- `Float32Handler`
-- `DataTypeHandlerProtocol`
-
-### Processing Modules
-
-#### `pyngb.extractors` - Metadata Extractors
-**Responsibility**: Domain-specific metadata extraction
-- File-level metadata (instrument, sample info)
-- Column-level metadata (units, processing history)
-- Calibration constants
-- Temperature programs
-
-**Key Classes**:
-- `FileMetadataExtractor`
-- `ColumnMetadataExtractor`
-- `CalibrationExtractor`
-- `TemperatureProgramExtractor`
-
-#### `pyngb.validation` - Data Validation
-**Responsibility**: Quality assurance for parsed data
-- Structural validation (required columns, data types)
-- Physical validity (temperature ranges, mass values)
-- Statistical outlier detection
-- Metadata consistency checks
-
-**Key Classes**:
-- `QualityChecker`: Orchestrates all validators
-- `StructureValidator`
-- `TemperatureValidator`
-- `MassValidator`
-- `DSCValidator`
-- `ValidationResult`: Stores findings
-
-#### `pyngb.baseline` - Baseline Subtraction
-**Responsibility**: Baseline correction for thermal analysis
-- Dynamic segment alignment
-- Interpolation and subtraction
-- Temperature program validation
-
-**Key Classes**:
-- `BaselineSubtractor` (used by `read_ngb(path, baseline_file=...)`)
-
-#### `pyngb.analysis` - Analysis Functions
-**Responsibility**: Derived quantities and transformations
-- DTG (derivative thermogravimetry) calculation
-- Mass normalization
-- DSC calibration application
-
-**Key Functions**:
-- `dtg()`: Savitzky-Golay based DTG
-- `dtg_custom()`: Custom DTG parameters
-- `add_dtg()`: Add DTG column to table
-- `normalize_to_initial_mass()`: Percentage mass normalization
-
-### API Modules
-
-#### `pyngb.api.loaders` - Data Loading
-**Responsibility**: High-level data loading interface
-- `read_ngb()`: Main entry point for file reading
-- Baseline subtraction integration
-- Metadata return options
-
-#### `pyngb.api.cli` - Command Line Interface
-**Responsibility**: CLI for file conversion
-- Argument parsing and validation
-- Output format selection (Parquet, CSV)
-- Batch file processing
-
-#### `pyngb.batch` - Batch Processing
-**Responsibility**: Multi-file processing
-- Parallel processing with worker pools
-- Progress tracking and error handling
-- Dataset aggregation and export
-
-**Key Classes**:
-- `BatchProcessor`: Parallel file processing
-- `NGBDataset`: Dataset management and analysis
-
-### Configuration
-
-#### `pyngb.config` - Configuration Management
-**Responsibility**: Parsing resource limits (stream size, table count, array size)
-
-**Key Classes**:
-- `ParsingConfig`: Binary parsing settings, accepted by `NGBParser`
+- `read_ngb` loads streams 1–3 (stream 3 optional), attaches column metadata
+  and the BLAKE2b `file_hash`, and optionally performs baseline subtraction.
+- `read_ngb_metadata` is the fast path: stream 1 only, same
+  `build_metadata`, no data assembly. A parity test guarantees the two paths
+  never drift.
+- `load_document` exposes the document layer itself — any stream, including
+  the unextracted 4–6 — for programmatic exploration.
 
 ## Key Design Decisions
 
+### Why a tokenizer instead of pattern matching?
+
+Earlier versions hunted per-field byte patterns over concatenated stream
+bytes. That carried a structural false-match risk (a pattern can match inside
+an unrelated array payload) and could not enumerate what it *didn't* know.
+The tokenizer inverts this: parse everything once, strictly, then extract by
+keyed lookup. Unknown fields become a census (`NGBDocument.unknown_fields()`,
+`pyngb inspect --unknown`) instead of a search problem, and format drift
+fails loudly in the structural test suite.
+
 ### Why PyArrow + Polars?
 
-**PyArrow**:
-- Zero-copy interop with other Arrow-based tools
-- Efficient Parquet I/O for large datasets
-- Schema metadata embedding
-- Column-level metadata support
+**PyArrow**: zero-copy interop with Arrow-based tools, efficient Parquet
+I/O, schema-level and column-level metadata embedding.
 
-**Polars**:
-- Fast DataFrame operations (Rust-based)
-- Lazy evaluation for query optimization
-- Better memory efficiency than Pandas
-- Native Arrow support
+**Polars**: fast Rust-based DataFrame assembly during parsing, native Arrow
+interchange.
 
-### Why Extractors Pattern?
+### Why frozen dataclasses and NamedTuples for the model?
 
-**Benefits**:
-- **Single Responsibility**: Each extractor handles one metadata domain
-- **Testability**: Extractors can be tested in isolation
-- **Extensibility**: New extractors can be added without modifying core
-- **Maintainability**: Smaller, focused classes are easier to understand
+`StreamData`, `Table`, `NGBDocument` are frozen dataclasses; `FieldToken`,
+`UnknownSpan`, `Field`, `MetaField` are NamedTuples. The document is an
+immutable snapshot of the file — extraction cannot accidentally mutate it,
+and instances are safe to share across the metadata and data paths.
 
-**Tradeoffs**:
-- More files to manage
-- Slight overhead from composition
-- Need for careful interface design
-
-### Why Frozen Dataclasses for Config?
-
-**Benefits**:
-- Immutability prevents accidental modification
-- Type safety with automatic validation
-- Clear configuration structure
-- Easy to serialize/deserialize
-
-**Implementation**:
 ```python
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ParsingConfig:
     max_stream_size_mb: int = 1000
+    max_tables_per_stream: int = 10000
     max_array_size_mb: int = 500
-
-    def __post_init__(self) -> None:
-        if self.max_stream_size_mb <= 0:
-            raise ValueError("max_stream_size_mb must be positive")
 ```
 
-### Why Validator Composition?
+### Why validator composition?
 
-**Before (Monolithic)**:
-```python
-class QualityChecker:
-    def full_validation(self):
-        self._check_structure()      # 50 lines
-        self._check_temperature()    # 80 lines
-        self._check_mass()           # 100 lines
-        # ... 10 more methods
-```
-
-**After (Composition)**:
-```python
-class QualityChecker:
-    def full_validation(self):
-        StructureValidator(df).validate(result)
-        TemperatureValidator(df).validate(result)
-        MassValidator(df, metadata).validate(result)
-        # ... compose validators
-```
-
-**Benefits**:
-- Each validator is independently testable
-- Easier to add/remove validation checks
-- Clear separation of concerns
-- Validators can be reused in different contexts
+`QualityChecker` composes independent validators (`StructureValidator`,
+`TemperatureValidator`, `MassValidator`, `DSCValidator`) into one
+`ValidationResult` — each independently testable, easy to add or remove, and
+a validator crash becomes a finding rather than aborting the run.
 
 ## Performance Considerations
 
-### Memory Efficiency
-- Use memory-mapped files for large arrays
-- Stream-based ZIP reading
-- Lazy DataFrame evaluation where possible
-- Configurable memory limits
-
 ### Parsing Speed
-- Compiled regex patterns (cached)
-- Vectorized operations with NumPy
-- Parallel batch processing
-- Minimal data copying
+
+- Tokenizer: memoryview-based linear walk, precompiled `struct.Struct`
+  unpackers bound to locals, `bytes.find` resync, END_FIELD verified at the
+  count-computed position (no scanning).
+- Arrays decode via `np.frombuffer` and are **lazy**: `Field.array()`
+  decodes on demand, uncached — channel assembly consumes each array exactly
+  once.
+- The metadata-only path never tokenizes data streams; `read_ngb` never
+  loads streams 4–6.
 
 ### Benchmarks
-Typical performance on modern hardware:
-- Single file parsing: tens of milliseconds (~20 ms for a 400 KB file)
+
+Typical performance on modern hardware (398 KB fixture, medians):
+
+- `read_ngb`: ~30 ms; `read_ngb_metadata`: ~18 ms
 - Batch processing: dozens of files/second, scaling with worker count
-- DTG calculation: ~50ms (10,000 points)
-- Full validation: ~100ms (typical dataset)
+- DTG calculation: ~50 ms (10,000 points); full validation: ~100 ms
+
+Run `uv run python scripts/benchmarks.py` for current numbers.
+
+### Memory Efficiency
+
+- Declared ZIP-member sizes checked **before** decompression
+  (decompression-bomb guard); declared array sizes checked before allocation.
+- Zero-copy memoryview slices from stream blob to field payload.
 
 ## Error Handling Strategy
 
 ### Exception Hierarchy
+
 ```
 NGBParseError (base)
-├── NGBCorruptedFileError
-├── NGBDataTypeError
-├── NGBStreamNotFoundError
-└── NGBResourceLimitError
+├── NGBCorruptedFileError    # container integrity, data-stream grammar
+│                            # violations, channel-assembly mismatches
+├── NGBStreamNotFoundError   # required stream missing from the archive
+├── NGBResourceLimitError    # ParsingConfig limit exceeded (pre-allocation)
+└── NGBDataTypeError         # unknown/invalid data type
 ```
 
-### Error Recovery
-- Batch processing continues on individual file errors
-- Validation warnings don't stop processing
-- Graceful degradation for missing metadata
-- Clear error messages with context
+`NGBCorruptedFileError` carries structured attributes (`stream`, `offset`,
+`table_index`, `declared`, `available`); `NGBResourceLimitError` carries
+(`stream`, `offset`, `declared`, `limit`). Tests and callers assert on
+types and attributes, not message prose.
+
+### Severity policy
+
+- Streams 2/3 (data): malformed or truncated spans are fatal
+  (`NGBCorruptedFileError`) — silently wrong columns are worse than no
+  columns.
+- Stream 1 (metadata): grammar violations warn and extraction continues;
+  each extractor is individually wrapped so one failure cannot take down the
+  rest.
+- Batch processing isolates per-file errors; validation findings never stop
+  processing.
 
 ## Testing Strategy
 
-### Test Categories
-1. **Unit Tests**: Individual function/class testing
-2. **Integration Tests**: Full parsing pipeline
-3. **Property-Based Tests**: Hypothesis-driven edge cases
-4. **Performance Tests**: Regression detection
-5. **Stress Tests**: Large files, concurrent access
+1. **Parity goldens**: full metadata + per-column hashes for all six real
+   fixtures, pinned with zero tolerances, asserted through both parse paths.
+2. **Structural tests**: byte-coverage accounting (every gap byte
+   classified), dtype/census goldens, unknown-field census as a format-drift
+   tripwire.
+3. **Builder-based unit tests**: `tests/support/ngb_builder.py` constructs
+   valid NGB bytes; a duality property (`tokenize(build(x)) == x`) keeps the
+   builder honest against the real grammar.
+4. **Corruption matrix**: truncations, count overruns, directory corruption,
+   oversized declarations — each asserting exception type + attributes.
+5. **Property-based tests**: round-trips (bitwise float equality) and
+   random/mutation fuzzing (any outcome other than a result or
+   `NGBParseError` is a bug).
+6. **Performance gates**: parse-time ceilings in `test_performance.py`.
 
-### Test Coverage
-- Target: >90% code coverage
-- Critical paths: 100% coverage
-- Edge cases: Property-based tests
-- Performance: Benchmark suite
+Coverage gate: ≥86% (currently ~92%). See
+[tests/README.md](https://github.com/GraysonBellamy/pyngb/blob/main/tests/README.md).
 
 ## Future Considerations
 
-### Potential Enhancements
-- Streaming API for very large files
-- Incremental parsing for live data
-- Plugin system for custom extractors
-- SQL query interface via DuckDB
-- Cloud storage integration (S3, GCS)
+The document layer is the extension mechanism. Planned directions
+(tracked in `FORMAT_FINDINGS.md`):
 
-### Scalability
-- Current: Single machine, multi-core
-- Future: Distributed processing (Dask, Ray)
-- Database: Direct export to analytical databases
+- Extraction from streams 4–6 (end-of-run snapshot, furnace telemetry,
+  embedded EMF plot previews) — each is one function added to
+  `extract.py`'s tuple or one API function over the document.
+- DSC sensitivity fixpoints, consumables catalog, session identity.
+- Baseline auto-discovery via the extracted `correction_file_path`.

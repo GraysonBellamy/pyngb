@@ -249,36 +249,40 @@ if "sample_temperature" in df.columns:
 
 ```bash
 # Convert single file to Parquet
-python -m pyngb sample.ngb-ss3
+python -m pyngb convert sample.ngb-ss3
 
 # Convert to CSV
-python -m pyngb sample.ngb-ss3 --format csv
+python -m pyngb convert sample.ngb-ss3 --format csv
 
 # Convert to both formats
-python -m pyngb sample.ngb-ss3 --format both
+python -m pyngb convert sample.ngb-ss3 --format both
 ```
 
 ### Batch Processing with CLI
 
 ```bash
 # Process all files in directory
-python -m pyngb *.ngb-ss3 --output ./processed/
+python -m pyngb convert *.ngb-ss3 --output ./processed/
 
 # With baseline correction
-python -m pyngb *.ngb-ss3 --baseline baseline.ngb-bs3 --output ./corrected/
+python -m pyngb convert *.ngb-ss3 --baseline baseline.ngb-bs3 --output ./corrected/
 
 # Verbose output
-python -m pyngb *.ngb-ss3 --verbose --format parquet
+python -m pyngb convert *.ngb-ss3 --verbose --format parquet
 ```
 
 ### Advanced CLI Options
 
 ```bash
 # Custom dynamic axis for baseline subtraction
-python -m pyngb sample.ngb-ss3 --baseline baseline.ngb-bs3 --dynamic-axis time
+python -m pyngb convert sample.ngb-ss3 --baseline baseline.ngb-bs3 --dynamic-axis time
 
 # Specific output directory with both formats
-python -m pyngb experiments/*.ngb-ss3 --format both --output ./results/
+python -m pyngb convert experiments/*.ngb-ss3 --format both --output ./results/
+
+# Inspect file structure / run quality checks
+python -m pyngb inspect sample.ngb-ss3
+python -m pyngb validate sample.ngb-ss3
 ```
 
 ## Performance Tips
@@ -315,16 +319,16 @@ temp_array = temperature_col.to_numpy()
 ## Error Handling
 
 ```python
-from pyngb.exceptions import NGBParsingError, ValidationError
+from pyngb import read_ngb, NGBParseError, NGBCorruptedFileError
 
 try:
     table = read_ngb("sample.ngb-ss3")
-except NGBParsingError as e:
-    print(f"Parsing failed: {e}")
 except FileNotFoundError:
     print("File not found")
-except ValidationError as e:
-    print(f"Data validation failed: {e}")
+except NGBCorruptedFileError as e:
+    print(f"Corrupted file (stream={e.stream}, offset={e.offset}): {e}")
+except NGBParseError as e:
+    print(f"Parsing failed: {e}")
 ```
 
 ## Next Steps

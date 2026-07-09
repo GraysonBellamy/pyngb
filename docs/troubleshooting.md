@@ -371,8 +371,8 @@ python -c "import pyngb; print(f'pyngb {pyngb.__version__} installed')"
 # Check CLI module
 python -c "import pyngb.__main__; print('CLI module available')"
 
-# Use full module path if needed
-python -m pyngb.api.loaders sample.ngb-ss3
+# Remember the subcommand — 'pyngb FILE' without one is an error
+python -m pyngb convert sample.ngb-ss3
 
 # Alternative: use function directly
 python -c "
@@ -398,7 +398,7 @@ mkdir -p ./output/
 chmod 755 ./output/
 
 # Use different output location
-python -m pyngb sample.ngb-ss3 -o ~/Documents/ngb_output/
+python -m pyngb convert sample.ngb-ss3 -o ~/Documents/ngb_output/
 
 # Check disk space
 df -h .

@@ -26,8 +26,8 @@ non-record forms observed in real files are classified spans:
   semantically decoded.
 - ``table_trailer``: the 3-byte ``00 03 00`` sequence closing each table.
 - ``bare_record``: a table trailer followed by a fixed-size scalar record
-  that carries NO END_FIELD terminator (observed only in the 2022-vintage
-  fixture, field ids 0x0FDE/0x1165).
+  that carries NO END_FIELD terminator (present in both vintages, 11 per
+  fixture; field ids 0x0FDE/0x1165).
 - ``malformed``: anything else — grammar violation, resynced past.
 - ``truncated``: an array whose declared extent overruns the section; the
   walk stops there because a broken length forfeits resync trust.

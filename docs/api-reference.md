@@ -1,12 +1,14 @@
 ---
-description: Complete API reference for pyngb — read_ngb, NGBParser, BatchProcessor, configuration classes, and utilities for parsing NETZSCH STA NGB files.
+description: Complete API reference for pyngb — read_ngb, read_ngb_metadata, the document layer, BatchProcessor, the CLI subcommands, and utilities for parsing NETZSCH STA NGB files.
 ---
 
 # API Reference
 
-Complete reference for all pyngb functions and classes.
+Complete reference for all pyngb functions and classes. Everything documented
+here is importable from the package root (`from pyngb import ...`) unless
+noted otherwise.
 
-## Core Functions
+## Loading Functions
 
 ### read_ngb()
 
@@ -14,25 +16,34 @@ Main function for loading NGB files with optional baseline subtraction.
 
 ```python
 def read_ngb(
-    path: str,
+    path: str | Path,
     *,
     return_metadata: bool = False,
-    baseline_file: str | None = None,
+    baseline_file: str | Path | None = None,
     dynamic_axis: str = "sample_temperature",
-) -> Union[pa.Table, tuple[FileMetadata, pa.Table]]
+    limits: ParsingConfig | None = None,
+) -> pa.Table | tuple[FileMetadata, pa.Table]
 ```
 
 **Parameters:**
-- `path` (str): Path to NGB file (.ngb-ss3 or similar)
-- `return_metadata` (bool, default False): If True, return (metadata, table) tuple
-- `baseline_file` (str, optional): Path to baseline file for subtraction
-- `dynamic_axis` (str, default "sample_temperature"): Axis for dynamic segment alignment
 
-**Returns:**
-- `pa.Table`: PyArrow table with embedded metadata (default)
-- `tuple[dict, pa.Table]`: Metadata and table tuple (if return_metadata=True)
+- `path`: Path to NGB file (`.ngb-ss3` or `.ngb-bs3`)
+- `return_metadata`: If True, return a `(metadata, table)` tuple instead of a
+  table with embedded metadata
+- `baseline_file`: Path to a baseline (`.ngb-bs3`) file; when given, mass and
+  DSC columns are baseline-subtracted and marked in column metadata
+- `dynamic_axis`: Axis for dynamic-segment alignment during baseline
+  subtraction — `"time"`, `"sample_temperature"`, or `"furnace_temperature"`
+- `limits`: Optional `ParsingConfig` overriding the default resource limits
 
-**Examples:**
+**Returns:** a PyArrow table with metadata embedded in the schema (default),
+or `(FileMetadata, pa.Table)` when `return_metadata=True`. The metadata
+includes a BLAKE2b `file_hash` of the source file.
+
+**Raises:** `ValueError` (bad `dynamic_axis`), `FileNotFoundError`,
+`zipfile.BadZipFile`, `NGBStreamNotFoundError` (streams 1/2 required; 3
+optional), `NGBCorruptedFileError`, `NGBResourceLimitError`.
+
 ```python
 # Basic loading
 table = read_ngb("sample.ngb-ss3")
@@ -44,11 +55,96 @@ metadata, table = read_ngb("sample.ngb-ss3", return_metadata=True)
 corrected = read_ngb("sample.ngb-ss3", baseline_file="baseline.ngb-bs3")
 ```
 
+### read_ngb_metadata()
+
+Metadata-only fast path: reads and extracts stream 1 only (roughly half the
+time of a full parse; no data assembly, no `file_hash`).
+
+```python
+def read_ngb_metadata(
+    path: str | Path,
+    *,
+    limits: ParsingConfig | None = None,
+) -> FileMetadata
+```
+
+A parity test guarantees this never drifts from the metadata returned by
+`read_ngb(..., return_metadata=True)` (apart from `file_hash`).
+
+```python
+meta = read_ngb_metadata("sample.ngb-ss3")
+print(meta["sample_name"], meta["sample_mass"])
+```
+
+## Document Layer
+
+For programmatic exploration below the metadata/data level — every table and
+field of every stream, including the streams `read_ngb` does not consume.
+See [Binary Format](binary-format.md) for the underlying model.
+
+### load_document()
+
+```python
+def load_document(
+    path: str | Path,
+    *,
+    streams: Iterable[int] | None = None,   # default: all streams present
+    limits: ParsingConfig | None = None,
+) -> NGBDocument
+```
+
+### NGBDocument
+
+Immutable snapshot of a parsed file.
+
+**Attributes:** `streams` (raw `StreamData` per stream), `tables`
+(`dict[int, tuple[Table, ...]]`), `spans` (unknown spans per stream),
+`orphans` (fields outside any table).
+
+**Methods:**
+
+- `tables_of(stream_id) -> tuple[Table, ...]`
+- `by_category(stream_id, category) -> Iterator[Table]`
+- `find(stream_id, *, category=None, type_ref=None, with_fields=()) -> Iterator[Table]`
+- `first(stream_id, *, category=None, type_ref=None, with_fields=()) -> Table | None`
+- `has_defect(stream_id) -> bool` / `defects(stream_id) -> list[UnknownSpan]` —
+  malformed/truncated spans
+- `unknown_fields() -> dict[int, list[tuple[int, int, int]]]` — the
+  `(category, field_id, dtype)` triples not yet mapped by pyngb, per stream
+
+### Table
+
+One serialized object: `stream_id`, `index` (position in stream order —
+semantically meaningful), `category`, `type_ref`, `class_name`,
+`fields: dict[int, Field]`, `preamble`, `span`.
+
+**Methods:** `get(field_id) -> Field | None`, `value(field_id)`,
+`has_fields(*field_ids) -> bool`, `strings() -> list[str]`.
+
+### Field
+
+One record: `field_id`, `dtype`, `mode`, `value` (eagerly decoded scalar),
+`element_count`, `raw` (zero-copy payload view), `span`. Arrays decode
+lazily via `.array()` (f64 NumPy array, or `bytes` for dtype-`0x10`).
+
+```python
+from pyngb import load_document
+
+doc = load_document("sample.ngb-ss3")
+
+# Read the sample name straight off the document (category 0x7530, field 0x0840)
+sample_table = doc.first(1, category=0x7530, with_fields=(0x0840,))
+print(sample_table.value(0x0840))
+
+# What hasn't pyngb mapped yet?
+print(doc.unknown_fields()[1][:10])
+```
+
 ## Analysis Functions
 
 ### add_dtg()
 
-Add DTG column to PyArrow table.
+Add a DTG (derivative thermogravimetry) column to a PyArrow table.
 
 ```python
 def add_dtg(
@@ -60,44 +156,29 @@ def add_dtg(
 ```
 
 **Parameters:**
-- `table` (pa.Table): Table with 'time' and 'mass' columns
-- `method` (str): "savgol" or "gradient"
-- `smooth` (str): "strict", "medium", or "loose"
-- `column_name` (str): Name for DTG column
 
-**Returns:**
-- `pa.Table`: Table with added DTG column
+- `table`: Table with `time` and `mass` columns
+- `method`: `"savgol"` or `"gradient"`
+- `smooth`: `"strict"`, `"medium"`, or `"loose"`
+- `column_name`: Name for the DTG column
 
-### dtg()
+### dtg() / dtg_custom() / calculate_table_dtg()
 
-Calculate derivative thermogravimetry values.
+Array-level DTG calculation (mg/min):
 
 ```python
-def dtg(
-    time: np.ndarray,
-    mass: np.ndarray,
-    method: str = "savgol",
-    smooth: str = "medium",
-) -> np.ndarray
+def dtg(time: np.ndarray, mass: np.ndarray,
+        method: str = "savgol", smooth: str = "medium") -> np.ndarray
+
+def calculate_table_dtg(table: pa.Table,
+                        method: str = "savgol", smooth: str = "medium") -> np.ndarray
 ```
 
-**Parameters:**
-- `time` (np.ndarray): Time values
-- `mass` (np.ndarray): Mass values
-- `method` (str): Calculation method
-- `smooth` (str): Smoothing level
-
-**Returns:**
-- `np.ndarray`: DTG values in mg/min
-
-**Smoothing Options:**
-- `"strict"`: Minimal smoothing, preserves all features
-- `"medium"`: Balanced smoothing (recommended)
-- `"loose"`: Heavy smoothing for noisy data
+**Smoothing options:** `"strict"` (minimal, preserves all features),
+`"medium"` (balanced, recommended), `"loose"` (heavy, for noisy data).
+`dtg_custom()` accepts explicit Savitzky-Golay window/polyorder parameters.
 
 ### normalize_to_initial_mass()
-
-Normalize data columns to initial sample mass.
 
 ```python
 def normalize_to_initial_mass(
@@ -106,16 +187,15 @@ def normalize_to_initial_mass(
 ) -> pa.Table
 ```
 
-**Parameters:**
-- `table` (pa.Table): Table with embedded metadata
-- `columns` (list[str], optional): Columns to normalize (default: `["mass", "dsc_signal"]` where present)
-
-**Returns:**
-- `pa.Table`: New table with the specified columns normalized in place (divided by the initial sample mass), units updated (e.g. "mg" → "mg/mg"), and "normalized" appended to their processing history
+Divides the given columns (default: `["mass", "dsc_signal"]` where present)
+by the initial sample mass from the embedded metadata, **in place** — the
+column names do not change; units gain a `/mg` suffix and `"normalized"` is
+appended to their processing history.
 
 ### apply_dsc_calibration()
 
-Convert the DSC signal from µV to mW using the calibration constants embedded in the file metadata.
+Convert the DSC signal from µV to mW using the calibration constants
+(`p0`–`p5`) embedded in the file metadata.
 
 ```python
 def apply_dsc_calibration(
@@ -125,131 +205,131 @@ def apply_dsc_calibration(
 ) -> pa.Table
 ```
 
-**Parameters:**
-- `table` (pa.Table): Table with embedded metadata containing calibration constants (p0–p5)
-- `temperature_column` (str): Temperature column used to evaluate the calibration polynomial
-- `dsc_column` (str): DSC signal column to calibrate
+Samples whose temperature falls outside the calibration's valid range
+(vanishing sensitivity) are set to NaN with a logged warning. Calling it
+twice raises `ValueError`.
 
-**Returns:**
-- `pa.Table`: New table with the DSC column converted to mW, units updated, and `calibration_applied` recorded in the column metadata
+## Column Metadata Helpers
 
-Samples whose temperature falls outside the calibration's valid range (vanishing sensitivity) are set to NaN with a logged warning. Calling it twice raises `ValueError`.
+Column-level metadata (units, processing history, baseline status) is
+embedded in the Arrow schema; these helpers read and write it:
+
+```python
+get_column_units(table, column) -> str | None
+set_column_units(table, column, units) -> pa.Table
+get_column_baseline_status(table, column) -> bool | None
+mark_baseline_corrected(table, columns) -> pa.Table
+inspect_column_metadata(table, column) -> dict
+```
 
 ## Batch Processing
 
 ### BatchProcessor
 
-High-performance batch processing for multiple files.
+Parallel multi-file processing on a process pool.
 
 ```python
 class BatchProcessor:
     def __init__(self, max_workers: int | None = None, verbose: bool = True)
+
+    def process_files(self, files, output_format="parquet",
+                      output_dir=None, skip_errors=True) -> list[BatchResult]
+
+    def process_directory(self, directory, pattern="*.ngb-ss3",
+                          output_format="parquet", output_dir=None,
+                          skip_errors=True) -> list[BatchResult]
 ```
 
-**Parameters:**
-- `max_workers` (int, optional): Number of parallel processes (default: CPU count)
-- `verbose` (bool): Show progress information
+`output_format` is `"parquet"`, `"csv"`, or `"both"`. With
+`skip_errors=True` (default), per-file failures are recorded and processing
+continues; results are returned in input order.
 
-#### process_files()
+Module-level wrappers `process_files(...)` and `process_directory(...)`
+cover the common case without instantiating the class.
 
-Process multiple NGB files in parallel.
+### BatchResult
+
+Per-file outcome TypedDict: `file`, `status` (`"success"`/`"error"`),
+`rows`, `columns`, `sample_name`, `processing_time`, `error`.
+
+### NGBDataset
+
+Metadata-level view over a file collection (uses `read_ngb_metadata`, so no
+data parsing):
 
 ```python
-def process_files(
-    self,
-    files: list[str | Path],
-    output_format: str = "parquet",
-    output_dir: str | Path | None = None,
-    skip_errors: bool = True,
-) -> list[BatchResult]
+dataset = NGBDataset.from_directory("./data/")
+dataset.summary()                       # aggregate stats
+dataset.export_metadata("meta.csv")     # csv / json / parquet
+subset = dataset.filter_by_metadata(lambda m: m.get("operator") == "GB")
 ```
 
-**Parameters:**
-- `files` (list[str | Path]): List of file paths to process
-- `output_format` (str): "parquet", "csv", or "both"
-- `output_dir` (str | Path, optional): Output directory
-- `skip_errors` (bool): Continue processing if errors occur
-
-**Returns:**
-- `list[BatchResult]`: Processing results with status and metadata
-
-#### process_directory()
-
-Process all NGB files in a directory.
+## Validation
 
 ```python
-def process_directory(
-    self,
-    directory: str | Path,
-    pattern: str = "*.ngb-ss3",
-    output_format: str = "parquet",
-    output_dir: str | Path | None = None,
-    skip_errors: bool = True,
-) -> list[BatchResult]
+validate_sta_data(table) -> list[str]        # quick issue list
+checker = QualityChecker(table)
+result = checker.full_validation()           # -> ValidationResult
+result.is_valid, result.summary()
 ```
 
-**Parameters:**
-- `directory` (str | Path): Directory containing NGB files
-- `pattern` (str): File pattern to match
-- `output_format` (str): "parquet", "csv", or "both"
-- `output_dir` (str | Path, optional): Output directory
-- `skip_errors` (bool): Error handling mode
+`QualityChecker` composes structural, temperature, mass, and DSC validators;
+degenerate data produces findings, not exceptions.
+
+## Baseline Subtraction
+
+The public path is `read_ngb(path, baseline_file=...)` (see above), which
+also tags column metadata. `BaselineSubtractor` is exported for advanced use
+on already-parsed data: dynamic segments are aligned per temperature-program
+stage on the chosen `dynamic_axis`; isothermal segments subtract on time.
 
 ## Data Structures
 
 ### FileMetadata
 
-Dictionary containing extracted metadata from NGB files.
+TypedDict of everything extracted from stream 1. All fields are optional —
+absence means the file didn't carry it. Keys:
 
-**Common Fields:**
-- `sample_name` (str): Sample identifier
-- `sample_mass` (float): Initial sample mass in mg
-- `instrument` (str): Instrument model/name
-- `operator` (str): Operator name
-- `measurement_date` (str): Date of measurement
-- `temperature_program` (dict): Complete temperature program with stage durations in seconds
-- `crucible_type` (str): Crucible type used
-- `atmosphere` (str): Measurement atmosphere
-- `heating_rate` (float): Primary heating rate
-- `max_temperature` (float): Maximum temperature reached
+**Sample and run identity:** `sample_name`, `sample_id`, `material`,
+`sample_mass` (mg), `instrument`, `project`, `lab`, `operator`, `comment`,
+`date_performed` (ISO 8601 UTC), `application_version`, `licensed_to`,
+`file_hash` (`{"file", "method": "BLAKE2b", "hash"}`; full parse only).
 
-**Temperature Program Structure:**
+**Hardware configuration:** `crucible_type`, `furnace_type`, `carrier_type`,
+`crucible_mass`, `reference_mass`, `reference_crucible_mass` (mg).
+
+**Temperature program** — stage durations in seconds:
+
 ```python
 {
-    "stage_0": {"temperature": 25.0, "heating_rate": 0.0, "time": 300.0},
-    "stage_1": {"temperature": 700.0, "heating_rate": 10.0, "time": 4050.0},
-    "stage_2": {"temperature": 700.0, "heating_rate": 0.0, "time": 900.0}
+    "stage_0": {"stage_type": ..., "temperature": 25.0, "heating_rate": 0.0,
+                "acquisition_rate": ..., "time": 300.0},
+    "stage_1": {...},
+    # exactly the stages programmed for the run
 }
 ```
 
-**Calibration Fields:**
-- `calibration_constants` (dict): DSC sensitivity polynomial (`p0`–`p5`). This is
-  the one calibration that *must* be applied downstream — DSC is stored raw in µV.
-- `temperature_calibration` (dict): Temperature calibration captured for
-  traceability/QA **only** (see below).
-- `sensitivity_calibration` (dict): DSC sensitivity-calibration provenance:
-  `record_path` (the external `.ngb-es3` record), `date_measured` (ISO 8601
-  UTC), `gas`, `crucible_type`, `heating_rate` (K/min), and `comment`.
+**PID settings:** `furnace_xp`, `furnace_tn`, `furnace_tv`, `sample_xp`,
+`sample_tn`, `sample_tv`.
 
-**Run Environment Fields:**
-- `timezone` (str): Windows timezone name active on the instrument PC (e.g.
-  `"Eastern Daylight Time"`). `date_performed` is UTC; this recovers local time.
-- `utc_offset_minutes` (int): UTC offset of the run's local time, DST included.
-- `correction_file_path` (str): Correction file selected in the measurement
-  definition — for sample runs, the matching baseline (`.ngb-bs3`) file.
+**Run environment:** `timezone` (Windows timezone name active on the
+instrument PC), `utc_offset_minutes` (DST-aware; `date_performed` is UTC —
+these recover local wall-clock time), `correction_file_path` (for sample
+runs, the matching baseline file).
 
-**MFC Fields:**
-- `purge_1_mfc_gas` / `purge_2_mfc_gas` / `protective_mfc_gas` (str): Gas identity per channel.
-- `purge_1_mfc_range` / `purge_2_mfc_range` / `protective_mfc_range` (float): MFC full-scale range (ml/min).
-- `purge_1_mfc_flow` / `purge_2_mfc_flow` / `protective_mfc_flow` (float):
-  Configured flow setpoint for the run (ml/min). For MFC channels without a
-  data column in the file, this is the only record of the flow.
+**MFC gas metadata:** `purge_1_mfc_gas` / `purge_2_mfc_gas` /
+`protective_mfc_gas` (gas identity), `..._mfc_range` (full-scale range,
+ml/min), `..._mfc_flow` (configured setpoint, ml/min — for MFC channels
+without a data column this is the only record of the flow).
 
-**Temperature Calibration Structure:**
+**Calibrations:**
 
-The `sample_temperature` channel stored in NGB files is **already
-temperature-corrected** by Proteus, so these coefficients are *not* re-applied to
-the data — they are extracted for provenance and quality assurance.
+- `calibration_constants` (dict): DSC sensitivity polynomial `p0`–`p5`. This
+  is the one calibration that *must* be applied downstream
+  (`apply_dsc_calibration`) — DSC is stored raw in µV.
+- `temperature_calibration` (`TemperatureCalibration`): captured for
+  traceability/QA **only** — the `sample_temperature` channel is already
+  temperature-corrected by Proteus:
 
 ```python
 {
@@ -260,114 +340,137 @@ the data — they are extracted for provenance and quality assurance.
             "actual_c": 69.2,        # literature/reference temperature (°C)
             "measured_c": 69.8,      # raw measured transition temperature (°C)
             "weight": 1.0,           # regression weight for this point
-            "corrected_c": 69.202,   # measured value after the calibration polynomial
+            "corrected_c": 69.202,   # measured value after the polynomial
         },
         # ... 6-9 standards total, ascending temperature
     ],
     "record_path": r"C:\NETZSCH\...\Calibrations\K_44_....ngb-ts3",
-    "date_measured": "2025-07-27T19:12:18+00:00",  # when the calibration was run
-    "gas": "NITROGEN",                             # conditions of the calibration run
+    "date_measured": "2025-07-27T19:12:18+00:00",
+    "gas": "NITROGEN",
     "crucible_type": "PtRh20 85 µl, with lid",
-    "heating_rate": 10.0,                          # K/min
+    "heating_rate": 10.0,            # K/min
     "comment": "Swapped crucible positions, 70 mL/min total flowrate",
 }
 ```
 
-Each fixpoint is one row of the Proteus calibration table. The columns are
-related exactly by the calibration polynomial (verified by round-trip on all
-sample files):
+  The fixpoint columns satisfy
+  `corrected_c == measured_c + (1e-3*B0 + 1e-5*B1*T + 1e-8*B2*T**2)` with
+  `T = measured_c` (verified by round-trip on all sample files); the residual
+  `actual_c - corrected_c` is the calibration fit error.
+
+- `sensitivity_calibration` (`SensitivityCalibration`): provenance of the DSC
+  sensitivity calibration — `record_path` (the external `.ngb-es3` record),
+  `date_measured`, `gas`, `crucible_type`, `heating_rate`, `comment`.
+
+### ParsingConfig
+
+Frozen dataclass of resource limits, passed as `limits=` to all loading
+functions. Limits are enforced *before* allocation.
 
 ```python
-corrected_c == measured_c + (1e-3*B0 + 1e-5*B1*T + 1e-8*B2*T**2)   # T = measured_c
+@dataclass(frozen=True, slots=True)
+class ParsingConfig:
+    max_stream_size_mb: int = 1000      # declared decompressed stream size
+    max_tables_per_stream: int = 10000
+    max_array_size_mb: int = 500        # declared array payload size
 ```
-
-The residual `actual_c - corrected_c` is the calibration fit error.
 
 ### Column Names
 
 Standard column names in processed data:
 
-**Time and Temperature:**
-- `time`: Measurement time (seconds)
-- `sample_temperature`: Sample temperature (°C)
-- `furnace_temperature`: Furnace temperature (°C)
+- `time` (s), `sample_temperature` (°C), `furnace_temperature` (°C)
+- `mass` (mg), `dsc_signal` (µV raw; mW after `apply_dsc_calibration`),
+  `dtg` (mg/min, when calculated)
+- `purge_flow_1`, `purge_flow_2`, `protective_flow` (ml/min) — presence
+  depends on the instrument configuration
 
-**Mass and Signals:**
-- `mass`: Sample mass (mg)
-- `dsc_signal`: DSC heat flow (µV or mW)
-- `dtg`: Derivative thermogravimetry (mg/min) - when calculated
+Each column carries metadata (`units`, `processing_history`, `source`, and
+where applicable `baseline_subtracted` / `calibration_applied`) readable via
+the [column metadata helpers](#column-metadata-helpers).
 
-**Gas Flows:**
-- `purge_flow_1`: Primary purge gas flow (mL/min)
-- `purge_flow_2`: Secondary purge gas flow (mL/min)
-- `protective_flow`: Protective gas flow (mL/min)
+## Exceptions
 
-**Normalized Columns:** (when using normalize_to_initial_mass)
-- `mass_normalized`: Mass as fraction of initial mass
-- `dsc_signal_normalized`: DSC signal per unit initial mass
-
-## Exception Classes
-
-### NGBParsingError
-
-Raised when NGB file parsing fails.
-
-```python
-class NGBParsingError(Exception):
-    """Raised when parsing NGB file structure fails."""
+```
+NGBParseError (base)
+├── NGBCorruptedFileError
+├── NGBStreamNotFoundError
+├── NGBResourceLimitError
+└── NGBDataTypeError
 ```
 
-### ValidationError
+- **`NGBParseError`** — base class; catch this for "anything went wrong
+  parsing".
+- **`NGBCorruptedFileError`** — container integrity failures, grammar
+  violations in data streams, channel-assembly mismatches. Structured
+  attributes: `stream`, `offset`, `table_index`, `declared`, `available`.
+- **`NGBStreamNotFoundError`** — a required stream is missing from the
+  archive (`read_ngb` needs streams 1 and 2; `read_ngb_metadata` needs 1).
+- **`NGBResourceLimitError`** — a `ParsingConfig` limit was exceeded; raised
+  before allocation. Attributes: `stream`, `offset`, `declared`, `limit`.
+- **`NGBDataTypeError`** — unknown or invalid data type.
 
-Raised when data validation fails.
+Non-NGB failures surface as standard exceptions: `FileNotFoundError`,
+`zipfile.BadZipFile` (not a ZIP archive), `ValueError` (bad arguments).
 
-```python
-class ValidationError(Exception):
-    """Raised when data validation fails."""
+## Command Line Interface
+
+Installed as the `pyngb` console script (`python -m pyngb` is equivalent).
+Three subcommands; all accept multiple files with per-file error isolation
+and exit non-zero if any file fails.
+
+### pyngb convert
+
+Parse NGB files and export Parquet/CSV.
+
+```
+pyngb convert FILE... [-o DIR] [-f {parquet,csv,both}] [-b BASELINE]
+              [--dynamic-axis {time,sample_temperature,furnace_temperature}] [-v]
 ```
 
-### BaselineError
+| Flag | Default | Meaning |
+|------|---------|---------|
+| `-o, --output` | `.` | Output directory |
+| `-f, --format` | `parquet` | Output format |
+| `-b, --baseline` | — | Baseline file for subtraction (output gains a `_baseline_subtracted` suffix) |
+| `--dynamic-axis` | `sample_temperature` | Axis for dynamic-segment alignment |
+| `-v, --verbose` | off | Debug logging |
 
-Raised when baseline subtraction fails.
+### pyngb inspect
 
-```python
-class BaselineError(Exception):
-    """Raised when baseline subtraction cannot be performed."""
+Show document structure: sections, tables, coverage, unknown fields.
+
+```
+pyngb inspect FILE... [--stream N] [--values] [--unknown] [--coverage] [--json]
 ```
 
-## Constants
+| Flag | Default | Meaning |
+|------|---------|---------|
+| `--stream` | `1` | Stream for the table listing / cross-file comparison |
+| `--values` | off | Show decoded field values in the table listing |
+| `--unknown` | off | Only the unknown-field census (the format-mapping to-do list) |
+| `--coverage` | off | Only byte-coverage accounting (gap bytes and span kinds) |
+| `--json` | off | Machine-readable output |
 
-### File Extensions
+With multiple files, `inspect` cross-references scalar fields on the selected
+stream and reports which differ between files.
 
-- `.ngb-ss3`: Sample files (main data)
-- `.ngb-bs3`: Baseline files (for correction)
+### pyngb validate
 
-### Default Parameters
+Run data-quality checks (`QualityChecker.full_validation`) on each file.
 
-**DTG Calculation:**
-- Default method: `"savgol"`
-- Default smoothing: `"medium"`
-- Savitzky-Golay parameters by smoothing level:
-  - strict: window=7, polyorder=1
-  - medium: window=25, polyorder=2
-  - loose: window=51, polyorder=3
+```
+pyngb validate FILE... [--json]
+```
 
-**Baseline Subtraction:**
-- Default dynamic axis: `"sample_temperature"`
-- Supported axes: `"time"`, `"sample_temperature"`, `"furnace_temperature"`
-
-**Batch Processing:**
-- Default output format: `"parquet"`
-- Default workers: CPU count
-- Default compression: `"snappy"`
+Exit code 1 if any file is invalid or unparseable.
 
 ## Usage Examples
 
 ### Complete Analysis Workflow
 
 ```python
-from pyngb import read_ngb, BatchProcessor
-from pyngb.api.analysis import add_dtg, normalize_to_initial_mass
+from pyngb import read_ngb, add_dtg, normalize_to_initial_mass, BatchProcessor
 import polars as pl
 import json
 
@@ -380,9 +483,9 @@ table = add_dtg(table, smooth="medium")
 df = pl.from_arrow(table)
 
 # Access metadata
-metadata = json.loads(table.schema.metadata[b'file_metadata'])
+metadata = json.loads(table.schema.metadata[b"file_metadata"])
 print(f"Sample: {metadata['sample_name']}")
-print(f"Mass loss: {(1 - df['mass_normalized'].min()) * 100:.1f}%")
+print(f"Mass loss: {(1 - df['mass'].min()) * 100:.1f}%")  # mass is normalized in place
 
 # Batch processing
 processor = BatchProcessor(max_workers=4)
@@ -392,34 +495,32 @@ results = processor.process_directory("./data/", output_format="parquet")
 ### Error Handling
 
 ```python
-from pyngb.exceptions import NGBParsingError, ValidationError
+from pyngb import read_ngb, NGBParseError, NGBCorruptedFileError
 
 try:
     table = read_ngb("sample.ngb-ss3")
-except NGBParsingError as e:
-    print(f"File parsing failed: {e}")
 except FileNotFoundError:
     print("File not found")
-except ValidationError as e:
-    print(f"Data validation failed: {e}")
+except NGBCorruptedFileError as e:
+    print(f"Corrupted file (stream={e.stream}, offset={e.offset}): {e}")
+except NGBParseError as e:
+    print(f"Parsing failed: {e}")
 ```
 
 ### Custom Analysis
 
 ```python
 import numpy as np
+import polars as pl
 from scipy.signal import find_peaks
 
-# Extract data
 df = pl.from_arrow(table)
-temperature = df['sample_temperature'].to_numpy()
-dtg_values = df['dtg'].to_numpy()
+temperature = df["sample_temperature"].to_numpy()
+dtg_values = df["dtg"].to_numpy()
 
-# Find decomposition peaks
 peaks, _ = find_peaks(-dtg_values, height=0.01)
-peak_temps = temperature[peaks]
-
-print(f"Decomposition peaks at: {peak_temps} °C")
+print(f"Decomposition peaks at: {temperature[peaks]} °C")
 ```
 
-This reference covers all public functions and classes in pyngb. For implementation details and advanced customization, see the source code documentation.
+For the format itself see [Binary Format](binary-format.md); for the
+internal design see [Architecture](architecture.md).
