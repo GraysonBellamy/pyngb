@@ -17,10 +17,12 @@ from pyngb.format import (
     DType,
     FieldToken,
     UnknownSpan,
+    load_document,
     open_ngb,
     ref_type_ref,
     tokenize,
 )
+from pyngb.format.census import document_census
 from support.ngb_builder import assert_accounting
 
 FIXTURE_DIR = Path(__file__).parent / "test_files"
@@ -133,3 +135,19 @@ def test_channel_data_element_counts_match_the_parity_goldens(
     assert all(total == num_rows for total in per_channel), (
         f"per-channel element counts {per_channel} != golden num_rows {num_rows}"
     )
+
+
+@pytest.mark.parametrize("fixture", ALL_FIXTURES, ids=lambda p: p.name)
+def test_census_matches_the_golden(fixture: Path) -> None:
+    """The full structural census — table counts, dtype counts, span kinds,
+    type-ref sets, and the unknown-field enumeration — is pinned per fixture.
+    A diff here means the format model moved (or Proteus grew a new field:
+    the unknown-field diff is then the Phase-2 to-do list)."""
+    golden_path = GOLDEN_DIR / f"{fixture.name}.census.json"
+    assert golden_path.exists(), f"missing census golden for {fixture.name}"
+    golden = json.loads(golden_path.read_text(encoding="utf-8"))
+    assert golden["fixture"] == fixture.name
+
+    census = document_census(load_document(fixture))
+    assert census["streams"] == golden["streams"]
+    assert census["unknown_fields"] == golden["unknown_fields"]
