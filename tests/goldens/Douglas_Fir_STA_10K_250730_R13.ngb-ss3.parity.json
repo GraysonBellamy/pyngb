@@ -142,12 +142,15 @@
     "project": "Material Flammability",
     "protective_mfc_flow": 20.0,
     "protective_mfc_gas": "NITROGEN",
+    "protective_mfc_gas_formula": "N2",
     "protective_mfc_range": 250.0,
     "purge_1_mfc_flow": 50.0,
     "purge_1_mfc_gas": "NITROGEN",
+    "purge_1_mfc_gas_formula": "N2",
     "purge_1_mfc_range": 250.0,
-    "purge_2_mfc_flow": 20.0,
+    "purge_2_mfc_flow": 0.0,
     "purge_2_mfc_gas": "OXYGEN",
+    "purge_2_mfc_gas_formula": "O2",
     "purge_2_mfc_range": 252.5,
     "reference_crucible_mass": 256.2980041503906,
     "reference_mass": 0.0,
@@ -247,30 +250,50 @@
       "stage_0": {
         "acquisition_rate": 0.0,
         "heating_rate": 0.0,
+        "protective_mfc_flow": 20.0,
+        "purge_1_mfc_flow": 50.0,
+        "purge_2_mfc_flow": 0.0,
+        "stage_type": 0,
         "temperature": 26.0,
         "time": 0.0
       },
       "stage_1": {
         "acquisition_rate": 20.0,
         "heating_rate": 0.0,
+        "protective_mfc_flow": 20.0,
+        "purge_1_mfc_flow": 50.0,
+        "purge_2_mfc_flow": 0.0,
+        "stage_type": 1,
         "temperature": 26.0,
         "time": 1800.0
       },
       "stage_2": {
         "acquisition_rate": 100.0,
         "heating_rate": 10.0,
+        "protective_mfc_flow": 20.0,
+        "purge_1_mfc_flow": 50.0,
+        "purge_2_mfc_flow": 0.0,
+        "stage_type": 1,
         "temperature": 825.0,
         "time": 4794.000091552734
       },
       "stage_3": {
         "acquisition_rate": 20.0,
         "heating_rate": 0.0,
+        "protective_mfc_flow": 20.0,
+        "purge_1_mfc_flow": 50.0,
+        "purge_2_mfc_flow": 0.0,
+        "stage_type": 1,
         "temperature": 825.0,
         "time": 1800.0
       },
       "stage_4": {
         "acquisition_rate": 0.0,
         "heating_rate": 0.0,
+        "protective_mfc_flow": 20.0,
+        "purge_1_mfc_flow": 50.0,
+        "purge_2_mfc_flow": 0.0,
+        "stage_type": 2,
         "temperature": 835.0,
         "time": 0.0
       }

@@ -298,12 +298,17 @@ absence means the file didn't carry it. Keys:
 **Hardware configuration:** `crucible_type`, `furnace_type`, `carrier_type`,
 `crucible_mass`, `reference_mass`, `reference_crucible_mass` (mg).
 
-**Temperature program** — stage durations in seconds:
+**Temperature program** — keyed by program ordinal (execution order),
+durations in seconds, per-stage MFC flow setpoints in ml/min:
 
 ```python
 {
-    "stage_0": {"stage_type": ..., "temperature": 25.0, "heating_rate": 0.0,
-                "acquisition_rate": ..., "time": 300.0},
+    "stage_0": {"stage_type": 0,        # 0 initial, 1 ramp/isothermal,
+                                        # 2 final (emergency-reset entry)
+                "temperature": 25.0, "heating_rate": 0.0,
+                "acquisition_rate": 0.0, "time": 0.0,
+                "purge_1_mfc_flow": 0.0, "purge_2_mfc_flow": 0.0,
+                "protective_mfc_flow": 0.0},
     "stage_1": {...},
     # exactly the stages programmed for the run
 }
@@ -317,10 +322,13 @@ instrument PC), `utc_offset_minutes` (DST-aware; `date_performed` is UTC —
 these recover local wall-clock time), `correction_file_path` (for sample
 runs, the matching baseline file).
 
-**MFC gas metadata:** `purge_1_mfc_gas` / `purge_2_mfc_gas` /
-`protective_mfc_gas` (gas identity), `..._mfc_range` (full-scale range,
-ml/min), `..._mfc_flow` (configured setpoint, ml/min — for MFC channels
-without a data column this is the only record of the flow).
+**MFC gas metadata** (from the stream-1 device tree): `purge_1_mfc_gas` /
+`purge_2_mfc_gas` / `protective_mfc_gas` (gas name, e.g. `NITROGEN`),
+`..._mfc_gas_formula` (short formula, e.g. `N2`), `..._mfc_range`
+(full-scale range, ml/min), `..._mfc_flow` (the setpoint the run actually
+used, ml/min — emitted when uniform across the program's body stages;
+`0.0` means the MFC was configured but not flowing; per-stage values are
+in `temperature_program`).
 
 **Calibrations:**
 

@@ -192,12 +192,15 @@
     "project": "Oxidative Pyrolysis",
     "protective_mfc_flow": 20.0,
     "protective_mfc_gas": "NITROGEN",
+    "protective_mfc_gas_formula": "N2",
     "protective_mfc_range": 250.0,
     "purge_1_mfc_flow": 50.0,
     "purge_1_mfc_gas": "NITROGEN",
+    "purge_1_mfc_gas_formula": "N2",
     "purge_1_mfc_range": 250.0,
-    "purge_2_mfc_flow": 14.0,
+    "purge_2_mfc_flow": 0.0,
     "purge_2_mfc_gas": "OXYGEN",
+    "purge_2_mfc_gas_formula": "O2",
     "purge_2_mfc_range": 252.5,
     "reference_crucible_mass": 258.6000061035156,
     "reference_mass": 0.0,
@@ -290,32 +293,52 @@
       "stage_0": {
         "acquisition_rate": 0.0,
         "heating_rate": 0.0,
+        "protective_mfc_flow": 20.0,
+        "purge_1_mfc_flow": 50.0,
+        "purge_2_mfc_flow": 0.0,
+        "stage_type": 0,
         "temperature": 25.0,
         "time": 0.0
       },
       "stage_1": {
+        "acquisition_rate": 25.0,
+        "heating_rate": 0.0,
+        "protective_mfc_flow": 20.0,
+        "purge_1_mfc_flow": 50.0,
+        "purge_2_mfc_flow": 0.0,
+        "stage_type": 1,
+        "temperature": 25.0,
+        "time": 1200.0
+      },
+      "stage_2": {
         "acquisition_rate": 200.0,
         "heating_rate": 10.0,
+        "protective_mfc_flow": 20.0,
+        "purge_1_mfc_flow": 50.0,
+        "purge_2_mfc_flow": 0.0,
+        "stage_type": 1,
         "temperature": 800.0,
         "time": 4650.0
       },
-      "stage_2": {
+      "stage_3": {
         "acquisition_rate": 50.0,
         "heating_rate": 0.0,
+        "protective_mfc_flow": 20.0,
+        "purge_1_mfc_flow": 50.0,
+        "purge_2_mfc_flow": 0.0,
+        "stage_type": 1,
         "temperature": 800.0,
         "time": 600.0
       },
-      "stage_3": {
+      "stage_4": {
         "acquisition_rate": 0.0,
         "heating_rate": 0.0,
+        "protective_mfc_flow": 20.0,
+        "purge_1_mfc_flow": 50.0,
+        "purge_2_mfc_flow": 0.0,
+        "stage_type": 2,
         "temperature": 875.0,
         "time": 0.0
-      },
-      "stage_4": {
-        "acquisition_rate": 25.0,
-        "heating_rate": 0.0,
-        "temperature": 25.0,
-        "time": 1200.0
       }
     },
     "timezone": "Eastern Standard Time",

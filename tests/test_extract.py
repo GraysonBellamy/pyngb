@@ -7,8 +7,9 @@ which the API loaders add from the file rather than the document.
 
 The synthetic halves pin each extraction rule in isolation on the builder,
 including the legacy quirks the goldens depend on (neighbor-table crucible
-classification, MFC gas-missing suppressing the range, i32 stage_type
-exclusion, DST offset arithmetic).
+classification, DST offset arithmetic) and the structural rules that
+replaced the legacy heuristics (category-ordinal stage keying, the MFC
+device tree, per-stage flow states).
 """
 
 import json
@@ -134,33 +135,64 @@ class TestMasses:
         assert "reference_crucible_mass" not in metadata
 
 
-class TestTemperatureProgram:
-    def stage(self, temperature: float, minutes: float) -> bytes:
-        return build_table(
-            0x1789,
-            [
-                build_scalar(0x083F, DType.I32, 1),  # stage_type is i32
-                build_scalar(0x0E17, DType.F32, temperature),
-                build_scalar(0x0E13, DType.F32, 10.0),
-                build_scalar(0x0E14, DType.F32, 100.0),
-                build_scalar(0x0E15, DType.F32, minutes),
-            ],
-        )
+def stage_table(
+    ordinal: int,
+    temperature: float,
+    minutes: float,
+    *,
+    stage_type: int = 1,
+) -> bytes:
+    """A stage table; the category encodes the program ordinal."""
+    return build_table(
+        0x7530 + ordinal,
+        [
+            build_scalar(0x083F, DType.I32, stage_type),  # stage_type is i32
+            build_scalar(0x0E17, DType.F32, temperature),
+            build_scalar(0x0E13, DType.F32, 10.0),
+            build_scalar(0x0E14, DType.F32, 100.0),
+            build_scalar(0x0E15, DType.F32, minutes),
+        ],
+        type_ref=0x2B0C,
+    )
 
-    def test_stages_in_order_with_times_in_seconds(self, tmp_path: Path) -> None:
+
+class TestTemperatureProgram:
+    def test_stage_keys_and_times_in_seconds(self, tmp_path: Path) -> None:
         doc = doc_of(
-            tmp_path, [opener(), self.stage(25.0, 0.0), self.stage(700.0, 67.5)]
+            tmp_path,
+            [opener(), stage_table(0, 25.0, 0.0), stage_table(1, 700.0, 67.5)],
         )
         program = build_metadata(doc)["temperature_program"]
         assert list(program) == ["stage_0", "stage_1"]
         assert program["stage_1"]["temperature"] == 700.0
         assert program["stage_1"]["time"] == 67.5 * 60.0
 
-    def test_i32_stage_type_is_excluded(self, tmp_path: Path) -> None:
-        """The legacy pattern hard-coded f32, so stage_type never extracted."""
-        doc = doc_of(tmp_path, [opener(), self.stage(25.0, 0.0)])
+    def test_stage_keys_follow_the_category_not_stream_order(
+        self, tmp_path: Path
+    ) -> None:
+        """Edited programs serialize out of order (FILED fixtures: 0,2,3,4,1);
+        the category ordinal, verified against the recorded data, wins."""
+        doc = doc_of(
+            tmp_path,
+            [
+                opener(),
+                stage_table(0, 25.0, 0.0, stage_type=0),
+                stage_table(2, 700.0, 67.5),
+                stage_table(1, 25.0, 20.0),
+            ],
+        )
         program = build_metadata(doc)["temperature_program"]
+        assert list(program) == ["stage_0", "stage_1", "stage_2"]
+        assert program["stage_1"]["temperature"] == 25.0
+        assert program["stage_1"]["time"] == 20.0 * 60.0
+        assert program["stage_2"]["temperature"] == 700.0
+
+    def test_stage_type_is_extracted_as_int(self, tmp_path: Path) -> None:
+        doc = doc_of(tmp_path, [opener(), stage_table(0, 25.0, 0.0, stage_type=2)])
+        program = build_metadata(doc)["temperature_program"]
+        assert program["stage_0"]["stage_type"] == 2
         assert set(program["stage_0"]) == {
+            "stage_type",
             "temperature",
             "heating_rate",
             "acquisition_rate",
@@ -168,8 +200,50 @@ class TestTemperatureProgram:
         }
 
     def test_table_missing_a_stage_field_is_not_a_stage(self, tmp_path: Path) -> None:
-        partial = build_table(0x1789, [build_scalar(0x0E17, DType.F32, 500.0)])
+        partial = build_table(0x7530, [build_scalar(0x0E17, DType.F32, 500.0)])
         doc = doc_of(tmp_path, [opener(), partial])
+        assert "temperature_program" not in build_metadata(doc)
+
+    def test_duplicate_stage_ordinal_keeps_the_first(self, tmp_path: Path) -> None:
+        doc = doc_of(
+            tmp_path,
+            [opener(), stage_table(0, 25.0, 5.0), stage_table(0, 900.0, 1.0)],
+        )
+        program = build_metadata(doc)["temperature_program"]
+        assert list(program) == ["stage_0"]
+        assert program["stage_0"]["temperature"] == 25.0
+
+    def test_non_stage_category_is_ignored(self, tmp_path: Path) -> None:
+        """A stage-typed table with all five fields but a category below the
+        stage base cannot be assigned an ordinal and is dropped."""
+        rogue = build_table(
+            0x1789,
+            [
+                build_scalar(0x083F, DType.I32, 1),
+                build_scalar(0x0E17, DType.F32, 500.0),
+                build_scalar(0x0E13, DType.F32, 10.0),
+                build_scalar(0x0E14, DType.F32, 100.0),
+                build_scalar(0x0E15, DType.F32, 5.0),
+            ],
+            type_ref=0x2B0C,
+        )
+        doc = doc_of(tmp_path, [opener(), rogue])
+        assert "temperature_program" not in build_metadata(doc)
+
+    def test_non_stage_type_ref_is_ignored(self, tmp_path: Path) -> None:
+        """The five stage field ids on a non-stage-typed table (0x083F is
+        the device id elsewhere) do not make it a stage."""
+        rogue = build_table(
+            0x7530,
+            [
+                build_scalar(0x083F, DType.I32, 1),
+                build_scalar(0x0E17, DType.F32, 500.0),
+                build_scalar(0x0E13, DType.F32, 10.0),
+                build_scalar(0x0E14, DType.F32, 100.0),
+                build_scalar(0x0E15, DType.F32, 5.0),
+            ],
+        )
+        doc = doc_of(tmp_path, [opener(), rogue])
         assert "temperature_program" not in build_metadata(doc)
 
 
@@ -204,86 +278,243 @@ class TestPID:
         assert "sample_xp" not in metadata
 
 
+GUID_N2 = "292a050d-2f6c-490e-8385-7c743538a5a3"
+GUID_O2 = "51324bb0-7cf9-46e4-bb5a-0d4f9bf06cf9"
+
+
 class TestMFC:
-    def name_table(self, name: str) -> bytes:
-        return build_table(0x1786, [build_scalar(0x1057, DType.STRING, name)])
-
-    def gas_table(self, gas: str) -> bytes:
-        return build_table(0x1B01, [build_scalar(0x1058, DType.STRING, gas)])
-
-    def range_table(self, value: float) -> bytes:
-        return build_table(0x1785, [build_scalar(0x1048, DType.F32, value)])
-
-    def flow_table(self, param: str, value: float) -> bytes:
+    def device_def(
+        self,
+        category: int,
+        device_id: int,
+        gas: str,
+        guid: str,
+        *,
+        kind: int = 2,
+    ) -> bytes:
         return build_table(
-            0x7530,
+            category,
             [
-                build_scalar(0x1062, DType.STRING, param),
-                build_scalar(0x1061, DType.F32, value),
+                build_scalar(0x083F, DType.I32, device_id),
+                build_scalar(0x0840, DType.STRING, gas),
+                build_scalar(0x0C8F, DType.STRING, guid),
+                build_scalar(0x104B, DType.I32, kind),
             ],
+            type_ref=0x2B07,
         )
 
-    def test_ordinal_pairing_with_gas_context(self, tmp_path: Path) -> None:
-        doc = doc_of(
-            tmp_path,
-            [
-                opener(),
-                self.name_table("Purge 1"),
-                self.name_table("Purge 2"),
-                self.name_table("Protective"),
-                self.gas_table("OXYGEN"),
-                self.range_table(250.0),
-                self.gas_table("NITROGEN"),
-                self.range_table(100.0),
-                self.range_table(50.0),
-            ],
+    def range_table(self, full_scale: float) -> bytes:
+        return build_table(
+            0x1780, [build_scalar(0x1048, DType.F32, full_scale)], type_ref=0x2B0A
         )
+
+    def gas_record(self, gas: str, formula: str, guid: str) -> bytes:
+        return build_table(
+            0x1BE4,
+            [
+                build_scalar(0x17FC, DType.STRING, guid),
+                build_scalar(0x0840, DType.STRING, gas),
+                build_scalar(0x0C88, DType.STRING, formula),
+            ],
+            type_ref=0x2B81,
+        )
+
+    def state(self, category: int, device_id: int, flow: float) -> list[bytes]:
+        """A per-stage device-state pair: state table + its range table."""
+        return [
+            build_table(
+                category,
+                [build_scalar(0x083F, DType.I32, device_id)],
+                type_ref=0x2B11,
+            ),
+            build_table(
+                0x1780,
+                [
+                    build_scalar(0x1047, DType.F32, flow),
+                    build_scalar(0x1048, DType.F32, 250.0),
+                ],
+                type_ref=0x2B0A,
+            ),
+        ]
+
+    def full_tree(self) -> list[bytes]:
+        return [
+            self.device_def(0x1BAC, 30, "NITROGEN", GUID_N2),
+            self.range_table(250.0),
+            self.gas_record("NITROGEN", "N2", GUID_N2),
+            self.device_def(0x1BAD, 31, "OXYGEN", GUID_O2),
+            self.range_table(252.5),
+            self.gas_record("OXYGEN", "O2", GUID_O2),
+            self.device_def(0x1BAE, 32, "NITROGEN", GUID_N2),
+            self.range_table(250.0),
+            self.gas_record("NITROGEN", "N2", GUID_N2),
+        ]
+
+    def test_device_tree_yields_gas_formula_and_range(self, tmp_path: Path) -> None:
+        doc = doc_of(tmp_path, [opener(), *self.full_tree()])
         metadata = build_metadata(doc)
-        assert metadata["purge_1_mfc_gas"] == "OXYGEN"
+        assert metadata["purge_1_mfc_gas"] == "NITROGEN"
+        assert metadata["purge_1_mfc_gas_formula"] == "N2"
         assert metadata["purge_1_mfc_range"] == 250.0
-        assert metadata["purge_2_mfc_gas"] == "NITROGEN"
-        assert metadata["purge_2_mfc_range"] == 100.0
-        # No new gas context before the third range: nearest preceding wins.
+        assert metadata["purge_2_mfc_gas"] == "OXYGEN"
+        assert metadata["purge_2_mfc_gas_formula"] == "O2"
+        assert metadata["purge_2_mfc_range"] == 252.5
         assert metadata["protective_mfc_gas"] == "NITROGEN"
-        assert metadata["protective_mfc_range"] == 50.0
+        assert metadata["protective_mfc_gas_formula"] == "N2"
+        assert metadata["protective_mfc_range"] == 250.0
 
-    def test_no_preceding_gas_suppresses_gas_and_range(self, tmp_path: Path) -> None:
-        """Legacy quirk: without a gas context, the range is not set either."""
-        doc = doc_of(
-            tmp_path,
-            [opener(), self.name_table("Purge 1"), self.range_table(250.0)],
-        )
-        metadata = build_metadata(doc)
-        assert "purge_1_mfc_gas" not in metadata
-        assert "purge_1_mfc_range" not in metadata
-
-    def test_implausible_range_values_are_ignored(self, tmp_path: Path) -> None:
+    def test_non_mfc_device_kinds_are_ignored(self, tmp_path: Path) -> None:
         doc = doc_of(
             tmp_path,
             [
                 opener(),
-                self.name_table("Purge 1"),
-                self.gas_table("ARGON"),
-                self.range_table(0.05),  # below 0.1: not a range table
+                self.device_def(0x1BB4, 37, "NITROGEN", GUID_N2, kind=10),
                 self.range_table(250.0),
             ],
         )
         metadata = build_metadata(doc)
-        assert metadata["purge_1_mfc_range"] == 250.0
+        assert not any("mfc" in key for key in metadata)
 
-    def test_flow_setpoints_by_parameter_name(self, tmp_path: Path) -> None:
+    def test_unmapped_mfc_device_id_is_skipped_loudly(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A fourth MFC (the real-Purge-3 trigger) must warn, never map."""
         doc = doc_of(
             tmp_path,
             [
                 opener(),
-                self.flow_table("Purge 2 MFC_MFC400_LastUsedFlow", 20.0),
-                self.flow_table("Protective MFC_MFC400_LastUsedFlow", 25.0),
+                self.device_def(0x1BAF, 33, "ARGON", "some-guid"),
+                self.range_table(100.0),
+                self.device_def(0x1BAC, 30, "NITROGEN", GUID_N2),
+                self.range_table(250.0),
+            ],
+        )
+        with caplog.at_level("WARNING", logger="pyngb.format.extract"):
+            metadata = build_metadata(doc)
+        assert any("33" in record.message for record in caplog.records)
+        assert "purge_1_mfc_gas" in metadata
+        assert not any(v == "ARGON" for v in metadata.values())
+
+    def test_calibration_context_gas_records_never_leak(self, tmp_path: Path) -> None:
+        """Gas records outside the definition block (calibration contexts)
+        and GUID-mismatched records are ignored."""
+        doc = doc_of(
+            tmp_path,
+            [
+                opener(),
+                self.gas_record("HELIUM", "He", "cal-context-guid"),
+                self.device_def(0x1BAC, 30, "NITROGEN", GUID_N2),
+                self.range_table(250.0),
+                self.gas_record("OXYGEN", "O2", GUID_O2),  # mismatched GUID
             ],
         )
         metadata = build_metadata(doc)
-        assert metadata["purge_2_mfc_flow"] == 20.0
-        assert metadata["protective_mfc_flow"] == 25.0
+        assert metadata["purge_1_mfc_gas"] == "NITROGEN"
+        assert "purge_1_mfc_gas_formula" not in metadata
+
+    def test_run_flow_from_uniform_body_stages(self, tmp_path: Path) -> None:
+        """The initial stage's gas-off state must not defeat uniformity."""
+        doc = doc_of(
+            tmp_path,
+            [
+                opener(),
+                *self.full_tree(),
+                stage_table(0, 25.0, 0.0, stage_type=0),
+                *self.state(0x1BAC, 30, 0.0),
+                *self.state(0x1BAD, 31, 0.0),
+                stage_table(1, 25.0, 20.0),
+                *self.state(0x1BAC, 30, 35.0),
+                *self.state(0x1BAD, 31, 15.0),
+                stage_table(2, 700.0, 67.5),
+                *self.state(0x1BAC, 30, 35.0),
+                *self.state(0x1BAD, 31, 15.0),
+            ],
+        )
+        metadata = build_metadata(doc)
+        assert metadata["purge_1_mfc_flow"] == 35.0
+        assert metadata["purge_2_mfc_flow"] == 15.0
+        assert "protective_mfc_flow" not in metadata  # no states for it
+        program = metadata["temperature_program"]
+        assert program["stage_0"]["purge_1_mfc_flow"] == 0.0
+        assert program["stage_1"]["purge_1_mfc_flow"] == 35.0
+        assert program["stage_2"]["purge_2_mfc_flow"] == 15.0
+
+    def test_varying_body_flows_omit_the_scalar_key(self, tmp_path: Path) -> None:
+        """Gas-switching programs keep per-stage flows only."""
+        doc = doc_of(
+            tmp_path,
+            [
+                opener(),
+                *self.full_tree(),
+                stage_table(0, 25.0, 20.0),
+                *self.state(0x1BAC, 30, 35.0),
+                stage_table(1, 700.0, 67.5),
+                *self.state(0x1BAC, 30, 20.0),
+            ],
+        )
+        metadata = build_metadata(doc)
         assert "purge_1_mfc_flow" not in metadata
+        program = metadata["temperature_program"]
+        assert program["stage_0"]["purge_1_mfc_flow"] == 35.0
+        assert program["stage_1"]["purge_1_mfc_flow"] == 20.0
+
+    def test_body_stage_without_a_snapshot_suppresses_the_scalar(
+        self, tmp_path: Path
+    ) -> None:
+        """A truncated/missing state group must not let partial coverage
+        masquerade as a uniform run-level flow."""
+        doc = doc_of(
+            tmp_path,
+            [
+                opener(),
+                *self.full_tree(),
+                stage_table(1, 25.0, 20.0),
+                *self.state(0x1BAC, 30, 35.0),
+                stage_table(2, 700.0, 67.5),  # no state group parsed
+            ],
+        )
+        metadata = build_metadata(doc)
+        assert "purge_1_mfc_flow" not in metadata
+        assert metadata["temperature_program"]["stage_1"]["purge_1_mfc_flow"] == 35.0
+
+    def test_guidless_definition_takes_no_formula(self, tmp_path: Path) -> None:
+        """Without a definition GUID there is nothing to match against —
+        a GUID-less gas record must not pair by None == None."""
+        definition = build_table(
+            0x1BAC,
+            [
+                build_scalar(0x083F, DType.I32, 30),
+                build_scalar(0x0840, DType.STRING, "NITROGEN"),
+                build_scalar(0x104B, DType.I32, 2),
+            ],
+            type_ref=0x2B07,
+        )
+        guidless_record = build_table(
+            0x1BE4,
+            [
+                build_scalar(0x0840, DType.STRING, "HELIUM"),
+                build_scalar(0x0C88, DType.STRING, "He"),
+            ],
+            type_ref=0x2B81,
+        )
+        doc = doc_of(tmp_path, [opener(), definition, guidless_record])
+        metadata = build_metadata(doc)
+        assert metadata["purge_1_mfc_gas"] == "NITROGEN"
+        assert "purge_1_mfc_gas_formula" not in metadata
+
+    def test_range_requires_the_range_table_type(self, tmp_path: Path) -> None:
+        """Field 0x1048 on a non-range-type follower is not a range."""
+        rogue = build_table(0x1780, [build_scalar(0x1048, DType.F32, 99.0)])
+        doc = doc_of(
+            tmp_path,
+            [
+                opener(),
+                self.device_def(0x1BAC, 30, "NITROGEN", GUID_N2),
+                rogue,
+                self.range_table(250.0),
+            ],
+        )
+        assert build_metadata(doc)["purge_1_mfc_range"] == 250.0
 
 
 class TestCalibration:

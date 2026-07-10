@@ -232,17 +232,24 @@ The remaining structures are procedural (each one function in
 
 ### Temperature program
 
-Stage tables are the stream-1 tables carrying **all five** stage fields;
-stage N is the Nth such table in stream order (exposed as `stage_0`,
-`stage_1`, …):
+Stage tables (type ref `0x2B0C`) are the stream-1 tables carrying **all
+five** stage fields. The table's **category encodes the program ordinal**:
+stage N has category `0x7530 + N`, exposed as `stage_N`. Stream order is
+edit order, not program order — programs edited in Proteus serialize out
+of order (two fixtures store 0, 2, 3, 4, 1; verified against the recorded
+temperature data, which executes in category order):
 
 | Field | Key |
 |-------|-----|
-| `0x083F` | `stage_type` |
+| `0x083F` | `stage_type` (i32) — 0 = initial, 1 = ramp/isothermal (`heating_rate` > 0 vs = 0), 2 = final entry carrying the emergency-reset temperature (a limit, never executed) |
 | `0x0E17` | `temperature` (°C) |
 | `0x0E13` | `heating_rate` (°C/min) |
 | `0x0E14` | `acquisition_rate` |
 | `0x0E15` | `time` — stored in minutes, exposed in **seconds** (×60) |
+
+Each stage table is followed by per-device state snapshots (see the MFC
+device tree below) whose flow setpoints are merged into the stage dict as
+`purge_1_mfc_flow` / `purge_2_mfc_flow` / `protective_mfc_flow` (ml/min).
 
 ### PID settings
 
@@ -334,23 +341,50 @@ run (→ `correction_file_path`). For sample (`.ngb-ss3`) runs this identifies
 the matching baseline (`.ngb-bs3`) file; for correction runs it may reference
 the related sample or a prior correction run.
 
-### MFC gas metadata
+### MFC gas metadata: the device tree
 
-Three structures per MFC channel (Purge 1, Purge 2, Protective):
+Every file carries one self-describing device block in stream 1 (identical
+type refs in the Proteus 7.5 and 8.0 fixtures, sample and baseline files
+alike). All MFC metadata comes from it — no string matching, no ordinal
+pairing:
 
-- **Ranges** — name tables (a string field holding `Purge 1` etc.) pair by
-  ordinal with range tables carrying field `0x1048` (valid range 0.1–1000)
-  → `purge_1_mfc_range`, `purge_2_mfc_range`, `protective_mfc_range`.
-- **Gases** — the nearest *preceding* table whose category high byte is
-  `0x1B` and which carries a known gas string (`NITROGEN`, `OXYGEN`, `ARGON`,
-  `HELIUM`, `CARBON_DIOXIDE`) → `purge_1_mfc_gas`, ….
-- **Flow setpoints** (distinct from the ranges) — category-`0x7530`
-  device-parameter tables identified by their UTF-16LE parameter name in
-  field `0x1062` (e.g. `Purge 1 MFC_MFC400_LastUsedFlow`); the value is the
-  f32 field `0x1061` of the same table (0–1000 ml/min) →
-  `purge_1_mfc_flow`, `purge_2_mfc_flow`, `protective_mfc_flow`. For MFC
-  channels with no data column in stream 2 these setpoints are the only
-  record of the flow.
+- **Device definitions** (type ref `0x2B07`, categories `0x1BAC`+), one per
+  device: device id (`0x083F`, i32), configured gas name (`0x0840`), gas
+  GUID (`0x0C8F`), device kind (`0x104B`, 2 = MFC; kinds 10/8 are non-MFC
+  devices), hardware type (`0x1075`, 104 ↔ MFC400). The device id → role
+  map is fixed — **30 = purge 1, 31 = purge 2, 32 = protective** —
+  confirmed three independent ways on the 2022 fixture (device-parameter
+  names, recorded flow channels, category order). An MFC definition with
+  any other id (a real fourth controller) is logged as a warning, never
+  silently dropped. The gas name → `purge_1_mfc_gas`, ….
+- **Range table** (type ref `0x2B0A`, category `0x1780`), immediately after
+  each MFC definition: full scale `0x1048` → `purge_1_mfc_range`, … plus
+  the overrange limit `0x104D` (full scale × 1.02) and gas correction
+  factor `0x104C` (not extracted).
+- **Gas record** (type ref `0x2B81`, category `0x1BE4`), after the range
+  table: GUID `0x17FC` (must match the definition's `0x0C8F`), gas name
+  `0x0840`, short formula `0x0C88` → `purge_1_mfc_gas_formula`, …, and
+  density `0x1040` (g/l, not extracted). Gas records of the same shape
+  also occur inside calibration-context blocks elsewhere in the stream
+  (plus empty ones at category `0x1B58`); anchoring on the definitions and
+  GUID-matching keeps those out.
+- **Per-stage states** (type ref `0x2B11`, same categories as the
+  definitions): after every temperature-program stage table, one state
+  table per device, its following range table carrying that stage's flow
+  setpoint in `0x1047` (ml/min). These merge into the stage dicts, and
+  `purge_1_mfc_flow` / … is emitted when the flow is uniform across the
+  program's body stages (`stage_type` 1) — the setpoint the run actually
+  used. A 0.0 means the MFC was configured but not flowing (e.g. the O2
+  controller during an N2-only run). Programs that vary a flow per stage
+  get no scalar key for that MFC.
+
+The `0x7530`-category **device-parameter tables** (type ref `0x2B65`;
+UTF-16LE name in `0x1062`, f32 value in `0x1061`, e.g.
+`Purge 1 MFC_MFC400_LastUsedFlow`) are documented but deliberately **not
+extracted**: `LastUsedFlow` is persisted instrument config — the last flow
+ever used on the channel, stale for MFCs the run did not use — and Proteus
+8.0.3 writes parameter blocks even for hardware that does not exist
+(`Purge 3` on a three-MFC instrument).
 
 ### Application and license
 

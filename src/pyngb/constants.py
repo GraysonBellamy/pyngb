@@ -153,14 +153,21 @@ class FileMetadata(TypedDict, total=False):
     timezone: str
     utc_offset_minutes: int
     correction_file_path: str
-    # MFC (Mass Flow Controller) metadata
+    # MFC (Mass Flow Controller) metadata, from the stream-1 device tree:
+    # gas identity (name + short formula), full-scale range (ml/min), and
+    # the flow setpoint the run actually used (ml/min) — read from the
+    # per-stage device states, emitted only when uniform across the
+    # program's body stages (per-stage values live in temperature_program;
+    # 0.0 means the MFC was configured but not flowing).
     purge_1_mfc_gas: str
     purge_2_mfc_gas: str
     protective_mfc_gas: str
+    purge_1_mfc_gas_formula: str
+    purge_2_mfc_gas_formula: str
+    protective_mfc_gas_formula: str
     purge_1_mfc_range: float
     purge_2_mfc_range: float
     protective_mfc_range: float
-    # MFC flow setpoints as configured for the run (ml/min)
     purge_1_mfc_flow: float
     purge_2_mfc_flow: float
     protective_mfc_flow: float

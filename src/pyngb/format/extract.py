@@ -8,9 +8,13 @@ else. Every function is wrapped in a warn-and-continue net — all FileMetadata
 fields are optional by contract, so a single misbehaving rule never sinks the
 rest of the extraction.
 
-The rules preserve the legacy extractor semantics exactly (the parity goldens
-pin them): first-match-wins in stream order, occurrence-order classification
-for PID and crucible masses, ordinal pairing for MFC controllers.
+Most rules preserve the legacy extractor semantics (the parity goldens pin
+them): first-match-wins in stream order, occurrence-order classification for
+PID and crucible masses. Two deliberately do not: the temperature program is
+keyed by the category-encoded stage ordinal (stream order mislabels edited
+programs), and the MFC keys come from the self-describing device tree with
+flows read from the per-stage device states (the legacy string/ordinal
+heuristics reported stale ``LastUsedFlow`` config as the run's flow).
 """
 
 from __future__ import annotations
@@ -19,6 +23,7 @@ import logging
 import re
 from collections.abc import Callable, Iterator
 from datetime import datetime, timezone
+from itertools import islice
 
 import numpy as np
 
@@ -38,22 +43,33 @@ from .maps import (
     CORRECTION_LINK_FIELD,
     CRUCIBLE_CATEGORY,
     CRUCIBLE_MASS_FIELD,
+    DEVICE_DEF_TYPE,
+    DEVICE_ID_FIELD,
+    DEVICE_KIND_FIELD,
+    DEVICE_STATE_TYPE,
     FIELD_MAP,
     FIXPOINT_CATEGORIES,
     FIXPOINT_FIELDS,
-    GAS_CONTEXT_HIGH_BYTE,
-    GAS_TYPES,
+    GAS_FORMULA_FIELD,
+    GAS_GUID_FIELD,
+    GAS_NAME_FIELD,
+    GAS_RECORD_GUID_FIELD,
+    GAS_RECORD_TYPE,
     KNOWN_FIELD_IDS,  # noqa: F401  (re-exported for census tooling)
-    MFC_FIELD_NAMES,
-    MFC_FLOW_PARAM_NAMES,
-    MFC_FLOW_VALUE_FIELD,
+    MFC_DEVICE_KIND,
     MFC_RANGE_FIELD,
+    MFC_RANGE_TYPE,
+    MFC_ROLES,
     PID_FIELDS,
     PROVENANCE_FIELDS,
     REF_NEIGHBOR_FIELD,
     SAMPLE_NEIGHBOR_FIELD,
     SENSITIVITY_SUFFIX,
+    STAGE_CATEGORY_BASE,
     STAGE_FIELDS,
+    STAGE_FLOW_FIELD,
+    STAGE_TABLE_TYPE,
+    STAGE_TYPE_BODY,
     TEMP_CAL_CATEGORY,
     TEMP_CAL_COEFF_FIELD,
     TEMP_CAL_SUFFIX,
@@ -176,32 +192,122 @@ def extract_masses(doc: NGBDocument, metadata: FileMetadata) -> None:
 # -- Temperature program ---------------------------------------------------------
 
 
-def extract_temperature_program(doc: NGBDocument, metadata: FileMetadata) -> None:
-    """Stage N = the Nth table carrying all five stage fields (times x60).
+def _stage_ordinal(table: Table) -> int | None:
+    """The program ordinal of a stage table; None for non-stage tables.
 
-    Only f32-typed values are included: stage_type is stored as i32 and the
-    legacy extractor's pattern hard-coded the f32 dtype byte, so it never
-    captured it — the goldens pin stages without a stage_type key. (All five
-    fields still identify a stage table; decoding stage_type is Phase-2.)
+    A stage table is identified by its type ref AND the full five-field
+    signature (field 0x083F doubles as the device id elsewhere); its
+    category encodes the ordinal (STAGE_CATEGORY_BASE + N). Every stage
+    consumer resolves tables through this one predicate so the program
+    keys and the per-stage flow attribution can never disagree.
     """
-    program: dict[str, dict[str, float]] = {}
-    stage_tables = doc.find(_STREAM, with_fields=tuple(STAGE_FIELDS.values()))
-    for index, table in enumerate(stage_tables):
-        stage: dict[str, float] = {}
+    if table.type_ref != STAGE_TABLE_TYPE:
+        return None
+    if not table.has_fields(*STAGE_FIELDS.values()):
+        return None
+    ordinal = table.category - STAGE_CATEGORY_BASE
+    if ordinal < 0:
+        logger.debug(
+            f"stage-shaped table with non-stage category 0x{table.category:04X}"
+        )
+        return None
+    return ordinal
+
+
+def _stage_tables(doc: NGBDocument) -> list[tuple[int, Table]]:
+    """(ordinal, table) per stage, in program order; first wins a duplicate.
+
+    Stream order is edit order, not program order — two fixtures store
+    0, 2, 3, 4, 1.
+    """
+    stages: dict[int, Table] = {}
+    for table in doc.tables_of(_STREAM):
+        ordinal = _stage_ordinal(table)
+        if ordinal is None:
+            continue
+        if ordinal in stages:
+            logger.warning(f"duplicate stage ordinal {ordinal}; keeping the first")
+            continue
+        stages[ordinal] = table
+    return sorted(stages.items())
+
+
+def _mfc_role(table: Table) -> str | None:
+    """The metadata key prefix for a device table's id, or None if unmapped."""
+    device_id = table.value(DEVICE_ID_FIELD)
+    return MFC_ROLES.get(device_id) if isinstance(device_id, int) else None
+
+
+def _stage_mfc_flows(doc: NGBDocument) -> dict[int, dict[str, float]]:
+    """Per-stage MFC flow setpoints: {stage ordinal: {role: ml/min}}.
+
+    After each stage table the file snapshots every device as a
+    type-0x2B11 state table whose following range table (type 0x2B0A)
+    carries the stage's flow setpoint in field 0x1047.
+    """
+    tables = doc.tables_of(_STREAM)
+    flows: dict[int, dict[str, float]] = {}
+    current: int | None = None
+    for table in tables:
+        ordinal = _stage_ordinal(table)
+        if ordinal is not None:
+            current = ordinal
+            continue
+        if current is None or table.type_ref != DEVICE_STATE_TYPE:
+            continue
+        role = _mfc_role(table)
+        if role is None:
+            continue  # non-MFC device, or unmapped id (extract_mfc warns once)
+        follower = tables[table.index + 1] if table.index + 1 < len(tables) else None
+        if follower is None or follower.type_ref != MFC_RANGE_TYPE:
+            continue
+        entry = follower.get(STAGE_FLOW_FIELD)
+        if entry is None or entry.dtype != DType.F32:
+            continue
+        value = _numeric(entry.value)
+        if value is not None:
+            flows.setdefault(current, {}).setdefault(role, value)
+    return flows
+
+
+def extract_temperature_program(doc: NGBDocument, metadata: FileMetadata) -> None:
+    """Stage N = the stage table with category STAGE_CATEGORY_BASE + N.
+
+    Each stage carries the four f32 program fields (times x60: stored in
+    minutes, exposed in seconds), the i32 stage_type (0 = initial, 1 =
+    ramp/isothermal, 2 = final/emergency-reset entry), and the stage's MFC
+    flow setpoints from the device-state snapshots that follow it.
+    """
+    stages: dict[int, dict[str, float | int]] = {}
+    for ordinal, table in _stage_tables(doc):
+        stage: dict[str, float | int] = {}
         for name, field_id in STAGE_FIELDS.items():
             entry = table.get(field_id)
-            if entry is None or entry.dtype != DType.F32:
+            if entry is None:
+                continue
+            if name == "stage_type":
+                if entry.dtype == DType.I32 and isinstance(entry.value, int):
+                    stage[name] = entry.value
+                continue
+            if entry.dtype != DType.F32:
                 continue
             value = _numeric(entry.value)
             if value is None:
                 continue
-            # Stage durations are stored in minutes; the public API exposes
-            # seconds, consistent with the time column.
             stage[name] = value * 60.0 if name == "time" else value
         if stage:
-            program[f"stage_{index}"] = stage
-    if program:
-        metadata["temperature_program"] = program  # type: ignore[typeddict-item]
+            stages[ordinal] = stage
+    if not stages:
+        return
+    for ordinal, stage_flows in _stage_mfc_flows(doc).items():
+        target = stages.get(ordinal)
+        if target is None:
+            continue
+        for role, flow in stage_flows.items():
+            target[f"{role}_mfc_flow"] = flow
+    metadata["temperature_program"] = {  # type: ignore[typeddict-item]
+        f"stage_{ordinal}": stage for ordinal, stage in sorted(stages.items())
+    }
 
 
 # -- PID control parameters --------------------------------------------------------
@@ -221,70 +327,100 @@ def extract_pid(doc: NGBDocument, metadata: FileMetadata) -> None:
 
 
 def extract_mfc(doc: NGBDocument, metadata: FileMetadata) -> None:
-    """Gas/range by ordinal pairing; flow setpoints by parameter name.
+    """Gas identity and range from the device tree; flow from the stage states.
 
-    Controller name tables (in MFC_FIELD_NAMES order) pair positionally with
-    the first three range tables (field 0x1048, plausible 0.1..1000 ml/min)
-    in stream order. Each range table takes its gas from the nearest
-    preceding gas-context table (category high byte 0x1B carrying a known
-    gas name); legacy quirk preserved: when no gas context precedes a range
-    table, neither the gas nor the range key is emitted.
+    Every file carries one self-describing device block: a type-0x2B07
+    definition table per device, MFCs identified by kind code 2 and a fixed
+    device-id -> role map. The definition's own gas name plus the range
+    table and gas record that follow it (before the next definition) give
+    the identity keys directly — no string matching, no ordinal pairing.
+    The gas record must GUID-match the definition (gas records of the same
+    shape occur inside calibration-context blocks elsewhere in the stream).
+
+    ``*_mfc_flow`` is the setpoint the run actually used. It is derived
+    from the per-stage flows already merged into ``temperature_program``
+    (extract_temperature_program runs first in _EXTRACTORS), so the scalar
+    can never contradict the per-stage values it summarizes: the key is
+    emitted only when every body stage (stage_type 1 — the initial stage
+    may hold gas off, and the final type-2 stage is the never-executed
+    emergency-reset entry) carries the same flow for that MFC. A program
+    that varies a flow per stage, or with body stages missing their state
+    snapshots, gets no scalar key. The ``*_LastUsedFlow`` device parameters
+    are deliberately not read: they are persisted config, stale for MFCs
+    the run did not use, and Proteus 8.0.3 writes them even for hardware
+    that does not exist.
     """
     tables = doc.tables_of(_STREAM)
-    # Every rule below is a substring search over table strings; decode each
-    # table's string list exactly once.
-    strings_of = [table.strings() for table in tables]
-
-    def has_string_containing(index: int, needle: str) -> bool:
-        return any(needle in text for text in strings_of[index])
-
-    field_keys = [
-        name.lower().replace(" ", "_")
-        for name in MFC_FIELD_NAMES
-        if any(has_string_containing(t.index, name) for t in tables)
-    ]
-
-    range_tables: list[tuple[Table, float]] = []
-    for table in doc.find(_STREAM, with_fields=(MFC_RANGE_FIELD,)):
-        entry = table.get(MFC_RANGE_FIELD)
-        value = _numeric(entry.value) if entry is not None else None
-        if entry is not None and entry.dtype == DType.F32 and value is not None:
-            if 0.1 <= value <= 1000.0:
-                range_tables.append((table, value))
-            else:
-                logger.debug(
-                    f"MFC range value {value} outside plausible bounds; ignoring"
-                )
-
-    gas_by_index: dict[int, str] = {}
     for table in tables:
-        if (table.category >> 8) == GAS_CONTEXT_HIGH_BYTE:
-            for gas in GAS_TYPES:
-                if has_string_containing(table.index, gas):
-                    gas_by_index[table.index] = gas
-                    break
+        if table.type_ref != DEVICE_DEF_TYPE:
+            continue
+        if table.value(DEVICE_KIND_FIELD) != MFC_DEVICE_KIND:
+            continue
+        role = _mfc_role(table)
+        if role is None:
+            logger.warning(
+                f"MFC definition with unmapped device id "
+                f"{table.value(DEVICE_ID_FIELD)!r}; skipped "
+                "(an unrecognized fourth controller?)"
+            )
+            continue
 
-    for key, (range_table, range_value) in zip(field_keys, range_tables[:3]):
-        nearest_gas = next(
-            (
-                gas_by_index[i]
-                for i in range(range_table.index - 1, -1, -1)
-                if i in gas_by_index
-            ),
-            None,
-        )
-        if nearest_gas is not None:
-            metadata[f"{key}_mfc_gas"] = nearest_gas  # type: ignore[literal-required]
-            metadata[f"{key}_mfc_range"] = range_value  # type: ignore[literal-required]
+        # The definition's own block ends at the next definition or state
+        # table; within it, the range table and gas record are identified
+        # by their type refs, and the gas record must GUID-match the
+        # definition (records of the same shape occur in calibration
+        # contexts; a definition without a GUID takes no formula).
+        guid = table.value(GAS_GUID_FIELD)
+        range_value: float | None = None
+        formula: str | None = None
+        for follower in islice(tables, table.index + 1, None):
+            if follower.type_ref in (DEVICE_DEF_TYPE, DEVICE_STATE_TYPE):
+                break
+            if range_value is None and follower.type_ref == MFC_RANGE_TYPE:
+                entry = follower.get(MFC_RANGE_FIELD)
+                if entry is not None and entry.dtype == DType.F32:
+                    range_value = _numeric(entry.value)
+            if formula is None and follower.type_ref == GAS_RECORD_TYPE:
+                record_guid = follower.value(GAS_RECORD_GUID_FIELD)
+                if isinstance(guid, str) and guid and record_guid == guid:
+                    value = follower.value(GAS_FORMULA_FIELD)
+                    if isinstance(value, str) and value.strip():
+                        formula = value.strip()
+                else:
+                    logger.debug(
+                        f"{role}: ignoring gas record with GUID {record_guid!r} "
+                        f"(definition GUID {guid!r})"
+                    )
+            if range_value is not None and formula is not None:
+                break
 
-    for meta_key, param_name in MFC_FLOW_PARAM_NAMES.items():
-        for table in tables:
-            if not has_string_containing(table.index, param_name):
-                continue
-            value = _numeric(table.value(MFC_FLOW_VALUE_FIELD))
-            if value is not None and 0.0 <= value <= 1000.0:
-                metadata[meta_key] = value  # type: ignore[literal-required]
-            break  # one table per parameter name
+        gas = table.value(GAS_NAME_FIELD)
+        if isinstance(gas, str) and gas.strip() and f"{role}_mfc_gas" not in metadata:
+            metadata[f"{role}_mfc_gas"] = gas.strip()  # type: ignore[literal-required]
+        if range_value is not None and f"{role}_mfc_range" not in metadata:
+            metadata[f"{role}_mfc_range"] = range_value  # type: ignore[literal-required]
+        if formula is not None and f"{role}_mfc_gas_formula" not in metadata:
+            metadata[f"{role}_mfc_gas_formula"] = formula  # type: ignore[literal-required]
+
+    # Run-level flow setpoints, summarized from the per-stage values in
+    # temperature_program (single source of truth).
+    program = metadata.get("temperature_program") or {}
+    body = [
+        stage
+        for stage in program.values()
+        if stage.get("stage_type") == STAGE_TYPE_BODY
+    ]
+    if not body:  # no typed body stages: fall back to every snapshotted stage
+        body = [
+            stage
+            for stage in program.values()
+            if any(f"{role}_mfc_flow" in stage for role in MFC_ROLES.values())
+        ]
+    for role in MFC_ROLES.values():
+        key = f"{role}_mfc_flow"
+        values = {stage[key] for stage in body if key in stage}
+        if body and len(values) == 1 and all(key in stage for stage in body):
+            metadata[key] = values.pop()  # type: ignore[literal-required]
 
 
 # -- DSC sensitivity calibration constants --------------------------------------------

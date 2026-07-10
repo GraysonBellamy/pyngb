@@ -13,9 +13,11 @@ from pyngb.format.maps import (
     FIELD_MAP,
     FIXPOINT_FIELDS,
     KNOWN_FIELD_IDS,
-    MFC_FLOW_PARAM_NAMES,
+    MFC_RANGE_FIELD,
+    MFC_ROLES,
     PID_FIELDS,
     STAGE_FIELDS,
+    STAGE_FLOW_FIELD,
     channel_name,
 )
 from pyngb.format.grammar import DType
@@ -25,7 +27,13 @@ class TestFieldMap:
     def test_keys_are_file_metadata_keys(self) -> None:
         valid = set(FileMetadata.__annotations__)
         assert {meta.key for meta in FIELD_MAP} <= valid
-        assert set(MFC_FLOW_PARAM_NAMES) <= valid
+        for role in MFC_ROLES.values():
+            assert {
+                f"{role}_mfc_gas",
+                f"{role}_mfc_gas_formula",
+                f"{role}_mfc_range",
+                f"{role}_mfc_flow",
+            } <= valid
 
     def test_keys_are_unique(self) -> None:
         keys = [meta.key for meta in FIELD_MAP]
@@ -99,6 +107,11 @@ class TestNamedIds:
             "acquisition_rate",
             "time",
         }
+
+    def test_mfc_roles_are_the_fixed_proteus_channel_ids(self) -> None:
+        assert MFC_ROLES == {30: "purge_1", 31: "purge_2", 32: "protective"}
+        assert MFC_RANGE_FIELD == 0x1048
+        assert STAGE_FLOW_FIELD == 0x1047
 
     def test_fixpoint_fields_are_the_proteus_columns(self) -> None:
         assert list(FIXPOINT_FIELDS) == [

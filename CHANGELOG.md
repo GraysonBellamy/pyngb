@@ -18,8 +18,39 @@ paths. The public API is redesigned around the new model; this is a breaking
 release with no compatibility shims. Breaking changes are marked
 **breaking**.
 
+### Fixed
+
+- **breaking:** temperature-program stages are keyed by their program
+  ordinal (encoded in the stage table's category), not by stream order.
+  Edited programs serialize out of order, and two fixtures had their
+  stages mislabeled — the 20-min stabilization hold at 25 °C was reported
+  as the *last* stage when the recorded data shows it executed *first*
+  (stage durations match category order exactly). This also fixes baseline
+  subtraction's stage segmentation for such files, which walks the program
+  cumulatively.
+- **breaking:** `purge_1_mfc_flow` / `purge_2_mfc_flow` /
+  `protective_mfc_flow` now report the setpoint the run actually used,
+  read from the per-stage device states, instead of the `*_LastUsedFlow`
+  device parameters — persisted config that is stale for MFCs the run did
+  not use (the N2-only fixtures reported 14–20 ml/min on the idle O2
+  controller; the true value, now reported, is 0.0). The scalar key is
+  emitted when the flow is uniform across the program's body stages;
+  gas-switching programs get per-stage values only.
+
 ### Added
 
+- MFC extraction is anchored on the stream-1 **device tree** (the
+  type-`0x2B07` definition block with its range tables and GUID-matched
+  gas records) instead of string matching and ordinal pairing. New
+  metadata keys `purge_1_mfc_gas_formula` / `purge_2_mfc_gas_formula` /
+  `protective_mfc_gas_formula` (short formula, e.g. `N2`). An MFC
+  definition with an unmapped device id (a real fourth controller) logs a
+  warning instead of being silently dropped.
+- Temperature-program stages now carry `stage_type` (0 = initial, 1 =
+  ramp/isothermal, 2 = final/emergency-reset entry) and the per-stage MFC
+  flow setpoints (`purge_1_mfc_flow`, `purge_2_mfc_flow`,
+  `protective_mfc_flow`, ml/min) read from the device-state snapshots
+  that follow each stage table.
 - `read_ngb_metadata(path, *, limits=None)`: the metadata-only fast path
   (stream 1 only; replaces `NGBParser.parse_metadata`). Used by
   `NGBDataset`/batch metadata operations.

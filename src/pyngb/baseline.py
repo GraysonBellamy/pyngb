@@ -10,7 +10,7 @@ the API layer's job (``read_ngb(path, baseline_file=...)``).
 import logging
 import math
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 import polars as pl
@@ -42,7 +42,7 @@ class BaselineSubtractor:
     """Handles baseline subtraction operations for NGB data."""
 
     def identify_segments(
-        self, df: pl.DataFrame, temperature_program: dict[str, dict[str, float]]
+        self, df: pl.DataFrame, temperature_program: dict[str, dict[str, Any]]
     ) -> list[Segment]:
         """
         Partition every row of ``df`` into contiguous program segments.
