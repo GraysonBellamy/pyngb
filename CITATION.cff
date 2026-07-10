@@ -12,8 +12,8 @@ authors:
     family-names: Bellamy
     email: gbellamy@umd.edu
     orcid: "https://orcid.org/0000-0001-8778-0991"
-version: 0.3.0
-date-released: 2026-07-06
+version: 0.4.0
+date-released: 2026-07-09
 license: MIT
 repository-code: "https://github.com/GraysonBellamy/pyngb"
 url: "https://pyngb.graysonbellamy.dev/"
