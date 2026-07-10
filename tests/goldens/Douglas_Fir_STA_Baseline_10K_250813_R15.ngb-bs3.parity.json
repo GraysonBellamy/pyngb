@@ -164,6 +164,80 @@
       "comment": "Swapped crucible positions, 70 mL/min total flowrate",
       "crucible_type": "PtRh20 85 µl, with lid",
       "date_measured": "2025-08-07T11:02:15+00:00",
+      "fixpoints": [
+        {
+          "enthalpy": -120.5,
+          "fitted_sensitivity": 7.049779891967773,
+          "measured_sensitivity": 7.0858917236328125,
+          "name": "Biphenyl",
+          "peak_area": -853.8499755859375,
+          "temperature_c": 69.19999694824219,
+          "weight": 1.0
+        },
+        {
+          "enthalpy": -147.39999389648438,
+          "fitted_sensitivity": 6.73606538772583,
+          "measured_sensitivity": 6.783921718597412,
+          "name": "Benzoeacid",
+          "peak_area": -999.9500122070312,
+          "temperature_c": 122.4000015258789,
+          "weight": 1.0
+        },
+        {
+          "enthalpy": -25.969999313354492,
+          "fitted_sensitivity": 6.476441383361816,
+          "measured_sensitivity": 6.337312698364258,
+          "name": "RbNO3(trig>kub)",
+          "peak_area": -164.5800018310547,
+          "temperature_c": 164.1999969482422,
+          "weight": 1.0
+        },
+        {
+          "enthalpy": -104.80000305175781,
+          "fitted_sensitivity": 5.58476448059082,
+          "measured_sensitivity": 5.634828567504883,
+          "name": "KClO4",
+          "peak_area": -590.530029296875,
+          "temperature_c": 300.0,
+          "weight": 1.0
+        },
+        {
+          "enthalpy": -51.900001525878906,
+          "fitted_sensitivity": 4.724781036376953,
+          "measured_sensitivity": 4.781310081481934,
+          "name": "Ag2SO4",
+          "peak_area": -248.14999389648438,
+          "temperature_c": 426.20001220703125,
+          "weight": 1.0
+        },
+        {
+          "enthalpy": -17.200000762939453,
+          "fitted_sensitivity": 4.38295316696167,
+          "measured_sensitivity": 4.3484883308410645,
+          "name": "CsCl",
+          "peak_area": -74.79399871826172,
+          "temperature_c": 476.0,
+          "weight": 1.0
+        },
+        {
+          "enthalpy": -37.08000183105469,
+          "fitted_sensitivity": 3.07991623878479,
+          "measured_sensitivity": 3.036677360534668,
+          "name": "K2CrO4",
+          "peak_area": -112.5999984741211,
+          "temperature_c": 669.0,
+          "weight": 1.0
+        },
+        {
+          "enthalpy": -98.5,
+          "fitted_sensitivity": 2.2211291790008545,
+          "measured_sensitivity": 2.2483248710632324,
+          "name": "BaCO3",
+          "peak_area": -221.4600067138672,
+          "temperature_c": 807.0,
+          "weight": 1.0
+        }
+      ],
       "gas": "NITROGEN",
       "heating_rate": 10.0,
       "record_path": "C:\\NETZSCH\\Proteus80\\_Records\\Calibrations\\L_44_STA449F3A-0333-M_V1_101_4_104_1_4003000003EB03EB_0_1000_292a050d-2f6c-490e-8385-7c743538a5a3_100_.ngb-es3"

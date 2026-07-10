@@ -58,6 +58,9 @@ __all__ = [
     "SAMPLE_NEIGHBOR_FIELD",
     "SEGMENT_VALUES_TYPE",
     "SENSITIVITY_SUFFIX",
+    "SENS_FIXPOINT_EXCLUDES",
+    "SENS_FIXPOINT_FIELDS",
+    "SENS_FIXPOINT_REQUIRES",
     "STAGE_CATEGORY_BASE",
     "STAGE_FIELDS",
     "STAGE_FLOW_FIELD",
@@ -68,6 +71,8 @@ __all__ = [
     "TEMP_CAL_CATEGORY",
     "TEMP_CAL_COEFF_FIELD",
     "TEMP_CAL_SUFFIX",
+    "TEMP_FIXPOINT_EXCLUDES",
+    "TEMP_FIXPOINT_REQUIRES",
     "TIMEZONE_CATEGORY",
     "TIMEZONE_FIELDS",
     "MetaField",
@@ -230,10 +235,16 @@ CAL_CONSTANTS: Final[dict[str, int]] = {
 TEMP_CAL_CATEGORY: Final = 0x01F7
 TEMP_CAL_COEFF_FIELD: Final = 0x04BE
 
-#: Fixpoint tables are categorised 0x7530..0x753F (one per standard, ascending
-#: temperature). The 0x7530 category is shared with the sample table, so a
-#: fixpoint table is confirmed by carrying the actual- and corrected-
-#: temperature fields.
+#: Fixpoint tables are categorised 0x7530..0x753F (one standard per category,
+#: ascending temperature), and each category can hold one table of EACH
+#: fixpoint family: a temperature fixpoint and a DSC sensitivity fixpoint
+#: (enthalpy standard; see :class:`pyngb.constants.SensitivityFixpoint` for
+#: the column semantics and verified identities). The two families reuse
+#: field ids 0x0443 and 0x0445-0x0447 with family-specific meanings, and the
+#: categories are also shared with unrelated tables (sample, stage states),
+#: so family membership is decided by the REQUIRES/EXCLUDES sets below: a
+#: table belongs to a family when it carries all of the family's required
+#: fields and not the other family's marker.
 FIXPOINT_CATEGORIES: Final = tuple(range(0x7530, 0x7540))
 FIXPOINT_FIELDS: Final[dict[str, int]] = {
     "name": 0x0443,
@@ -242,6 +253,22 @@ FIXPOINT_FIELDS: Final[dict[str, int]] = {
     "weight": 0x0446,
     "corrected_c": 0x0447,
 }
+SENS_FIXPOINT_FIELDS: Final[dict[str, int]] = {
+    "name": 0x0443,
+    "temperature_c": 0x0454,
+    "enthalpy": 0x0455,
+    "peak_area": 0x0456,
+    "measured_sensitivity": 0x0445,
+    "weight": 0x0446,
+    "fitted_sensitivity": 0x0447,
+}
+TEMP_FIXPOINT_REQUIRES: Final = (
+    FIXPOINT_FIELDS["actual_c"],
+    FIXPOINT_FIELDS["corrected_c"],
+)
+TEMP_FIXPOINT_EXCLUDES: Final = SENS_FIXPOINT_FIELDS["temperature_c"]
+SENS_FIXPOINT_REQUIRES: Final = (SENS_FIXPOINT_FIELDS["temperature_c"],)
+SENS_FIXPOINT_EXCLUDES: Final = FIXPOINT_FIELDS["actual_c"]
 
 #: External calibration record path suffixes (values of string fields in the
 #: 0x01F5 calibration-source tables).
@@ -363,6 +390,7 @@ KNOWN_FIELD_IDS: Final[frozenset[int]] = frozenset(
     | set(CAL_CONSTANTS.values())
     | {TEMP_CAL_COEFF_FIELD}
     | set(FIXPOINT_FIELDS.values())
+    | set(SENS_FIXPOINT_FIELDS.values())
     | {fid for candidates in PROVENANCE_FIELDS.values() for fid in candidates}
     | set(TIMEZONE_FIELDS.values())
     | {CORRECTION_LINK_FIELD}

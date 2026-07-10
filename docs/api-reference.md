@@ -366,9 +366,15 @@ in `temperature_program`).
   `T = measured_c` (verified by round-trip on all sample files); the residual
   `actual_c - corrected_c` is the calibration fit error.
 
-- `sensitivity_calibration` (`SensitivityCalibration`): provenance of the DSC
-  sensitivity calibration — `record_path` (the external `.ngb-es3` record),
-  `date_measured`, `gas`, `crucible_type`, `heating_rate`, `comment`.
+- `sensitivity_calibration` (`SensitivityCalibration`): the DSC sensitivity
+  calibration — provenance (`record_path` to the external `.ngb-es3` record,
+  `date_measured`, `gas`, `crucible_type`, `heating_rate`, `comment`) plus
+  `fixpoints`, the enthalpy standards behind `calibration_constants`. Each
+  `SensitivityFixpoint` carries `name`, `temperature_c`, `enthalpy` (J/g,
+  endothermic negative), `peak_area` (µV·s/mg), `measured_sensitivity` and
+  `fitted_sensitivity` (µV/mW), and `weight`. Two exact relationships hold:
+  `measured_sensitivity == peak_area / enthalpy`, and `fitted_sensitivity`
+  is the p0–p5 calibration curve evaluated at `temperature_c`.
 
 ### ParsingConfig
 

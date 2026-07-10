@@ -14,6 +14,7 @@ __all__ = [  # noqa: RUF022 - order chosen for logical grouping
     "FIELD_APPLICABILITY",
     "FileMetadata",
     "SensitivityCalibration",
+    "SensitivityFixpoint",
     "TemperatureCalibration",
     "TemperatureFixpoint",
 ]
@@ -85,11 +86,54 @@ class TemperatureCalibration(TypedDict, total=False):
     comment: str
 
 
+class SensitivityFixpoint(TypedDict, total=False):
+    """A single DSC sensitivity-calibration fixpoint (enthalpy standard).
+
+    Each fixpoint is one row of the Proteus sensitivity-calibration table:
+    a standard of known transition enthalpy whose measured DSC peak area
+    yields a sensitivity point, regressed into the ``calibration_constants``
+    curve. Standards vary per calibration (e.g. Biphenyl, KClO4, CsCl, BaCO3) -
+    names and values are read from the file, never hard-coded.
+
+    Two relationships are exact and were verified against every available
+    file (residuals ``< 4e-7``, f32 precision)::
+
+        measured_sensitivity = peak_area / enthalpy
+        fitted_sensitivity   = (P2 + P3*z + P4*z**2 + P5*z**3) * exp(-z**2)
+        z = (temperature_c - P0) / P1
+
+    where ``P0..P5`` are the file's ``calibration_constants`` - these
+    standards are the regression behind that curve, and ``fitted_sensitivity``
+    is the curve evaluated at each standard's transition temperature.
+
+    Sign convention: ``enthalpy`` and ``peak_area`` are stored by Proteus
+    with endothermic transitions negative and are reported as stored.
+
+    Fields:
+        name: Standard name as recorded by Proteus.
+        temperature_c: Transition temperature of the standard in °C.
+        enthalpy: Literature transition enthalpy in J/g (negative = endothermic).
+        peak_area: Measured DSC peak area in µV·s/mg (sign matches enthalpy).
+        measured_sensitivity: peak_area / enthalpy, in µV/mW.
+        weight: Regression weight for this point (1.0 in all observed files).
+        fitted_sensitivity: Calibration curve evaluated at temperature_c, in µV/mW.
+    """
+
+    name: str
+    temperature_c: float
+    enthalpy: float
+    peak_area: float
+    measured_sensitivity: float
+    weight: float
+    fitted_sensitivity: float
+
+
 class SensitivityCalibration(TypedDict, total=False):
-    """DSC sensitivity-calibration provenance (traceability/QA only).
+    """DSC sensitivity-calibration block (traceability/QA only).
 
     The calibration constants themselves (p0-p5) are exposed separately as
-    ``calibration_constants``; this block records where they came from.
+    ``calibration_constants``; this block records where they came from and
+    the enthalpy standards they were regressed from.
 
     Fields:
         record_path: Path to the external sensitivity record (.ngb-es3).
@@ -98,6 +142,7 @@ class SensitivityCalibration(TypedDict, total=False):
         crucible_type: Crucible used during the calibration run.
         heating_rate: Heating rate of the calibration run in K/min.
         comment: Operator comment recorded on the calibration run.
+        fixpoints: The enthalpy standards used for the calibration.
     """
 
     record_path: str
@@ -106,6 +151,7 @@ class SensitivityCalibration(TypedDict, total=False):
     crucible_type: str
     heating_rate: float
     comment: str
+    fixpoints: list[SensitivityFixpoint]
 
 
 class FileMetadata(TypedDict, total=False):

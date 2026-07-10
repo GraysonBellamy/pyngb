@@ -51,6 +51,16 @@ release with no compatibility shims. Breaking changes are marked
   flow setpoints (`purge_1_mfc_flow`, `purge_2_mfc_flow`,
   `protective_mfc_flow`, ml/min) read from the device-state snapshots
   that follow each stage table.
+- `sensitivity_calibration.fixpoints` (`SensitivityFixpoint`): the enthalpy
+  standards behind the p0–p5 `calibration_constants` — `name`,
+  `temperature_c`, literature `enthalpy` (J/g, endothermic negative),
+  measured `peak_area` (µV·s/mg), `measured_sensitivity` and
+  `fitted_sensitivity` (µV/mW), and regression `weight`. Semantics are
+  pinned by two exact identities verified on every fixture:
+  `measured_sensitivity = peak_area / enthalpy`, and `fitted_sensitivity`
+  is the calibration curve evaluated at the standard's transition
+  temperature. `SensitivityCalibration` and `SensitivityFixpoint` are
+  exported from the package root.
 - `read_ngb_metadata(path, *, limits=None)`: the metadata-only fast path
   (stream 1 only; replaces `NGBParser.parse_metadata`). Used by
   `NGBDataset`/batch metadata operations.

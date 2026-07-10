@@ -224,6 +224,62 @@
       "comment": "Open pan, swapped crucibles, 21% O2, 70 mL/min total flowrate",
       "crucible_type": "PtRh20 85 µl, open",
       "date_measured": "2023-02-16T20:35:10+00:00",
+      "fixpoints": [
+        {
+          "enthalpy": -120.5,
+          "fitted_sensitivity": 0.9252583384513855,
+          "measured_sensitivity": 0.9439833760261536,
+          "name": "Biphenyl",
+          "peak_area": -113.75,
+          "temperature_c": 69.19999694824219,
+          "weight": 1.0
+        },
+        {
+          "enthalpy": -147.39999389648438,
+          "fitted_sensitivity": 0.9022538661956787,
+          "measured_sensitivity": 0.8776797652244568,
+          "name": "Benzoeacid",
+          "peak_area": -129.3699951171875,
+          "temperature_c": 122.4000015258789,
+          "weight": 1.0
+        },
+        {
+          "enthalpy": -104.72699737548828,
+          "fitted_sensitivity": 0.8225704431533813,
+          "measured_sensitivity": 0.8309127688407898,
+          "name": "KClO4",
+          "peak_area": -87.01899719238281,
+          "temperature_c": 300.79998779296875,
+          "weight": 1.0
+        },
+        {
+          "enthalpy": -51.900001525878906,
+          "fitted_sensitivity": 0.7462488412857056,
+          "measured_sensitivity": 0.7394797801971436,
+          "name": "Ag2SO4",
+          "peak_area": -38.37900161743164,
+          "temperature_c": 426.3999938964844,
+          "weight": 1.0
+        },
+        {
+          "enthalpy": -17.200000762939453,
+          "fitted_sensitivity": 0.7086248993873596,
+          "measured_sensitivity": 0.7147092819213867,
+          "name": "CsCl",
+          "peak_area": -12.293000221252441,
+          "temperature_c": 476.0,
+          "weight": 1.0
+        },
+        {
+          "enthalpy": -97.5,
+          "fitted_sensitivity": 0.36965206265449524,
+          "measured_sensitivity": 0.3684307634830475,
+          "name": "BaCO3",
+          "peak_area": -35.922000885009766,
+          "temperature_c": 808.0,
+          "weight": 1.0
+        }
+      ],
       "gas": "NITROGEN",
       "heating_rate": 10.0,
       "record_path": "C:\\NETZSCH\\Proteus80\\_Records\\Calibrations\\L_44_STA449F3A-0157-M_V1_104_5_101_5_40000000000003EB_0_1000_292a050d-2f6c-490e-8385-7c743538a5a3_100_.ngb-es3"

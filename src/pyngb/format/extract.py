@@ -1,7 +1,7 @@
 """Metadata extraction: FileMetadata as queries over the document model.
 
 ``build_metadata`` applies the declarative :data:`~pyngb.format.maps.FIELD_MAP`
-first, then eight plain extraction functions. Each function is one metadata
+first, then nine plain extraction functions. Each function is one metadata
 concern expressed against tables and fields; adding a Phase-2 field means
 adding a function to :data:`_EXTRACTORS` (or an entry to FIELD_MAP), nothing
 else. Every function is wrapped in a warn-and-continue net — all FileMetadata
@@ -31,7 +31,6 @@ from ..constants import (
     FileMetadata,
     SensitivityCalibration,
     TemperatureCalibration,
-    TemperatureFixpoint,
 )
 from .document import NGBDocument, Table
 from .grammar import DType
@@ -65,6 +64,9 @@ from .maps import (
     REF_NEIGHBOR_FIELD,
     SAMPLE_NEIGHBOR_FIELD,
     SENSITIVITY_SUFFIX,
+    SENS_FIXPOINT_EXCLUDES,
+    SENS_FIXPOINT_FIELDS,
+    SENS_FIXPOINT_REQUIRES,
     STAGE_CATEGORY_BASE,
     STAGE_FIELDS,
     STAGE_FLOW_FIELD,
@@ -73,6 +75,8 @@ from .maps import (
     TEMP_CAL_CATEGORY,
     TEMP_CAL_COEFF_FIELD,
     TEMP_CAL_SUFFIX,
+    TEMP_FIXPOINT_EXCLUDES,
+    TEMP_FIXPOINT_REQUIRES,
     TIMEZONE_CATEGORY,
     TIMEZONE_FIELDS,
 )
@@ -480,8 +484,46 @@ def _extract_provenance(table: Table) -> dict[str, str | float]:
     return provenance
 
 
+def _fixpoint_rows(
+    doc: NGBDocument,
+    field_map: dict[str, int],
+    requires: tuple[int, ...],
+    excludes: int,
+) -> list[dict[str, str | float]]:
+    """Rows of one fixpoint family, one table per 0x7530+ category.
+
+    The temperature and sensitivity families share the categories and reuse
+    field ids with different meanings; a family's table is the first in the
+    category carrying all of ``requires`` and not ``excludes`` (the other
+    family's marker field) — see the discriminator constants in maps.py.
+    """
+    rows: list[dict[str, str | float]] = []
+    for category in FIXPOINT_CATEGORIES:
+        table = next(
+            (
+                t
+                for t in doc.by_category(_STREAM, category)
+                if t.has_fields(*requires) and excludes not in t.fields
+            ),
+            None,
+        )
+        if table is None:
+            continue
+        row: dict[str, str | float] = {}
+        for name, field_id in field_map.items():
+            value = table.value(field_id)
+            if name == "name":
+                if isinstance(value, str) and value.strip():
+                    row["name"] = value.strip()
+            elif (numeric := _numeric(value)) is not None:
+                row[name] = numeric
+        if row:
+            rows.append(row)
+    return rows
+
+
 def extract_temperature_calibration(doc: NGBDocument, metadata: FileMetadata) -> None:
-    """Coefficients, fixpoints, and provenance (traceability/QA only).
+    """Coefficients, temperature fixpoints, and ts3 provenance (traceability/QA only).
 
     The sample_temperature channel is already corrected by Proteus; the
     coefficients are captured for provenance and never applied to the data.
@@ -501,27 +543,11 @@ def extract_temperature_calibration(doc: NGBDocument, metadata: FileMetadata) ->
             else:
                 logger.debug(f"Invalid coefficient array length: {entry.raw.nbytes}")
 
-    actual_id = FIXPOINT_FIELDS["actual_c"]
-    corrected_id = FIXPOINT_FIELDS["corrected_c"]
-    fixpoints: list[TemperatureFixpoint] = []
-    for category in FIXPOINT_CATEGORIES:
-        table = doc.first(
-            _STREAM, category=category, with_fields=(actual_id, corrected_id)
-        )
-        if table is None:
-            continue
-        row: TemperatureFixpoint = {}
-        for name, field_id in FIXPOINT_FIELDS.items():
-            value = table.value(field_id)
-            if name == "name":
-                if isinstance(value, str) and value.strip():
-                    row["name"] = value.strip()
-            elif (numeric := _numeric(value)) is not None:
-                row[name] = numeric  # type: ignore[literal-required]
-        if row:
-            fixpoints.append(row)
+    fixpoints = _fixpoint_rows(
+        doc, FIXPOINT_FIELDS, TEMP_FIXPOINT_REQUIRES, TEMP_FIXPOINT_EXCLUDES
+    )
     if fixpoints:
-        cal["fixpoints"] = fixpoints
+        cal["fixpoints"] = fixpoints  # type: ignore[typeddict-item]
 
     ts3 = _find_record_table(doc, TEMP_CAL_SUFFIX)
     if ts3 is not None:
@@ -531,7 +557,22 @@ def extract_temperature_calibration(doc: NGBDocument, metadata: FileMetadata) ->
     if cal:
         metadata["temperature_calibration"] = cal
 
+
+def extract_sensitivity_calibration(doc: NGBDocument, metadata: FileMetadata) -> None:
+    """Sensitivity fixpoints and es3 provenance (traceability/QA only).
+
+    The fixpoints are the enthalpy standards behind ``calibration_constants``
+    p0-p5 (see :class:`~pyngb.constants.SensitivityFixpoint`); the constants
+    themselves are extracted by :func:`extract_calibration_constants`.
+    """
     sensitivity: SensitivityCalibration = {}
+
+    fixpoints = _fixpoint_rows(
+        doc, SENS_FIXPOINT_FIELDS, SENS_FIXPOINT_REQUIRES, SENS_FIXPOINT_EXCLUDES
+    )
+    if fixpoints:
+        sensitivity["fixpoints"] = fixpoints  # type: ignore[typeddict-item]
+
     es3 = _find_record_table(doc, SENSITIVITY_SUFFIX)
     if es3 is not None:
         table, path = es3
@@ -609,6 +650,7 @@ _EXTRACTORS: tuple[Callable[[NGBDocument, FileMetadata], None], ...] = (
     extract_mfc,
     extract_calibration_constants,
     extract_temperature_calibration,
+    extract_sensitivity_calibration,
     extract_run_environment,
     extract_app_license,
 )

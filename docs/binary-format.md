@@ -279,9 +279,9 @@ the DSC signal µV → mW.
 ### Temperature calibration
 
 Surfaced as the `temperature_calibration` metadata block plus a sibling
-`sensitivity_calibration` provenance block. Captured for **traceability/QA
-only**: the `sample_temperature` channel is already temperature-corrected by
-Proteus, so re-applying these coefficients would double-correct the data.
+`sensitivity_calibration` block. Captured for **traceability/QA only**: the
+`sample_temperature` channel is already temperature-corrected by Proteus, so
+re-applying these coefficients would double-correct the data.
 
 **Coefficients** — three f32 values stored as a dtype-`0x10` byte array on
 field `0x04BE` of the category-`0x01F7` table (12 bytes = 3 × f32 LE),
@@ -310,6 +310,36 @@ corrected_c = measured_c + (1e-3·B0 + 1e-5·B1·T + 1e-8·B2·T²)   # T = meas
 ```
 
 The residual `actual_c − corrected_c` is the calibration fit error.
+
+**DSC sensitivity fixpoints** — the enthalpy standards behind the p0–p5
+calibration constants, surfaced as `sensitivity_calibration.fixpoints`. A
+second table family in the same `0x7530`–`0x753F` categories (ascending
+temperature; 6–8 standards in real files), reusing field ids
+`0x0443`/`0x0445`–`0x0447` with different meanings — the family is
+discriminated by carrying `0x0454` and **no** `0x0444`:
+
+| Field | Key | Description |
+|-------|-----|-------------|
+| `0x0443` | `name` | standard name |
+| `0x0454` | `temperature_c` | transition temperature (°C) |
+| `0x0455` | `enthalpy` | literature transition enthalpy (J/g, endothermic negative) |
+| `0x0456` | `peak_area` | measured DSC peak area (µV·s/mg, sign matches enthalpy) |
+| `0x0445` | `measured_sensitivity` | measured sensitivity point (µV/mW) |
+| `0x0446` | `weight` | regression weight (1.0 in observed files) |
+| `0x0447` | `fitted_sensitivity` | calibration curve at `temperature_c` (µV/mW) |
+
+**Relationships** (both exact on every fixpoint of every fixture, residual
+< 4e-7 — f32 precision):
+
+```
+measured_sensitivity = peak_area / enthalpy
+fitted_sensitivity   = (P2 + P3·z + P4·z² + P5·z³)·exp(−z²)   # z = (temperature_c − P0)/P1
+```
+
+i.e. these standards are the regression behind the `calibration_constants`
+curve used by `apply_dsc_calibration`, and `fitted_sensitivity` is that
+curve evaluated at each standard's transition temperature. Values were stored
+negative (endothermic-negative convention) and are reported as stored.
 
 **Record paths and provenance** — each external calibration record has one
 category-`0x01F5` source table, located by the suffix of its path string

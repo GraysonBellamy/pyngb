@@ -36,6 +36,8 @@ from .constants import (
     FileMetadata,
     BaseColumnMetadata,
     BaselinableColumnMetadata,
+    SensitivityCalibration,
+    SensitivityFixpoint,
     TemperatureCalibration,
     TemperatureFixpoint,
 )
@@ -73,6 +75,8 @@ __all__ = [
     "NGBStreamNotFoundError",
     "ParsingConfig",
     "QualityChecker",
+    "SensitivityCalibration",
+    "SensitivityFixpoint",
     "Table",
     "TemperatureCalibration",
     "TemperatureFixpoint",

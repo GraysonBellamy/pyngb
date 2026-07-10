@@ -214,6 +214,80 @@
       "comment": "Swapped crucible positions, 70 mL/min total flowrate",
       "crucible_type": "PtRh20 85 µl, with lid",
       "date_measured": "2024-12-10T12:46:24+00:00",
+      "fixpoints": [
+        {
+          "enthalpy": -89.53399658203125,
+          "fitted_sensitivity": 1.0075150728225708,
+          "measured_sensitivity": 0.9995420575141907,
+          "name": "Phenyl salicylate",
+          "peak_area": -89.49299621582031,
+          "temperature_c": 41.79999923706055,
+          "weight": 1.0
+        },
+        {
+          "enthalpy": -120.5,
+          "fitted_sensitivity": 1.0218373537063599,
+          "measured_sensitivity": 1.0230705738067627,
+          "name": "Biphenyl",
+          "peak_area": -123.27999877929688,
+          "temperature_c": 69.19999694824219,
+          "weight": 1.0
+        },
+        {
+          "enthalpy": -147.39999389648438,
+          "fitted_sensitivity": 1.0375112295150757,
+          "measured_sensitivity": 1.0289688110351562,
+          "name": "Benzoeacid",
+          "peak_area": -151.6699981689453,
+          "temperature_c": 122.4000015258789,
+          "weight": 1.0
+        },
+        {
+          "enthalpy": -146.8000030517578,
+          "fitted_sensitivity": 1.0395489931106567,
+          "measured_sensitivity": 1.06641685962677,
+          "name": "Diphenylacetic Acid",
+          "peak_area": -156.5500030517578,
+          "temperature_c": 147.1999969482422,
+          "weight": 1.0
+        },
+        {
+          "enthalpy": -104.9000015258789,
+          "fitted_sensitivity": 0.9885122179985046,
+          "measured_sensitivity": 0.9706386923789978,
+          "name": "KClO4",
+          "peak_area": -101.81999969482422,
+          "temperature_c": 300.79998779296875,
+          "weight": 1.0
+        },
+        {
+          "enthalpy": -51.900001525878906,
+          "fitted_sensitivity": 0.8904641270637512,
+          "measured_sensitivity": 0.8920037746429443,
+          "name": "Ag2SO4",
+          "peak_area": -46.29499816894531,
+          "temperature_c": 426.3999938964844,
+          "weight": 1.0
+        },
+        {
+          "enthalpy": -17.200000762939453,
+          "fitted_sensitivity": 0.845095694065094,
+          "measured_sensitivity": 0.8506976366043091,
+          "name": "CsCl",
+          "peak_area": -14.631999969482422,
+          "temperature_c": 476.0,
+          "weight": 1.0
+        },
+        {
+          "enthalpy": -97.5,
+          "fitted_sensitivity": 0.5634244084358215,
+          "measured_sensitivity": 0.5627076625823975,
+          "name": "BaCO3",
+          "peak_area": -54.86399841308594,
+          "temperature_c": 808.0,
+          "weight": 1.0
+        }
+      ],
       "gas": "NITROGEN",
       "heating_rate": 10.0,
       "record_path": "C:\\NETZSCH\\Proteus80\\_Records\\Calibrations\\L_44_STA449F3A-0157-M_V1_104_5_101_5_4003000003EB03EB_0_1000_292a050d-2f6c-490e-8385-7c743538a5a3_100_.ngb-es3"
