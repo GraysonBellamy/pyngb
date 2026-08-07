@@ -1,0 +1,392 @@
+{
+  "column_dtypes": {
+    "31": "double",
+    "dsc_signal": "double",
+    "furnace_power": "double",
+    "furnace_temperature": "double",
+    "mass": "double",
+    "protective_flow": "double",
+    "purge_flow_2": "double",
+    "sample_temperature": "double",
+    "time": "double"
+  },
+  "column_sha256": {
+    "31": "c87d9be8ffddb1c4cf6cc7faecf381401ba86eec36a1d733f86b747f808e24fb",
+    "dsc_signal": "2af6f935b5e716843829d3028cea2487ad22f6b1fe2612726fbcaa57ca58275e",
+    "furnace_power": "8754fd39b469b517e1216aad821b476b163c7e52548b2416b98c2beeb3e7fe2a",
+    "furnace_temperature": "12e9d558c5fc4a37311e7364259290e13ecfead4233ca5b2d482f77dd1a21472",
+    "mass": "5ebe5720b7f5d39b48bad383a53029ba1bb020c57e345335c0f0d6b23e2f1048",
+    "protective_flow": "23479266ed5c2a54ce5f7e29b9de8de243f7240ce33d6fd383b93e4a74832f55",
+    "purge_flow_2": "23479266ed5c2a54ce5f7e29b9de8de243f7240ce33d6fd383b93e4a74832f55",
+    "sample_temperature": "4805b98a5174b27d0d5d54a92a96368a5859bc290d5107d1294134ac10918612",
+    "time": "5bc7df271f89f8c4da8a073f689796f454f33a7284d4cf59798d171227de70d3"
+  },
+  "column_stats": {
+    "31": {
+      "first": 0.0,
+      "last": 0.0,
+      "max": 0.0,
+      "min": 0.0,
+      "null_count": 0
+    },
+    "dsc_signal": {
+      "first": -3.6933910846710205,
+      "last": -1.6281132698059082,
+      "max": 2.7664194107055664,
+      "min": -16.202550888061523,
+      "null_count": 0
+    },
+    "furnace_power": {
+      "first": 0.014000000432133675,
+      "last": 0.0,
+      "max": 1.680999994277954,
+      "min": 0.0,
+      "null_count": 0
+    },
+    "furnace_temperature": {
+      "first": 33.952999114990234,
+      "last": 72.03900146484375,
+      "max": 313.92401123046875,
+      "min": 33.952999114990234,
+      "null_count": 0
+    },
+    "mass": {
+      "first": 0.0,
+      "last": -5.497000217437744,
+      "max": 0.6349999904632568,
+      "min": -15.032999992370605,
+      "null_count": 0
+    },
+    "protective_flow": {
+      "first": 20.0,
+      "last": 20.0,
+      "max": 20.0,
+      "min": 20.0,
+      "null_count": 0
+    },
+    "purge_flow_2": {
+      "first": 20.0,
+      "last": 20.0,
+      "max": 20.0,
+      "min": 20.0,
+      "null_count": 0
+    },
+    "sample_temperature": {
+      "first": 34.323001861572266,
+      "last": 81.38700103759766,
+      "max": 303.9830017089844,
+      "min": 34.07699966430664,
+      "null_count": 0
+    },
+    "time": {
+      "first": 0.0,
+      "last": 4380.050000000118,
+      "max": 4380.050000000118,
+      "min": 0.0,
+      "null_count": 0
+    }
+  },
+  "columns": [
+    "time",
+    "sample_temperature",
+    "dsc_signal",
+    "purge_flow_2",
+    "protective_flow",
+    "mass",
+    "furnace_temperature",
+    "31",
+    "furnace_power"
+  ],
+  "fixture": "02_Messung_Probe_E_300_Grad_Ar.ngb-ds3",
+  "fixture_blake2b": "436ba625e8f0d9ca07d00a0f83fe10196d2acb74e8000039c8fc377d0de3a9a47c35b898b0393c39f9926c68643d991b7868078d94cd89873ba92a46a43fcf3d",
+  "metadata": {
+    "application_version": "Version 6.0.0  (21.11.2012)",
+    "calibration_constants": {
+      "p0": 3.0,
+      "p1": 0.0,
+      "p2": 0.0,
+      "p3": 0.0,
+      "p4": 0.0,
+      "p5": 0.0
+    },
+    "carrier_type": "DSC/TG Cp S",
+    "comment": "zwei Tiegel Al, 23mg; Erstellung Kalibrierkurve(n)",
+    "correction_file_path": "C:\\NETZSCH\\Proteus6\\data\\Korrektur\\Korrekturkurve_Netzschtiegel_Al_23mg_10K_105_300_Ar_Reinhold2.ngb-bs3",
+    "crucible_mass": 23.0,
+    "crucible_type": "DSC/TG pan Al",
+    "date_performed": "2026-08-04T12:23:04+00:00",
+    "file_hash": {
+      "file": "02_Messung_Probe_E_300_Grad_Ar.ngb-ds3",
+      "hash": "436ba625e8f0d9ca07d00a0f83fe10196d2acb74e8000039c8fc377d0de3a9a47c35b898b0393c39f9926c68643d991b7868078d94cd89873ba92a46a43fcf3d",
+      "method": "BLAKE2b"
+    },
+    "furnace_tn": 4.0,
+    "furnace_tv": 4.0,
+    "furnace_type": "High Temp Rh S",
+    "furnace_xp": 4.0,
+    "instrument": "STA449F3A-0042-M",
+    "lab": "WST",
+    "licensed_to": "HTWK Leipzig\nFachbereich Maschinen- und Energietechnik\nD-04416 Markkleeberg",
+    "material": "Papier E",
+    "operator": "Ja",
+    "project": "Trocknung",
+    "protective_mfc_flow": 20.0,
+    "protective_mfc_gas": "ARGON",
+    "protective_mfc_gas_formula": "Ar",
+    "protective_mfc_range": 244.25,
+    "purge_1_mfc_flow": 0.0,
+    "purge_1_mfc_gas": "OXYGEN",
+    "purge_1_mfc_gas_formula": "O2",
+    "purge_1_mfc_range": 254.00001525878906,
+    "purge_2_mfc_flow": 20.0,
+    "purge_2_mfc_gas": "ARGON",
+    "purge_2_mfc_gas_formula": "Ar",
+    "purge_2_mfc_range": 244.25,
+    "reference_crucible_mass": 23.0,
+    "reference_mass": 0.0,
+    "sample_id": "011",
+    "sample_mass": 13.856,
+    "sample_name": "Papier E",
+    "sample_tn": 4.0,
+    "sample_tv": 4.0,
+    "sample_xp": 4.0,
+    "sensitivity_calibration": {
+      "fixpoints": [
+        {
+          "enthalpy": -79.01000213623047,
+          "fitted_sensitivity": 1.0,
+          "measured_sensitivity": 1.0,
+          "name": "C6H12",
+          "peak_area": -79.01000213623047,
+          "temperature_c": -86.0,
+          "weight": 1.0
+        },
+        {
+          "enthalpy": -11.4399995803833,
+          "fitted_sensitivity": 1.0,
+          "measured_sensitivity": 1.0,
+          "name": "Hg",
+          "peak_area": -11.4399995803833,
+          "temperature_c": -38.79999923706055,
+          "weight": 1.0
+        },
+        {
+          "enthalpy": -28.59000015258789,
+          "fitted_sensitivity": 1.0,
+          "measured_sensitivity": 1.0,
+          "name": "Indium",
+          "peak_area": -28.59000015258789,
+          "temperature_c": 156.60000610351562,
+          "weight": 10.0
+        },
+        {
+          "enthalpy": -60.619998931884766,
+          "fitted_sensitivity": 1.0,
+          "measured_sensitivity": 1.0,
+          "name": "Sn",
+          "peak_area": -60.619998931884766,
+          "temperature_c": 231.6999969482422,
+          "weight": 1.0
+        },
+        {
+          "enthalpy": -53.2599983215332,
+          "fitted_sensitivity": 1.0,
+          "measured_sensitivity": 1.0,
+          "name": "Bi",
+          "peak_area": -53.2599983215332,
+          "temperature_c": 271.3999938964844,
+          "weight": 1.0
+        },
+        {
+          "enthalpy": -107.5,
+          "fitted_sensitivity": 1.0,
+          "measured_sensitivity": 1.0,
+          "name": "Zn",
+          "peak_area": -107.5,
+          "temperature_c": 419.6000061035156,
+          "weight": 0.800000011920929
+        },
+        {
+          "enthalpy": -17.219999313354492,
+          "fitted_sensitivity": 1.0,
+          "measured_sensitivity": 1.0,
+          "name": "CsCl",
+          "peak_area": -17.219999313354492,
+          "temperature_c": 476.0,
+          "weight": 1.0
+        },
+        {
+          "enthalpy": -397.0,
+          "fitted_sensitivity": 1.0,
+          "measured_sensitivity": 1.0,
+          "name": "Al",
+          "peak_area": -397.0,
+          "temperature_c": 660.2999877929688,
+          "weight": 1.0
+        },
+        {
+          "enthalpy": -94.9000015258789,
+          "fitted_sensitivity": 1.0,
+          "measured_sensitivity": 1.0,
+          "name": "BaCO3",
+          "peak_area": -94.9000015258789,
+          "temperature_c": 810.0,
+          "weight": 1.0
+        },
+        {
+          "enthalpy": -107.0,
+          "fitted_sensitivity": 1.0,
+          "measured_sensitivity": 1.0,
+          "name": "Ag",
+          "peak_area": -107.0,
+          "temperature_c": 961.7999877929688,
+          "weight": 1.0
+        },
+        {
+          "enthalpy": -63.70000076293945,
+          "fitted_sensitivity": 1.0,
+          "measured_sensitivity": 1.0,
+          "name": "Au",
+          "peak_area": -63.70000076293945,
+          "temperature_c": 1064.199951171875,
+          "weight": 1.0
+        },
+        {
+          "enthalpy": -299.79998779296875,
+          "fitted_sensitivity": 1.0,
+          "measured_sensitivity": 1.0,
+          "name": "Ni",
+          "peak_area": -299.79998779296875,
+          "temperature_c": 1455.0,
+          "weight": 1.0
+        }
+      ]
+    },
+    "temperature_calibration": {
+      "coefficients": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "fixpoints": [
+        {
+          "actual_c": 74.0,
+          "corrected_c": 74.0,
+          "measured_c": 74.0,
+          "name": "CURIE_A",
+          "weight": 1.0
+        },
+        {
+          "actual_c": 158.0,
+          "corrected_c": 158.0,
+          "measured_c": 158.0,
+          "name": "CURIE_B",
+          "weight": 1.0
+        },
+        {
+          "actual_c": 266.0,
+          "corrected_c": 266.0,
+          "measured_c": 266.0,
+          "name": "CURIE_C",
+          "weight": 1.0
+        },
+        {
+          "actual_c": 358.0,
+          "corrected_c": 358.0,
+          "measured_c": 358.0,
+          "name": "CURIE_D",
+          "weight": 1.0
+        },
+        {
+          "actual_c": 492.0,
+          "corrected_c": 492.0,
+          "measured_c": 492.0,
+          "name": "CURIE_E",
+          "weight": 1.0
+        },
+        {
+          "actual_c": 771.0,
+          "corrected_c": 771.0,
+          "measured_c": 771.0,
+          "name": "CURIE_F",
+          "weight": 1.0
+        }
+      ]
+    },
+    "temperature_program": {
+      "stage_0": {
+        "acquisition_rate": 0.0,
+        "heating_rate": 0.0,
+        "protective_mfc_flow": 20.0,
+        "purge_1_mfc_flow": 0.0,
+        "purge_2_mfc_flow": 20.0,
+        "stage_type": 0,
+        "temperature": 30.0,
+        "time": 0.0
+      },
+      "stage_1": {
+        "acquisition_rate": 100.0,
+        "heating_rate": 10.0,
+        "protective_mfc_flow": 20.0,
+        "purge_1_mfc_flow": 0.0,
+        "purge_2_mfc_flow": 20.0,
+        "stage_type": 1,
+        "temperature": 105.0,
+        "time": 450.0
+      },
+      "stage_2": {
+        "acquisition_rate": 25.0,
+        "heating_rate": 0.0,
+        "protective_mfc_flow": 20.0,
+        "purge_1_mfc_flow": 0.0,
+        "purge_2_mfc_flow": 20.0,
+        "stage_type": 1,
+        "temperature": 105.0,
+        "time": 600.0
+      },
+      "stage_3": {
+        "acquisition_rate": 100.0,
+        "heating_rate": 10.0,
+        "protective_mfc_flow": 20.0,
+        "purge_1_mfc_flow": 0.0,
+        "purge_2_mfc_flow": 20.0,
+        "stage_type": 1,
+        "temperature": 300.0,
+        "time": 1170.0
+      },
+      "stage_4": {
+        "acquisition_rate": 25.0,
+        "heating_rate": 0.0,
+        "protective_mfc_flow": 20.0,
+        "purge_1_mfc_flow": 0.0,
+        "purge_2_mfc_flow": 20.0,
+        "stage_type": 1,
+        "temperature": 300.0,
+        "time": 600.0
+      },
+      "stage_5": {
+        "acquisition_rate": 100.0,
+        "heating_rate": 10.0,
+        "protective_mfc_flow": 20.0,
+        "purge_1_mfc_flow": 0.0,
+        "purge_2_mfc_flow": 20.0,
+        "stage_type": 1,
+        "temperature": 40.0,
+        "time": 1560.0
+      },
+      "stage_6": {
+        "acquisition_rate": 0.0,
+        "heating_rate": 0.0,
+        "protective_mfc_flow": 0.0,
+        "purge_1_mfc_flow": 0.0,
+        "purge_2_mfc_flow": 0.0,
+        "stage_type": 2,
+        "temperature": 320.0,
+        "time": 0.0
+      }
+    },
+    "timezone": "Mitteleuropäische Sommerzeit",
+    "utc_offset_minutes": 120
+  },
+  "num_rows": 5801
+}

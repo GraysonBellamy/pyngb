@@ -34,7 +34,8 @@ print(f"Sample: {metadata.get('sample_name', 'Unknown')}")
 
 ## What You Can Do
 
-- Parse `.ngb-ss3` sample files and `.ngb-bs3` baseline files
+- Parse `.ngb-ss3` sample files, `.ngb-bs3` baseline files, and `.ngb-ds3`
+  Sample + Correction files (raw, correction, or corrected curves)
 - Extract metadata, temperature programs, mass data, and instrument details
 - Apply baseline correction and derivative thermogravimetry analysis
 - Export parsed data to Parquet, CSV, and JSON-friendly metadata

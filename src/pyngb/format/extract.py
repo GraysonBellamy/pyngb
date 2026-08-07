@@ -89,6 +89,13 @@ logger.addHandler(logging.NullHandler())
 #: The metadata stream.
 _STREAM = 1
 
+#: Type ref of the section-prologue table (category 6005) that opens each
+#: block of stream 1. Single-measurement files carry exactly one — between
+#: the calibration-context block and the main metadata document. "Sample +
+#: Correction" .ngb-ds3 files append the correction measurement's
+#: calibration-context block after a second prologue.
+_PROLOGUE_TYPE = 0x2AFD
+
 #: Scalar dtypes the legacy parser decoded to numbers; "last numeric field"
 #: rules must skip everything else (u16/u8 came back as raw bytes and were
 #: never accepted).
@@ -585,9 +592,40 @@ def extract_sensitivity_calibration(doc: NGBDocument, metadata: FileMetadata) ->
 # -- Run environment -----------------------------------------------------------------------
 
 
+def _main_document_start(doc: NGBDocument) -> int:
+    """Table index where stream 1's main metadata document begins.
+
+    Stream 1 opens with a calibration-context block — provenance snapshots
+    of the calibration/correction files the run references — and the run's
+    own metadata document starts at the first section-prologue table.
+    Returns 0 when no prologue exists, so callers degrade to whole-stream
+    scans on files without the block structure.
+    """
+    for table in doc.tables_of(_STREAM):
+        if table.type_ref == _PROLOGUE_TYPE:
+            return table.index
+    return 0
+
+
 def extract_run_environment(doc: NGBDocument, metadata: FileMetadata) -> None:
-    """Timezone snapshot and the linked correction file."""
-    tz_table = doc.first(_STREAM, category=TIMEZONE_CATEGORY)
+    """Timezone snapshot and the linked correction file.
+
+    Timezone tables occur many times per stream: every embedded calibration
+    or correction reference carries a snapshot from when THAT file was
+    measured (NETZSCH factory calibrations show up as German-timezone
+    entries worldwide). The run's own snapshot is the first one inside the
+    main metadata document — a calibration measured under a different DST
+    state than the run makes the first-in-stream table wrong.
+    """
+    start = _main_document_start(doc)
+    tz_table = next(
+        (
+            table
+            for table in doc.by_category(_STREAM, TIMEZONE_CATEGORY)
+            if table.index >= start
+        ),
+        None,
+    ) or doc.first(_STREAM, category=TIMEZONE_CATEGORY)
     if tz_table is not None:
         name = tz_table.value(TIMEZONE_FIELDS["name"])
         if isinstance(name, str) and name.strip():
@@ -656,14 +694,44 @@ _EXTRACTORS: tuple[Callable[[NGBDocument, FileMetadata], None], ...] = (
 )
 
 
+def _sample_metadata_view(doc: NGBDocument) -> NGBDocument:
+    """Stream-1 view bounded to the sample measurement's metadata.
+
+    ``.ngb-ds3`` files append the embedded correction measurement's
+    calibration-context block after a second stream-1 prologue. First-match
+    rules are naturally immune (the sample's tables come first), but
+    per-category scans — the calibration fixpoint families — would collect
+    tables from both measurements' calibrations. Dropping everything from
+    the second prologue on restores exactly the table population a
+    single-measurement file presents. Single-prologue files pass through
+    untouched.
+    """
+    tables = doc.tables_of(_STREAM)
+    prologues = [t.index for t in tables if t.type_ref == _PROLOGUE_TYPE]
+    if len(prologues) < 2:
+        return doc
+    return NGBDocument(
+        streams=doc.streams,
+        tables={**doc.tables, _STREAM: tables[: prologues[1]]},
+        spans=doc.spans,
+        orphans=doc.orphans,
+    )
+
+
 def build_metadata(doc: NGBDocument) -> FileMetadata:
     """Extract all file metadata from a parsed document (stream 1 only).
+
+    Metadata is file-level and describes the sample measurement: on "Sample
+    + Correction" files the embedded correction's calibration block is
+    excluded (see :func:`_sample_metadata_view`); the correction itself is
+    identified by the ``correction_file_path`` key.
 
     Never raises for missing or malformed metadata: every FileMetadata field
     is optional by contract, so each extraction rule that fails logs a
     warning and the rest proceed. (``file_hash`` is not set here — the API
     loaders add it, since it hashes the file, not the document.)
     """
+    doc = _sample_metadata_view(doc)
     metadata: FileMetadata = {}
     _apply_field_map(doc, metadata)
     for extractor in _EXTRACTORS:

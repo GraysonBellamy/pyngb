@@ -205,6 +205,120 @@ class TestSpanClassification:
         assert tokens_of(b"") == []
 
 
+UNIT_2 = b"\x01\x00\x00\x00\x02\x00"
+UNIT_3 = b"\x01\x00\x00\x00\x03\x00"
+UNIT_4 = b"\x01\x00\x00\x00\x04\x00"
+
+
+def swap_terminator(record: bytes, units: bytes) -> bytes:
+    """Replace a built record's canonical END_FIELD with trailer units."""
+    assert record.endswith(END_FIELD)
+    return record[: -len(END_FIELD)] + units
+
+
+class TestTrailerUnitTerminators:
+    """The record terminator is really a run of 6-byte units
+    ``01 00 00 00 <K u16>`` — the canonical END_FIELD is unit(2) plus the
+    first half of unit(3). STA-449F3A .ngb-ds3 timezone blocks (issue #198,
+    fixture 01) write the variant runs directly; the tokenizer must decode
+    them, and the DST fields they carry, instead of resyncing past."""
+
+    def test_single_unit_terminator(self) -> None:
+        token = only_token(swap_terminator(build_scalar(0x03E9, DType.I32, 44), UNIT_3))
+        assert token.field_id == 0x03E9
+        assert decode_scalar(token.dtype, token.raw) == 44
+
+    def test_unit_run_terminator(self) -> None:
+        token = only_token(
+            swap_terminator(
+                build_scalar(0x1135, DType.STRING, "Mitteleuropäische Zeit"),
+                UNIT_4 + UNIT_3,
+            )
+        )
+        assert decode_scalar(token.dtype, token.raw) == "Mitteleuropäische Zeit"
+
+    def test_variant_records_chain(self) -> None:
+        data = swap_terminator(
+            build_scalar(0x1135, DType.I32, 1), UNIT_3
+        ) + swap_terminator(build_scalar(0x1136, DType.I32, 2), UNIT_4 + UNIT_3)
+        items = tokens_of(data)
+        assert [t.field_id for t in items if isinstance(t, FieldToken)] == [
+            0x1135,
+            0x1136,
+        ]
+        assert span_kinds(items) == []
+
+    def test_array_accepts_unit_terminator(self) -> None:
+        token = only_token(
+            swap_terminator(build_array(0x0F40, DType.F64, [1.0, 2.0]), UNIT_3)
+        )
+        assert token.mode == Mode.ARRAY
+        assert decode_array(token.dtype, token.raw).tolist() == [1.0, 2.0]
+
+    def test_unknown_unit_kind_stays_malformed(self) -> None:
+        """An unobserved K is a drift tripwire, not a pass."""
+        data = swap_terminator(
+            build_scalar(0x1135, DType.I32, 1), b"\x01\x00\x00\x00\x05\x00"
+        )
+        items = tokens_of(data)
+        assert not any(isinstance(t, FieldToken) for t in items)
+        assert "malformed" in span_kinds(items)
+
+    def test_truncated_end_field_stays_malformed(self) -> None:
+        """A canonical record missing its final 3 bytes leaves a bare
+        unit(2) — that is truncation, never a valid terminator."""
+        record = build_scalar(0x1135, DType.I32, 1)
+        items = tokens_of(record[:-3])
+        assert not any(isinstance(t, FieldToken) for t in items)
+        assert "malformed" in span_kinds(items)
+
+    def test_unobserved_unit_combinations_stay_malformed(self) -> None:
+        """Only END_FIELD, unit(3), and unit(4)+unit(3) exist in real
+        files; other unit runs must not terminate a record."""
+        for units in (UNIT_2, UNIT_4, UNIT_4 + UNIT_4):
+            data = swap_terminator(build_scalar(0x1135, DType.I32, 1), units)
+            items = tokens_of(data)
+            assert not any(isinstance(t, FieldToken) for t in items), units.hex()
+            assert "malformed" in span_kinds(items), units.hex()
+
+    def test_excess_trailing_unit_is_not_absorbed(self) -> None:
+        """unit(3)+unit(3) terminates at the first unit; the unobserved
+        second unit surfaces as a malformed span instead of being silently
+        swallowed."""
+        data = swap_terminator(build_scalar(0x1135, DType.I32, 1), UNIT_3 + UNIT_3)
+        items = tokens_of(data)
+        assert [t.field_id for t in items if isinstance(t, FieldToken)] == [0x1135]
+        assert "malformed" in span_kinds(items)
+
+    def test_null_scalar_roundtrip(self) -> None:
+        token = only_token(build_scalar(0x0000, DType.NULL, b""))
+        assert token.dtype == DType.NULL
+        assert decode_scalar(token.dtype, token.raw) is None
+
+    def test_issue_198_timezone_block_bytes(self) -> None:
+        """Byte-exact reconstruction of the once-malformed 154-byte span in
+        fixture 01 (daylight-timezone block): builder duality must hold and
+        every record must tokenize."""
+        data = (
+            swap_terminator(
+                build_scalar(0x1135, DType.STRING, "Mitteleuropäische Zeit"),
+                UNIT_4 + UNIT_3,
+            )
+            + swap_terminator(build_scalar(0x03E9, DType.I32, 44), UNIT_3)
+            + build_scalar(0x0000, DType.NULL, b"")
+            + b"\x00\x03\x00"
+        )
+        assert len(data) == 154
+        fixture = Path(__file__).parent / "test_files"
+        blob = open_ngb(fixture / "01_Messung_Probe_G_300_Grad_Ar.ngb-ds3")[1].raw
+        assert data == bytes(blob[31858:32012])
+
+        items = tokens_of(data)
+        fields = [t.field_id for t in items if isinstance(t, FieldToken)]
+        assert fields == [0x1135, 0x03E9, 0x0000]
+        assert span_kinds(items) == ["table_trailer"]
+
+
 class TestCorruption:
     """Each case first proves the uncorrupted bytes parse cleanly."""
 

@@ -47,6 +47,8 @@ GOLDEN_DIR = REPO_ROOT / "tests" / "goldens"
 # Frozen list, not a glob: a missing fixture must be an error, never a
 # shorter loop. Mirrored in tests/test_parity_goldens.py on purpose.
 FIXTURES = (
+    "01_Messung_Probe_G_300_Grad_Ar.ngb-ds3",
+    "02_Messung_Probe_E_300_Grad_Ar.ngb-ds3",
     "DF_FILED_STA_21O2_10K_220222_R1.ngb-ss3",
     "Douglas_Fir_STA_10K_250730_R13.ngb-ss3",
     "Douglas_Fir_STA_Baseline_10K_250730_R13.ngb-bs3",

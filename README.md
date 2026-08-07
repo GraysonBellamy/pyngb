@@ -13,7 +13,7 @@ A high-performance Python library for parsing NETZSCH STA (Simultaneous Thermal 
 
 - **Strict Binary Parsing**: a record-grammar tokenizer parses every byte of the file — no pattern-match guessing (tens of milliseconds per file)
 - **Complete Metadata**: Extract instrument settings, sample info, and experimental conditions
-- **Baseline Correction**: Automatic baseline subtraction with validation
+- **Baseline Correction**: Automatic baseline subtraction with validation, including the correction run embedded in Sample + Correction (`.ngb-ds3`) files
 - **DTG Analysis**: Derivative thermogravimetry calculation with smoothing options
 - **Batch Processing**: Parallel processing of multiple files
 - **Data Export**: Convert data to Parquet or CSV; export metadata to JSON
@@ -46,6 +46,12 @@ print(f"Sample: {metadata.get('sample_name', 'Unknown')}")
 
 # Baseline correction
 corrected = read_ngb("sample.ngb-ss3", baseline_file="baseline.ngb-bs3")
+
+# Sample + Correction files (.ngb-ds3): raw sample run by default, the
+# embedded correction run, or the corrected curves Proteus displays
+raw = read_ngb("run.ngb-ds3")
+corr = read_ngb("run.ngb-ds3", run="correction")
+corrected = read_ngb("run.ngb-ds3", run="corrected")
 
 # DTG analysis
 from pyngb.api.analysis import add_dtg

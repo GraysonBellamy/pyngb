@@ -12,30 +12,81 @@ from ..baseline import BaselineSubtractor
 from ..config import ParsingConfig
 from ..constants import FileMetadata
 from ..exceptions import NGBStreamNotFoundError
-from ..format import build_dataframe, build_metadata, load_document
+from ..format import build_dataframe, build_metadata, count_runs, load_document
 from ..util import get_hash, initialize_table_column_metadata, set_metadata
 from .metadata import mark_baseline_corrected
 
 __all__ = ["read_ngb", "read_ngb_metadata"]
 
+#: Measurement runs a file can physically contain, in stream order.
+_RUNS = ("sample", "correction")
 
-def _parse(
-    path: str | Path, limits: ParsingConfig | None
-) -> tuple[FileMetadata, pl.DataFrame]:
-    """Parse metadata and measurement data through the document layer.
+#: Run selectors accepted by :func:`read_ngb`: the two embedded runs, plus
+#: "corrected" — the sample run with the embedded correction subtracted.
+_SELECTORS = ("sample", "correction", "corrected")
 
-    Single seam shared by every full-parse path (plain, baseline sample,
-    baseline reference) so the two halves can never diverge.
+
+def _load(path: str | Path, limits: ParsingConfig | None):
+    """Load the full-parse document.
 
     Loader policy: streams 1 and 2 are required, stream 3 is optional.
     """
     try:
-        doc = load_document(path, streams=(1, 2, 3), limits=limits)
+        return load_document(path, streams=(1, 2, 3), limits=limits)
     except NGBStreamNotFoundError:
         # Stream 3 is optional; if 1 or 2 is the one missing, this second
         # request raises again with the accurate message.
-        doc = load_document(path, streams=(1, 2), limits=limits)
-    return build_metadata(doc), build_dataframe(doc)
+        return load_document(path, streams=(1, 2), limits=limits)
+
+
+def _parse(
+    path: str | Path, limits: ParsingConfig | None, run: str = "sample"
+) -> tuple[FileMetadata, pl.DataFrame]:
+    """Parse metadata and one measurement run through the document layer.
+
+    Single seam shared by every full-parse path (plain, baseline sample,
+    baseline reference) so the two halves can never diverge.
+
+    ``run`` is "sample" or "correction". "Sample + Correction" ``.ngb-ds3``
+    files embed both measurements; "correction" selects the embedded
+    correction and raises on files that carry none. The metadata is
+    file-level and always describes the sample measurement (the correction's
+    provenance is recorded in its ``correction_file_path`` key).
+    """
+    doc = _load(path, limits)
+    run_index = _RUNS.index(run)
+    if run_index > 0 and count_runs(doc) < 2:
+        raise ValueError(
+            f"{path} contains no embedded correction run; only "
+            '"Sample + Correction" .ngb-ds3 files carry one'
+        )
+    return build_metadata(doc), build_dataframe(doc, run=run_index)
+
+
+def _parse_baseline(
+    path: str | Path, limits: ParsingConfig | None, *, require_embedded: bool = False
+) -> tuple[FileMetadata, pl.DataFrame]:
+    """Parse a file *as a baseline*: the correction curves it provides.
+
+    A standalone ``.ngb-bs3`` IS a correction measurement, so its single run
+    is the baseline. A ``.ngb-ds3`` passed as a baseline (typically the
+    sample file itself) contributes its embedded correction run — this is
+    what makes ``run="corrected"`` reproduce the corrected curves Proteus
+    displays for a Sample + Correction measurement.
+
+    ``require_embedded`` demands an embedded correction run (the
+    ``run="corrected"`` path, where the file must be its own baseline);
+    without it a single-run file contributes its only run.
+    """
+    doc = _load(path, limits)
+    n_runs = count_runs(doc)
+    if require_embedded and n_runs < 2:
+        raise ValueError(
+            f"{path} contains no embedded correction run; only "
+            '"Sample + Correction" .ngb-ds3 files carry one'
+        )
+    run_index = 1 if n_runs >= 2 else 0
+    return build_metadata(doc), build_dataframe(doc, run=run_index)
 
 
 @overload
@@ -43,6 +94,7 @@ def read_ngb(
     path: str | Path,
     *,
     return_metadata: Literal[False] = False,
+    run: Literal["sample", "correction", "corrected"] = "sample",
     baseline_file: None = None,
     dynamic_axis: str = "sample_temperature",
     limits: ParsingConfig | None = None,
@@ -54,6 +106,7 @@ def read_ngb(
     path: str | Path,
     *,
     return_metadata: Literal[True],
+    run: Literal["sample", "correction", "corrected"] = "sample",
     baseline_file: None = None,
     dynamic_axis: str = "sample_temperature",
     limits: ParsingConfig | None = None,
@@ -65,6 +118,7 @@ def read_ngb(
     path: str | Path,
     *,
     return_metadata: Literal[False] = False,
+    run: Literal["sample", "correction", "corrected"] = "sample",
     baseline_file: str | Path,
     dynamic_axis: str = "sample_temperature",
     limits: ParsingConfig | None = None,
@@ -76,6 +130,7 @@ def read_ngb(
     path: str | Path,
     *,
     return_metadata: Literal[True],
+    run: Literal["sample", "correction", "corrected"] = "sample",
     baseline_file: str | Path,
     dynamic_axis: str = "sample_temperature",
     limits: ParsingConfig | None = None,
@@ -86,6 +141,7 @@ def read_ngb(
     path: str | Path,
     *,
     return_metadata: bool = False,
+    run: Literal["sample", "correction", "corrected"] = "sample",
     baseline_file: str | Path | None = None,
     dynamic_axis: str = "sample_temperature",
     limits: ParsingConfig | None = None,
@@ -97,18 +153,37 @@ def read_ngb(
     a PyArrow table with embedded metadata. For direct metadata access, use return_metadata=True.
     When baseline_file is provided, baseline subtraction is performed automatically.
 
+    "Sample + Correction" measurements (``.ngb-ds3``) embed two complete raw
+    measurements in one file: the sample run and a verbatim copy of the
+    correction run it was measured against. Neither is subtracted from the
+    other in the stored data — Proteus applies the correction at display
+    time. By default the raw sample run is returned; ``run="correction"``
+    returns the embedded correction, and ``run="corrected"`` subtracts the
+    embedded correction from the sample run, reproducing the corrected
+    curves Proteus displays.
+
     Parameters
     ----------
     path : str or Path
-        Path to the NGB file (.ngb-ss3 or similar extension).
+        Path to the NGB file (.ngb-ss3, .ngb-bs3, .ngb-ds3 or similar).
         Supports absolute and relative paths, as strings or Path objects.
     return_metadata : bool, default False
         If False (default), return PyArrow table with embedded metadata.
         If True, return (metadata, data) tuple.
+    run : {"sample", "correction", "corrected"}, default "sample"
+        What to return: the raw sample run, the embedded correction run, or
+        the sample run with the embedded correction subtracted. "correction"
+        and "corrected" are only valid for files that embed a correction
+        (.ngb-ds3) and cannot be combined with baseline_file. Metadata
+        always describes the sample measurement; the correction's provenance
+        is in its ``correction_file_path`` key. The selected run is recorded
+        in the returned table's schema metadata under the ``run`` key.
     baseline_file : str, Path, or None, default None
-        Path to baseline file (.ngb-bs3) for baseline subtraction.
-        If provided, performs automatic baseline subtraction. The baseline file
-        must have an identical temperature program to the sample file.
+        Path to a file providing correction curves for baseline subtraction.
+        A ``.ngb-bs3`` contributes its (only) run; a ``.ngb-ds3`` — typically
+        the sample file itself — contributes its embedded correction run.
+        The baseline must have an identical temperature program to the
+        sample file.
     dynamic_axis : str, default "sample_temperature"
         Axis to use for dynamic segment alignment in baseline subtraction.
         Options: "time", "sample_temperature", "furnace_temperature"
@@ -127,7 +202,9 @@ def read_ngb(
     Raises
     ------
     ValueError
-        If dynamic_axis is not a recognized axis name
+        If dynamic_axis or run is not a recognized value, a non-"sample" run
+        is combined with baseline_file or requested from a file with no
+        embedded correction run
     FileNotFoundError
         If the specified file does not exist
     NGBStreamNotFoundError
@@ -200,6 +277,13 @@ def read_ngb(
     ...     print(f"Mass loss: {mass_loss:.2f}%")
     Mass loss: 12.3%
 
+    Sample + Correction files (.ngb-ds3):
+
+    >>> raw = read_ngb("run.ngb-ds3")                      # raw sample run
+    >>> corr = read_ngb("run.ngb-ds3", run="correction")   # embedded correction
+    >>> # Corrected curves, as Proteus displays them:
+    >>> corrected = read_ngb("run.ngb-ds3", run="corrected")
+
     Performance Notes
     -----------------
     - Strict single-pass tokenization with NumPy-backed array decoding
@@ -218,8 +302,20 @@ def read_ngb(
         raise ValueError(
             f"dynamic_axis must be one of {valid_axes}, got '{dynamic_axis}'"
         )
+    if run not in _SELECTORS:
+        raise ValueError(f"run must be one of {list(_SELECTORS)}, got '{run}'")
+    if run != "sample" and baseline_file is not None:
+        raise ValueError(
+            f"run='{run}' cannot be combined with baseline_file: the "
+            "embedded correction run is the baseline"
+        )
+    # "corrected" is the sample run baseline-subtracted against the file's
+    # own embedded correction — the file is its own baseline.
+    self_correct = run == "corrected"
+    if self_correct:
+        baseline_file = path
 
-    metadata, data_df = _parse(path, limits)
+    metadata, data_df = _parse(path, limits, "sample" if self_correct else run)
 
     # Add file hash to metadata
     file_hash = get_hash(path)
@@ -232,7 +328,9 @@ def read_ngb(
 
     # Handle baseline subtraction if requested
     if baseline_file is not None:
-        baseline_metadata, baseline_df = _parse(baseline_file, limits)
+        baseline_metadata, baseline_df = _parse_baseline(
+            baseline_file, limits, require_embedded=self_correct
+        )
         data_df = BaselineSubtractor().process_baseline_subtraction(
             data_df, baseline_df, metadata, baseline_metadata, dynamic_axis
         )
@@ -243,8 +341,13 @@ def read_ngb(
 
     if not return_metadata:
         # Attach file-level metadata to the Arrow schema; with
-        # return_metadata=True it is handed back separately instead.
-        data = set_metadata(data, tbl_meta={"file_metadata": metadata, "type": "STA"})
+        # return_metadata=True it is handed back separately instead. The
+        # "run" tag records which run the table holds — the file-level
+        # metadata alone cannot distinguish the exports.
+        data = set_metadata(
+            data,
+            tbl_meta={"file_metadata": metadata, "type": "STA", "run": run},
+        )
 
     # Column metadata (units, processing history, source) is present on every
     # return path; baseline subtraction changes the meaning of the mass/DSC
@@ -271,6 +374,10 @@ def read_ngb_metadata(
     Unlike :func:`read_ngb`, the returned metadata carries no ``file_hash``
     key — the hash covers the whole file, which this path deliberately does
     not read in full.
+
+    Metadata is file-level: for "Sample + Correction" ``.ngb-ds3`` files it
+    describes the sample measurement, with the correction identified by the
+    ``correction_file_path`` key.
 
     Args:
         path: Path to the .ngb-ss3 file to parse

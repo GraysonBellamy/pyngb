@@ -11,7 +11,7 @@ import multiprocessing as mp
 from concurrent.futures import Future, ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import TypedDict
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
 import polars as pl
 import pyarrow.parquet as pq
@@ -48,6 +48,20 @@ class BatchResult(TypedDict):
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
+
+#: Default directory patterns: every file type whose primary content is a
+#: sample measurement (.ngb-ds3 is "Sample + Correction"; read_ngb returns
+#: its sample run).
+DEFAULT_PATTERNS: tuple[str, ...] = ("*.ngb-ss3", "*.ngb-ds3")
+
+
+def _matching_files(directory: Path, pattern: str | Sequence[str]) -> list[Path]:
+    """Files under ``directory`` matching one pattern or any of several."""
+    patterns = (pattern,) if isinstance(pattern, str) else tuple(pattern)
+    matched: set[Path] = set()
+    for entry in patterns:
+        matched.update(directory.glob(entry))
+    return sorted(matched)
 
 
 def _process_single_file_worker(
@@ -174,7 +188,7 @@ class BatchProcessor:
     def process_directory(
         self,
         directory: str | Path,
-        pattern: str = "*.ngb-ss3",
+        pattern: str | Sequence[str] = DEFAULT_PATTERNS,
         output_format: str = "parquet",
         output_dir: str | Path | None = None,
         skip_errors: bool = True,
@@ -183,7 +197,8 @@ class BatchProcessor:
 
         Args:
             directory: Directory containing NGB files
-            pattern: File pattern to match (default: "*.ngb-ss3")
+            pattern: File pattern to match, or several (default: sample
+                measurements — "*.ngb-ss3" and "*.ngb-ds3")
             output_format: Output format ("parquet", "csv", "both")
             output_dir: Output directory (default: same as input)
             skip_errors: Whether to continue processing if individual files fail
@@ -208,7 +223,7 @@ class BatchProcessor:
             raise FileNotFoundError(f"Directory not found: {directory}")
 
         # Find all matching files
-        files = list(directory.glob(pattern))
+        files = _matching_files(directory, pattern)
         if not files:
             logger.warning(
                 f"No files matching pattern '{pattern}' found in {directory}"
@@ -393,20 +408,20 @@ class NGBDataset:
 
     @classmethod
     def from_directory(
-        cls, directory: str | Path, pattern: str = "*.ngb-ss3"
+        cls, directory: str | Path, pattern: str | Sequence[str] = DEFAULT_PATTERNS
     ) -> NGBDataset:
         """Create dataset from directory.
 
         Args:
             directory: Directory containing NGB files
-            pattern: File pattern to match
+            pattern: File pattern to match, or several (default: sample
+                measurements — "*.ngb-ss3" and "*.ngb-ds3")
 
         Returns:
             NGBDataset instance
         """
         directory = Path(directory)
-        files = list(directory.glob(pattern))
-        return cls(files)
+        return cls(_matching_files(directory, pattern))
 
     def __len__(self) -> int:
         """Return number of files in dataset."""
@@ -597,7 +612,7 @@ class NGBDataset:
 # Convenience functions
 def process_directory(
     directory: str | Path,
-    pattern: str = "*.ngb-ss3",
+    pattern: str | Sequence[str] = DEFAULT_PATTERNS,
     output_format: str = "parquet",
     max_workers: int | None = None,
 ) -> list[BatchResult]:
@@ -607,7 +622,8 @@ def process_directory(
 
     Args:
         directory: Directory containing NGB files
-        pattern: File pattern to match
+        pattern: File pattern to match, or several (default: sample
+            measurements — "*.ngb-ss3" and "*.ngb-ds3")
         output_format: Output format ("parquet", "csv", "both")
         max_workers: Maximum parallel processes
 

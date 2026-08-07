@@ -54,7 +54,19 @@ def build_parser() -> argparse.ArgumentParser:
         "-v", "--verbose", action="store_true", help="Enable verbose logging"
     )
     convert.add_argument(
-        "-b", "--baseline", help="Baseline file path for baseline subtraction"
+        "-b",
+        "--baseline",
+        help="Baseline file path for baseline subtraction (a .ngb-bs3, or a "
+        ".ngb-ds3 whose embedded correction run is used; to subtract a "
+        ".ngb-ds3's own embedded correction, use --run corrected instead)",
+    )
+    convert.add_argument(
+        "--run",
+        choices=["sample", "correction", "corrected"],
+        default="sample",
+        help="What to export from Sample + Correction .ngb-ds3 files: the "
+        "raw sample run (default), the embedded correction run, or the "
+        "sample with the embedded correction subtracted",
     )
     convert.add_argument(
         "--dynamic-axis",
@@ -119,7 +131,7 @@ def validate_input_file(input_path: Path) -> None:
         raise ValueError(f"Input path is not a file: {input_path}")
 
     # Check if it's a valid NGB file extension
-    valid_extensions = {".ngb-ss3", ".ngb-bs3"}
+    valid_extensions = {".ngb-ss3", ".ngb-bs3", ".ngb-ds3"}
     if input_path.suffix.lower() not in valid_extensions:
         logger.warning(
             f"File extension '{input_path.suffix}' may not be a standard NGB format. Proceeding anyway."
@@ -142,7 +154,7 @@ def validate_baseline_file(baseline_path: Path) -> None:
     if not baseline_path.is_file():
         raise ValueError(f"Baseline path is not a file: {baseline_path}")
 
-    valid_extensions = {".ngb-ss3", ".ngb-bs3"}
+    valid_extensions = {".ngb-ss3", ".ngb-bs3", ".ngb-ds3"}
     if baseline_path.suffix.lower() not in valid_extensions:
         logger.warning(
             f"Baseline file extension '{baseline_path.suffix}' may not be a standard NGB format. Proceeding anyway."
@@ -174,7 +186,7 @@ def validate_output_directory(output_path: Path) -> None:
 
 
 def load_data(
-    input_file: str, baseline_file: str | None, dynamic_axis: str
+    input_file: str, baseline_file: str | None, dynamic_axis: str, run: str = "sample"
 ) -> pa.Table:
     """Load NGB data with optional baseline subtraction.
 
@@ -182,6 +194,7 @@ def load_data(
         input_file: Path to input NGB file
         baseline_file: Optional path to baseline NGB file
         dynamic_axis: Axis for dynamic segment alignment
+        run: Which embedded measurement to load ("sample" or "correction")
 
     Returns:
         PyArrow Table with loaded data
@@ -193,6 +206,10 @@ def load_data(
         return read_ngb(
             input_file, baseline_file=baseline_file, dynamic_axis=dynamic_axis
         )
+    if run == "correction":
+        return read_ngb(input_file, run="correction")
+    if run == "corrected":
+        return read_ngb(input_file, run="corrected")
     return read_ngb(input_file)
 
 
@@ -231,6 +248,7 @@ def process_file(
     output_format: str,
     baseline_file: str | None,
     dynamic_axis: str,
+    run: str = "sample",
 ) -> None:
     """Parse one NGB file and write its output file(s).
 
@@ -240,6 +258,7 @@ def process_file(
         output_format: Output format ("parquet", "csv", or "both")
         baseline_file: Optional path to baseline NGB file
         dynamic_axis: Axis for dynamic segment alignment
+        run: Which embedded measurement to export
 
     Raises:
         Anything read_ngb or the filesystem raises; the caller decides
@@ -248,12 +267,15 @@ def process_file(
     input_path = Path(input_file)
     validate_input_file(input_path)
 
-    data = load_data(input_file, baseline_file, dynamic_axis)
+    data = load_data(input_file, baseline_file, dynamic_axis, run)
 
     base_name = input_path.stem
-    # Add suffix to indicate baseline subtraction was performed
+    # Suffix the output name so exports of different runs / processing of the
+    # same input file never collide.
     if baseline_file:
         base_name += "_baseline_subtracted"
+    elif run != "sample":
+        base_name += f"_{run}"
 
     write_output_files(data, output_path, base_name, output_format)
 
@@ -269,6 +291,11 @@ def cmd_convert(args: argparse.Namespace) -> int:
     """Run the convert subcommand: parse files and write outputs."""
     # Validate shared inputs once; failures here abort the whole run.
     try:
+        if args.baseline and args.run != "sample":
+            raise ValueError(
+                f"--run {args.run} cannot be combined with --baseline: the "
+                "embedded correction run is the baseline"
+            )
         if args.baseline:
             validate_baseline_file(Path(args.baseline))
         output_path = Path(args.output)
@@ -282,7 +309,12 @@ def cmd_convert(args: argparse.Namespace) -> int:
     for input_file in args.input:
         try:
             process_file(
-                input_file, output_path, args.format, args.baseline, args.dynamic_axis
+                input_file,
+                output_path,
+                args.format,
+                args.baseline,
+                args.dynamic_axis,
+                args.run,
             )
         except zipfile.BadZipFile:
             logger.error(f"{input_file} is not a valid NGB file (not a ZIP archive)")
@@ -481,7 +513,7 @@ def main(argv: list[str] | None = None) -> int:
     """Command-line interface for pyngb.
 
     Usage:
-        pyngb convert FILE... [-o DIR] [-f parquet|csv|both] [-b BASELINE]
+        pyngb convert FILE... [-o DIR] [-f parquet|csv|both] [-b BASELINE] [--run sample|correction|corrected]
         pyngb inspect FILE... [--stream N] [--values] [--unknown] [--coverage] [--json]
         pyngb validate FILE... [--json]
 
@@ -494,6 +526,12 @@ def main(argv: list[str] | None = None) -> int:
 
         # Baseline-subtract every input against the same baseline
         pyngb convert *.ngb-ss3 -b baseline.ngb-bs3
+
+        # Sample + Correction files: raw sample run, embedded correction run,
+        # or corrected curves (subtract the file's own embedded correction)
+        pyngb convert run.ngb-ds3
+        pyngb convert run.ngb-ds3 --run correction
+        pyngb convert run.ngb-ds3 --run corrected
 
         # Structural inspection and cross-file field comparison
         pyngb inspect sample.ngb-ss3 --stream 1 --values

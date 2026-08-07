@@ -127,7 +127,9 @@ def build_scalar(
 ) -> bytes:
     """One scalar field record. ``end_field=False`` reproduces the observed
     END_FIELD-less "bare record" variant."""
-    if dtype in _SCALAR_PACK:
+    if dtype == DType.NULL:
+        payload = b""
+    elif dtype in _SCALAR_PACK:
         assert isinstance(value, (int, float))
         payload = _SCALAR_PACK[dtype].pack(value)
     elif dtype == DType.U8:

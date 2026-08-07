@@ -100,14 +100,16 @@ class TestSensitivityFixpointStability:
         sens = md.get("sensitivity_calibration")
         assert sens is not None, f"no sensitivity_calibration in {path.name}"
 
-        # Real calibrations carry 6-8 standards, in ascending temperature.
+        # Real calibrations carry 4-12 standards, in ascending temperature.
+        # Low-temperature standards (mercury -38.8 C, cyclohexane -86 C) are
+        # legitimate, so the physical bound is absolute zero, not 0 C.
         fixpoints = sens["fixpoints"]
-        assert 6 <= len(fixpoints) <= 16
+        assert 4 <= len(fixpoints) <= 16
         temps = [fp["temperature_c"] for fp in fixpoints]
         assert temps == sorted(temps)
         for fp in fixpoints:
             assert fp["name"]
-            assert 0.0 < fp["temperature_c"] < 2000.0
+            assert -273.15 < fp["temperature_c"] < 2000.0
             # Endothermic-negative sign convention, as stored by Proteus.
             assert fp["enthalpy"] < 0.0
             assert fp["peak_area"] < 0.0
@@ -137,7 +139,19 @@ class TestSensitivityFixpointStability:
         are the regression behind the curve that apply_dsc_calibration uses.
         """
         md = _metadata(path)
+        if "calibration_constants" not in md:
+            pytest.skip(f"{path.name} carries no p0-p5 calibration constants")
         constants = md["calibration_constants"]
+        if constants.get("p1") == 0.0:
+            # Placeholder constants (p1=0 makes the curve undefined): runs
+            # recorded while CREATING calibration curves store fitted
+            # sensitivities of exactly 1.0 and no usable p0-p5.
+            fitted = [
+                fp["fitted_sensitivity"]
+                for fp in md["sensitivity_calibration"]["fixpoints"]
+            ]
+            assert set(fitted) == {1.0}
+            pytest.skip(f"{path.name}: placeholder constants, no fitted curve")
         for fp in md["sensitivity_calibration"]["fixpoints"]:
             assert math.isclose(
                 _curve(fp["temperature_c"], constants),

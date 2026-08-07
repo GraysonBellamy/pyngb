@@ -53,6 +53,18 @@ same structure. `read_ngb` requires streams 1 and 2 and uses stream 3 when
 present; `read_ngb_metadata` reads stream 1 only; `load_document` models any
 requested stream, including 4–6.
 
+`.ngb-ds3` ("Sample + Correction") uses the same container but packs **two
+complete measurements per stream, back-to-back**: the raw sample run first,
+then a verbatim copy of the correction run it was measured against (byte-
+identical across every file sharing that correction). In streams 2/3 each
+run carries the full channel-header + segment-value sequence; the run
+boundary is a channel header repeating a channel already seen, and
+`count_runs`/`build_dataframe(doc, run=...)` split there. Stream 1 likewise
+appends the correction's calibration-context block after a second section
+prologue; metadata extraction is bounded to the sample's blocks. Neither run
+is subtracted from the other in the stored data — Proteus applies the
+correction at display time.
+
 ### Stream header and section directory
 
 Every `stream_N.table` starts with two magic strings and a section directory:
@@ -101,17 +113,36 @@ soup. Every field of every table in every stream follows one grammar:
 80 01 <scalar payload>          SCALAR mode …
   — or —
 a0 01 <count u32 LE> <payload>  ARRAY mode
+<terminator>
+```
+
+The canonical terminator — on every record of the 2022/2025 fixtures — is
+the 9-byte `END_FIELD`:
+
+```
 01 00 00 00 02 00 01 00 00      END_FIELD
 ```
+
+with the following `00 03 00`, where present, covered as a `table_trailer`
+span. The underlying serialization actually ends records with a run of
+6-byte **trailer units** `01 00 00 00 <K u16>` — the canonical 12-byte
+ending is unit(K=2) + unit(K=3), chunked as 9+3 for historical parity —
+and STA-449F3A `.ngb-ds3` files write variant runs directly: unit(3)
+alone, or unit(4) + unit(3), notably throughout their timezone blocks.
+Those three forms are the only ones observed across all fixtures, and the
+tokenizer matches exactly them — `END_FIELD` first, preserving the
+canonical segmentation byte-for-byte. Anything else, including a truncated
+`END_FIELD` or an unobserved unit combination, surfaces as a malformed
+span, as a drift tripwire.
 
 Two rules with teeth:
 
 - **Array counts are element counts**, not byte counts: the payload occupies
   `count × ITEM_SIZE[dtype]` bytes.
 - A scalar's extent is fully determined by its dtype (fixed `ITEM_SIZE`, or
-  the string/REF headers below), so `END_FIELD` is *verified at the computed
-  position*, never searched for. Record anchors occurring inside array
-  payloads are therefore harmless — a linear walk never sees them.
+  the string/REF headers below), so the terminator is *verified at the
+  computed position*, never searched for. Record anchors occurring inside
+  array payloads are therefore harmless — a linear walk never sees them.
 
 ### String encoding
 
@@ -132,11 +163,13 @@ rather than mangled text.
 
 ### Data types
 
-Nine dtypes are observed across all fixtures and streams (`DType` enum;
-counts are strict-grammar records summed over all six fixtures, all streams):
+Ten dtypes are observed across all fixtures and streams (`DType` enum;
+counts are strict-grammar records summed over the original six fixtures,
+all streams):
 
 | dtype | Type | Item size | Records | Notes |
 |-------|------|-----------|---------|-------|
+| `0x00` | null (empty scalar) | 0 | — | ds3 timezone blocks; decodes to `None` |
 | `0x02` | u16 | 2 | 4,525 | |
 | `0x03` | i32 | 4 | 6,668 | plus the 66 END_FIELD-less "bare records" below |
 | `0x04` | f32 | 4 | 2,694 | |
@@ -363,7 +396,13 @@ of the calibration run, extracted into both blocks:
 (i32; 1 = standard, 2 = daylight). Exposed as `timezone` and
 `utc_offset_minutes` (`−(bias + dst_bias)` when daylight time is active, else
 `−bias`). `date_performed` is UTC; this recovers the local wall-clock time of
-the run. Files carry several snapshots; the first (run start) is used.
+the run. Files carry many snapshots — every referenced calibration or
+correction embeds one from when *that* file was measured (NETZSCH factory
+calibrations appear as German-timezone entries worldwide), and the
+calibration-context block precedes the main metadata document in stream 1.
+The run's own snapshot is the first one **inside the main document** (at or
+after the first section-prologue table); a calibration measured under a
+different DST state than the run makes the first-in-stream table wrong.
 
 **Correction file link** — the category-`0x1770` measurement-definition table
 stores, in field `0x0843`, the path of the correction file selected for the

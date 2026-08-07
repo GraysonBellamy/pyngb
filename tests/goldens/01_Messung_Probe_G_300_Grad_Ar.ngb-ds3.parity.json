@@ -1,0 +1,326 @@
+{
+  "column_dtypes": {
+    "31": "double",
+    "dsc_signal": "double",
+    "furnace_power": "double",
+    "furnace_temperature": "double",
+    "mass": "double",
+    "protective_flow": "double",
+    "purge_flow_2": "double",
+    "sample_temperature": "double",
+    "time": "double"
+  },
+  "column_sha256": {
+    "31": "c87d9be8ffddb1c4cf6cc7faecf381401ba86eec36a1d733f86b747f808e24fb",
+    "dsc_signal": "3a392ee7bfa28dffeffdb325d200b9bcfa0fa8572948c29935a2d186765d892b",
+    "furnace_power": "c6e26908b6ffac45d23eb82ad196599fd9930a65cdbd86213a4fe93e41879199",
+    "furnace_temperature": "b1a81b9f7a5dc2c1761e5852254207a8a3af95844defee438a7d893c46888059",
+    "mass": "55bf476ce6441ce14c82b8a06182aaa3b93ea39a747ef18bd9d9e6c09724e3fd",
+    "protective_flow": "23479266ed5c2a54ce5f7e29b9de8de243f7240ce33d6fd383b93e4a74832f55",
+    "purge_flow_2": "23479266ed5c2a54ce5f7e29b9de8de243f7240ce33d6fd383b93e4a74832f55",
+    "sample_temperature": "e6d1a1343f779c85c5f92bcd64b74ab33e5503e5b2dc53b72107ac850594c726",
+    "time": "5bc7df271f89f8c4da8a073f689796f454f33a7284d4cf59798d171227de70d3"
+  },
+  "column_stats": {
+    "31": {
+      "first": 0.0,
+      "last": 0.0,
+      "max": 0.0,
+      "min": 0.0,
+      "null_count": 0
+    },
+    "dsc_signal": {
+      "first": -3.8108837604522705,
+      "last": -1.5953068733215332,
+      "max": 3.2112131118774414,
+      "min": -12.36648941040039,
+      "null_count": 0
+    },
+    "furnace_power": {
+      "first": 0.017999999225139618,
+      "last": 0.0,
+      "max": 1.6829999685287476,
+      "min": 0.0,
+      "null_count": 0
+    },
+    "furnace_temperature": {
+      "first": 34.470001220703125,
+      "last": 71.99700164794922,
+      "max": 314.98199462890625,
+      "min": 34.444000244140625,
+      "null_count": 0
+    },
+    "mass": {
+      "first": 0.0,
+      "last": -2.859999895095825,
+      "max": 0.335999995470047,
+      "min": -2.859999895095825,
+      "null_count": 0
+    },
+    "protective_flow": {
+      "first": 20.0,
+      "last": 20.0,
+      "max": 20.0,
+      "min": 20.0,
+      "null_count": 0
+    },
+    "purge_flow_2": {
+      "first": 20.0,
+      "last": 20.0,
+      "max": 20.0,
+      "min": 20.0,
+      "null_count": 0
+    },
+    "sample_temperature": {
+      "first": 34.88600158691406,
+      "last": 81.58599853515625,
+      "max": 304.04901123046875,
+      "min": 34.854000091552734,
+      "null_count": 0
+    },
+    "time": {
+      "first": 0.0,
+      "last": 4380.050000000118,
+      "max": 4380.050000000118,
+      "min": 0.0,
+      "null_count": 0
+    }
+  },
+  "columns": [
+    "time",
+    "sample_temperature",
+    "dsc_signal",
+    "purge_flow_2",
+    "protective_flow",
+    "mass",
+    "furnace_temperature",
+    "31",
+    "furnace_power"
+  ],
+  "fixture": "01_Messung_Probe_G_300_Grad_Ar.ngb-ds3",
+  "fixture_blake2b": "3ce16eb952c10d3132ca6aa538f74fc575e604470ccc39a5dc4977c0a9d866850e14dae8e037fc145cd36924fbcf76c1efab13a351d8355392a8142209b1bb6b",
+  "metadata": {
+    "application_version": "Version 6.0.0  (21.11.2012)",
+    "calibration_constants": {
+      "p0": 156.60000610351562,
+      "p1": 553.5524291992188,
+      "p2": 1.1615203619003296,
+      "p3": -0.1326359659433365,
+      "p4": 0.0,
+      "p5": 0.0
+    },
+    "carrier_type": "DSC/TG Cp S",
+    "comment": "zwei Tiegel Al, 23mg; Erstellung Kalibrierkurve(n)",
+    "correction_file_path": "C:\\NETZSCH\\Proteus6\\data\\Korrektur\\Korrekturkurve_Netzschtiegel_Al_23mg_10K_105_300_Ar_Reinhold2.ngb-bs3",
+    "crucible_mass": 23.0,
+    "crucible_type": "DSC/TG pan Al",
+    "date_performed": "2026-08-04T09:38:15+00:00",
+    "file_hash": {
+      "file": "01_Messung_Probe_G_300_Grad_Ar.ngb-ds3",
+      "hash": "3ce16eb952c10d3132ca6aa538f74fc575e604470ccc39a5dc4977c0a9d866850e14dae8e037fc145cd36924fbcf76c1efab13a351d8355392a8142209b1bb6b",
+      "method": "BLAKE2b"
+    },
+    "furnace_tn": 4.0,
+    "furnace_tv": 4.0,
+    "furnace_type": "High Temp Rh S",
+    "furnace_xp": 4.0,
+    "instrument": "STA449F3A-0042-M",
+    "lab": "WST",
+    "licensed_to": "HTWK Leipzig\nFachbereich Maschinen- und Energietechnik\nD-04416 Markkleeberg",
+    "material": "Papier G",
+    "operator": "Ja",
+    "project": "Trocknung",
+    "protective_mfc_flow": 20.0,
+    "protective_mfc_gas": "ARGON",
+    "protective_mfc_gas_formula": "Ar",
+    "protective_mfc_range": 244.25,
+    "purge_1_mfc_flow": 0.0,
+    "purge_1_mfc_gas": "OXYGEN",
+    "purge_1_mfc_gas_formula": "O2",
+    "purge_1_mfc_range": 254.00001525878906,
+    "purge_2_mfc_flow": 20.0,
+    "purge_2_mfc_gas": "ARGON",
+    "purge_2_mfc_gas_formula": "Ar",
+    "purge_2_mfc_range": 244.25,
+    "reference_crucible_mass": 23.0,
+    "reference_mass": 0.0,
+    "sample_id": "010",
+    "sample_mass": 10.848,
+    "sample_name": "Papier G",
+    "sample_tn": 4.0,
+    "sample_tv": 4.0,
+    "sample_xp": 4.0,
+    "sensitivity_calibration": {
+      "comment": "ohne Pb, Flächen aus 2. und 3. Aufheizung gemittelt",
+      "crucible_type": "DSC/TG pan Al",
+      "date_measured": "2026-03-18T14:55:09+00:00",
+      "fixpoints": [
+        {
+          "enthalpy": -28.600000381469727,
+          "fitted_sensitivity": 1.161520004272461,
+          "measured_sensitivity": 1.168357014656067,
+          "name": "Indium",
+          "peak_area": -33.415000915527344,
+          "temperature_c": 156.60000610351562,
+          "weight": 10.0
+        },
+        {
+          "enthalpy": -60.5,
+          "fitted_sensitivity": 1.1225130558013916,
+          "measured_sensitivity": 1.056777000427246,
+          "name": "Sn",
+          "peak_area": -63.935001373291016,
+          "temperature_c": 231.89999389648438,
+          "weight": 1.0
+        },
+        {
+          "enthalpy": -53.099998474121094,
+          "fitted_sensitivity": 1.0862740278244019,
+          "measured_sensitivity": 1.0454800128936768,
+          "name": "Bi",
+          "peak_area": -55.51499938964844,
+          "temperature_c": 271.3999938964844,
+          "weight": 1.0
+        },
+        {
+          "enthalpy": -107.5,
+          "fitted_sensitivity": 0.8766999840736389,
+          "measured_sensitivity": 0.9325581192970276,
+          "name": "Zn",
+          "peak_area": -100.25,
+          "temperature_c": 419.5,
+          "weight": 0.800000011920929
+        }
+      ],
+      "gas": "ARGON",
+      "heating_rate": 10.0,
+      "record_path": "C:\\NETZSCH\\Proteus6\\cal\\Empfindl_Al-Tiegel_23mg_Ar_10K_min_2026.ngb-es3"
+    },
+    "temperature_calibration": {
+      "coefficients": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "fixpoints": [
+        {
+          "actual_c": 74.0,
+          "corrected_c": 74.0,
+          "measured_c": 74.0,
+          "name": "CURIE_A",
+          "weight": 1.0
+        },
+        {
+          "actual_c": 158.0,
+          "corrected_c": 158.0,
+          "measured_c": 158.0,
+          "name": "CURIE_B",
+          "weight": 1.0
+        },
+        {
+          "actual_c": 266.0,
+          "corrected_c": 266.0,
+          "measured_c": 266.0,
+          "name": "CURIE_C",
+          "weight": 1.0
+        },
+        {
+          "actual_c": 358.0,
+          "corrected_c": 358.0,
+          "measured_c": 358.0,
+          "name": "CURIE_D",
+          "weight": 1.0
+        },
+        {
+          "actual_c": 492.0,
+          "corrected_c": 492.0,
+          "measured_c": 492.0,
+          "name": "CURIE_E",
+          "weight": 1.0
+        },
+        {
+          "actual_c": 771.0,
+          "corrected_c": 771.0,
+          "measured_c": 771.0,
+          "name": "CURIE_F",
+          "weight": 1.0
+        }
+      ]
+    },
+    "temperature_program": {
+      "stage_0": {
+        "acquisition_rate": 0.0,
+        "heating_rate": 0.0,
+        "protective_mfc_flow": 20.0,
+        "purge_1_mfc_flow": 0.0,
+        "purge_2_mfc_flow": 20.0,
+        "stage_type": 0,
+        "temperature": 30.0,
+        "time": 0.0
+      },
+      "stage_1": {
+        "acquisition_rate": 100.0,
+        "heating_rate": 10.0,
+        "protective_mfc_flow": 20.0,
+        "purge_1_mfc_flow": 0.0,
+        "purge_2_mfc_flow": 20.0,
+        "stage_type": 1,
+        "temperature": 105.0,
+        "time": 450.0
+      },
+      "stage_2": {
+        "acquisition_rate": 25.0,
+        "heating_rate": 0.0,
+        "protective_mfc_flow": 20.0,
+        "purge_1_mfc_flow": 0.0,
+        "purge_2_mfc_flow": 20.0,
+        "stage_type": 1,
+        "temperature": 105.0,
+        "time": 600.0
+      },
+      "stage_3": {
+        "acquisition_rate": 100.0,
+        "heating_rate": 10.0,
+        "protective_mfc_flow": 20.0,
+        "purge_1_mfc_flow": 0.0,
+        "purge_2_mfc_flow": 20.0,
+        "stage_type": 1,
+        "temperature": 300.0,
+        "time": 1170.0
+      },
+      "stage_4": {
+        "acquisition_rate": 25.0,
+        "heating_rate": 0.0,
+        "protective_mfc_flow": 20.0,
+        "purge_1_mfc_flow": 0.0,
+        "purge_2_mfc_flow": 20.0,
+        "stage_type": 1,
+        "temperature": 300.0,
+        "time": 600.0
+      },
+      "stage_5": {
+        "acquisition_rate": 100.0,
+        "heating_rate": 10.0,
+        "protective_mfc_flow": 20.0,
+        "purge_1_mfc_flow": 0.0,
+        "purge_2_mfc_flow": 20.0,
+        "stage_type": 1,
+        "temperature": 40.0,
+        "time": 1560.0
+      },
+      "stage_6": {
+        "acquisition_rate": 0.0,
+        "heating_rate": 0.0,
+        "protective_mfc_flow": 0.0,
+        "purge_1_mfc_flow": 0.0,
+        "purge_2_mfc_flow": 0.0,
+        "stage_type": 2,
+        "temperature": 320.0,
+        "time": 0.0
+      }
+    },
+    "timezone": "Mitteleuropäische Sommerzeit",
+    "utc_offset_minutes": 120
+  },
+  "num_rows": 5801
+}

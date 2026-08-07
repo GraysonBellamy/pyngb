@@ -19,6 +19,7 @@ def read_ngb(
     path: str | Path,
     *,
     return_metadata: bool = False,
+    run: Literal["sample", "correction", "corrected"] = "sample",
     baseline_file: str | Path | None = None,
     dynamic_axis: str = "sample_temperature",
     limits: ParsingConfig | None = None,
@@ -27,20 +28,29 @@ def read_ngb(
 
 **Parameters:**
 
-- `path`: Path to NGB file (`.ngb-ss3` or `.ngb-bs3`)
+- `path`: Path to NGB file (`.ngb-ss3`, `.ngb-bs3`, or `.ngb-ds3`)
 - `return_metadata`: If True, return a `(metadata, table)` tuple instead of a
   table with embedded metadata
-- `baseline_file`: Path to a baseline (`.ngb-bs3`) file; when given, mass and
-  DSC columns are baseline-subtracted and marked in column metadata
+- `run`: What to return — `"sample"` (default) or, for "Sample +
+  Correction" `.ngb-ds3` files, `"correction"` for the embedded correction
+  run or `"corrected"` for the sample with the embedded correction
+  subtracted; non-default values cannot be combined with `baseline_file`.
+  The selected run is recorded in the table's schema metadata under `run`
+- `baseline_file`: Path to a file providing correction curves; a `.ngb-bs3`
+  contributes its only run, a `.ngb-ds3` (typically the sample file itself)
+  its embedded correction run. Mass and DSC columns are baseline-subtracted
+  and marked in column metadata
 - `dynamic_axis`: Axis for dynamic-segment alignment during baseline
   subtraction — `"time"`, `"sample_temperature"`, or `"furnace_temperature"`
 - `limits`: Optional `ParsingConfig` overriding the default resource limits
 
 **Returns:** a PyArrow table with metadata embedded in the schema (default),
 or `(FileMetadata, pa.Table)` when `return_metadata=True`. The metadata
-includes a BLAKE2b `file_hash` of the source file.
+includes a BLAKE2b `file_hash` of the source file and always describes the
+sample measurement.
 
-**Raises:** `ValueError` (bad `dynamic_axis`), `FileNotFoundError`,
+**Raises:** `ValueError` (bad `dynamic_axis`/`run`, or a non-`"sample"`
+run on a file with no embedded correction), `FileNotFoundError`,
 `zipfile.BadZipFile`, `NGBStreamNotFoundError` (streams 1/2 required; 3
 optional), `NGBCorruptedFileError`, `NGBResourceLimitError`.
 
@@ -53,6 +63,11 @@ metadata, table = read_ngb("sample.ngb-ss3", return_metadata=True)
 
 # With baseline subtraction
 corrected = read_ngb("sample.ngb-ss3", baseline_file="baseline.ngb-bs3")
+
+# Sample + Correction (.ngb-ds3) files
+raw = read_ngb("run.ngb-ds3")                      # raw sample run
+corr = read_ngb("run.ngb-ds3", run="correction")   # embedded correction
+corrected = read_ngb("run.ngb-ds3", run="corrected")  # as Proteus displays
 ```
 
 ### read_ngb_metadata()
@@ -235,14 +250,16 @@ class BatchProcessor:
     def process_files(self, files, output_format="parquet",
                       output_dir=None, skip_errors=True) -> list[BatchResult]
 
-    def process_directory(self, directory, pattern="*.ngb-ss3",
+    def process_directory(self, directory,
+                          pattern=("*.ngb-ss3", "*.ngb-ds3"),
                           output_format="parquet", output_dir=None,
                           skip_errors=True) -> list[BatchResult]
 ```
 
-`output_format` is `"parquet"`, `"csv"`, or `"both"`. With
-`skip_errors=True` (default), per-file failures are recorded and processing
-continues; results are returned in input order.
+`output_format` is `"parquet"`, `"csv"`, or `"both"`. `pattern` is a glob
+pattern or a sequence of them; the default matches every sample-measurement
+type. With `skip_errors=True` (default), per-file failures are recorded and
+processing continues; results are returned in input order.
 
 Module-level wrappers `process_files(...)` and `process_directory(...)`
 cover the common case without instantiating the class.
@@ -439,6 +456,7 @@ Parse NGB files and export Parquet/CSV.
 
 ```
 pyngb convert FILE... [-o DIR] [-f {parquet,csv,both}] [-b BASELINE]
+              [--run {sample,correction,corrected}]
               [--dynamic-axis {time,sample_temperature,furnace_temperature}] [-v]
 ```
 
@@ -446,7 +464,8 @@ pyngb convert FILE... [-o DIR] [-f {parquet,csv,both}] [-b BASELINE]
 |------|---------|---------|
 | `-o, --output` | `.` | Output directory |
 | `-f, --format` | `parquet` | Output format |
-| `-b, --baseline` | — | Baseline file for subtraction (output gains a `_baseline_subtracted` suffix) |
+| `-b, --baseline` | — | Baseline file for subtraction — a `.ngb-bs3`, or a `.ngb-ds3` whose embedded correction is used (output gains a `_baseline_subtracted` suffix) |
+| `--run` | `sample` | What to export from `.ngb-ds3` files: `sample`, `correction`, or `corrected` (non-default output gains a `_correction`/`_corrected` suffix) |
 | `--dynamic-axis` | `sample_temperature` | Axis for dynamic-segment alignment |
 | `-v, --verbose` | off | Debug logging |
 

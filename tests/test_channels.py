@@ -10,14 +10,13 @@ policy for data streams.
 
 import hashlib
 import json
-import logging
 from pathlib import Path
 
 import numpy as np
 import pytest
 
 from pyngb.exceptions import NGBCorruptedFileError
-from pyngb.format import DType, build_dataframe, load_document
+from pyngb.format import DType, build_dataframe, count_runs, load_document
 from support.ngb_builder import (
     build_array,
     build_scalar,
@@ -69,12 +68,12 @@ def segment(
     )
 
 
-def dataframe_of(tmp_path: Path, tables: list[bytes], stream_id: int = 2):
+def dataframe_of(tmp_path: Path, tables: list[bytes], stream_id: int = 2, run: int = 0):
     path = write_ngb(
         tmp_path / "synth.ngb-ss3",
         {stream_id: build_stream(stream_id, body=build_section(tables))},
     )
-    return build_dataframe(load_document(path))
+    return build_dataframe(load_document(path), run=run)
 
 
 class TestAssemblyRules:
@@ -165,23 +164,123 @@ class TestAssemblyRules:
         )
         assert frame["mass"].to_list() == [1.0]
 
-    def test_duplicate_channel_warns_and_overwrites(
-        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
-    ) -> None:
-        tables = [
-            header(0x90, class_def=True),
-            segment([1.0]),
-            header(0x90),
-            segment([2.0]),
-        ]
-        with caplog.at_level(logging.WARNING):
-            frame = dataframe_of(tmp_path, tables)
-        assert frame["mass"].to_list() == [2.0]
-        assert "more than once" in caplog.text
-
     def test_headers_only_yields_empty_frame(self, tmp_path: Path) -> None:
         frame = dataframe_of(tmp_path, [header(0x90, class_def=True)])
         assert frame.is_empty()
+
+
+class TestMultiRun:
+    """Sample + Correction (.ngb-ds3) files pack two complete runs into the
+    same data streams; a repeated channel header is the run boundary."""
+
+    def two_run_tables(self) -> list[bytes]:
+        return [
+            header(0x90, class_def=True),
+            segment([1.0, 2.0]),
+            header(0x90),
+            segment([3.0, 4.0]),
+        ]
+
+    def test_repeated_channel_starts_a_new_run(self, tmp_path: Path) -> None:
+        """Regression for issue #198: the second run must never overwrite
+        the first — run 0 is the sample measurement."""
+        frame = dataframe_of(tmp_path, self.two_run_tables())
+        assert frame["mass"].to_list() == [1.0, 2.0]
+
+    def test_second_run_is_selectable(self, tmp_path: Path) -> None:
+        frame = dataframe_of(tmp_path, self.two_run_tables(), run=1)
+        assert frame["mass"].to_list() == [3.0, 4.0]
+
+    def test_count_runs(self, tmp_path: Path) -> None:
+        path = write_ngb(
+            tmp_path / "synth.ngb-ss3",
+            {2: build_stream(2, body=build_section(self.two_run_tables()))},
+        )
+        assert count_runs(load_document(path)) == 2
+
+    def test_count_runs_is_one_for_a_single_run(self, tmp_path: Path) -> None:
+        path = write_ngb(
+            tmp_path / "synth.ngb-ss3",
+            {
+                2: build_stream(
+                    2,
+                    body=build_section([header(0x90, class_def=True), segment([1.0])]),
+                )
+            },
+        )
+        assert count_runs(load_document(path)) == 1
+
+    def test_run_out_of_range_raises(self, tmp_path: Path) -> None:
+        with pytest.raises(ValueError, match="run 1 requested"):
+            dataframe_of(
+                tmp_path, [header(0x90, class_def=True), segment([1.0])], run=1
+            )
+
+    def test_negative_run_raises(self, tmp_path: Path) -> None:
+        with pytest.raises(ValueError, match="run -1 requested"):
+            dataframe_of(
+                tmp_path, [header(0x90, class_def=True), segment([1.0])], run=-1
+            )
+
+    def test_stray_duplicate_header_is_corruption_not_a_run(
+        self, tmp_path: Path
+    ) -> None:
+        """A repeated header alone does not make a second run: every run
+        must repeat the FULL channel signature. A stray duplicate in an
+        otherwise single-run stream must raise, not silently truncate run 0
+        at the duplicate — even with no second data stream to disagree
+        with."""
+        tables = [
+            header(0x8C, class_def=True),
+            segment([0.0, 1.0]),
+            header(0x90),
+            segment([5.0, 6.0]),
+            header(0x90),
+            segment([7.0, 8.0]),
+        ]
+        with pytest.raises(NGBCorruptedFileError, match="channel signature"):
+            dataframe_of(tmp_path, tables)
+
+    def test_streams_disagreeing_on_run_count_raise(self, tmp_path: Path) -> None:
+        path = write_ngb(
+            tmp_path / "synth.ngb-ss3",
+            {
+                2: build_stream(2, body=build_section(self.two_run_tables())),
+                3: build_stream(
+                    3,
+                    body=build_section(
+                        [
+                            header(0x30, high_byte=0x75, class_def=True),
+                            segment([9.0, 9.0]),
+                        ]
+                    ),
+                ),
+            },
+        )
+        with pytest.raises(NGBCorruptedFileError, match="disagree"):
+            build_dataframe(load_document(path))
+
+    def test_runs_pair_across_streams(self, tmp_path: Path) -> None:
+        stream3 = [
+            header(0x30, high_byte=0x75, class_def=True),
+            segment([10.0, 20.0]),
+            header(0x30, high_byte=0x75),
+            segment([30.0, 40.0]),
+        ]
+        path = write_ngb(
+            tmp_path / "synth.ngb-ss3",
+            {
+                2: build_stream(2, body=build_section(self.two_run_tables())),
+                3: build_stream(3, body=build_section(stream3)),
+            },
+        )
+        doc = load_document(path)
+        first = build_dataframe(doc, run=0)
+        second = build_dataframe(doc, run=1)
+        assert first["mass"].to_list() == [1.0, 2.0]
+        assert first["furnace_temperature"].to_list() == [10.0, 20.0]
+        assert second["mass"].to_list() == [3.0, 4.0]
+        assert second["furnace_temperature"].to_list() == [30.0, 40.0]
 
 
 class TestCorruptionPolicy:

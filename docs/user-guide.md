@@ -54,6 +54,28 @@ corrected_table = read_ngb(
 - Subtracts only `mass` and `dsc_signal` columns
 - Preserves time, temperature, and flow data from sample
 
+### Sample + Correction Files (.ngb-ds3)
+
+Measurements saved in Proteus' "Sample + Correction" mode embed **two
+complete raw measurements** in one `.ngb-ds3` file: the sample run and a
+verbatim copy of the correction run it was measured against. Nothing is
+pre-subtracted — Proteus applies the correction at display time, and so can
+you:
+
+```python
+raw = read_ngb("run.ngb-ds3")                      # raw sample run (default)
+corr = read_ngb("run.ngb-ds3", run="correction")   # embedded correction run
+
+# Corrected curves, as Proteus displays them — the file is its own baseline:
+corrected = read_ngb("run.ngb-ds3", run="corrected")
+```
+
+Any `.ngb-ds3` passed as `baseline_file` contributes its embedded correction
+run, so a correction shared by several measurements can be taken from any of
+them. Metadata always describes the sample measurement; the correction it
+was measured against is identified by the `correction_file_path` key, and
+the run a table holds is recorded in its schema metadata under `run`.
+
 ### DTG Analysis
 
 Calculate derivative thermogravimetry with smart defaults:
@@ -256,6 +278,12 @@ python -m pyngb convert sample.ngb-ss3 --format csv
 
 # Convert to both formats
 python -m pyngb convert sample.ngb-ss3 --format both
+
+# Sample + Correction files: raw sample run (default), embedded correction
+# run, or corrected curves (subtract the file's own embedded correction)
+python -m pyngb convert run.ngb-ds3
+python -m pyngb convert run.ngb-ds3 --run correction
+python -m pyngb convert run.ngb-ds3 --run corrected
 ```
 
 ### Batch Processing with CLI

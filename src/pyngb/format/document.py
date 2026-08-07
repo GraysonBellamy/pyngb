@@ -313,11 +313,14 @@ def assemble_stream(
                 orphans.append(_field_of(item))
                 continue
             if field_id in current.fields:
-                logger.warning(
-                    f"stream_{stream.stream_id} table {len(tables)}: duplicate "
-                    f"field 0x{field_id:04X} at offset {start}; "
-                    "keeping the first occurrence"
-                )
+                if dtype is not DType.NULL:
+                    # NULL records recur as structural separators; a repeated
+                    # data field is the anomaly worth surfacing.
+                    logger.warning(
+                        f"stream_{stream.stream_id} table {len(tables)}: duplicate "
+                        f"field 0x{field_id:04X} at offset {start}; "
+                        "keeping the first occurrence"
+                    )
             else:
                 value = decode(dtype, raw) if mode is scalar else None
                 current.fields[field_id] = Field(

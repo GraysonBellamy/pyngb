@@ -14,7 +14,7 @@ This package is the 0.4.0 extraction backbone. The document layer
 the byte-level grammar surface lives here only.
 """
 
-from .channels import build_dataframe
+from .channels import build_dataframe, count_runs
 from .container import SectionEntry, StreamData, open_ngb, parse_container
 from .document import Field, NGBDocument, Table, load_document
 from .extract import build_metadata
@@ -57,6 +57,7 @@ __all__ = [
     "UnknownSpan",
     "build_dataframe",
     "build_metadata",
+    "count_runs",
     "decode_array",
     "decode_scalar",
     "decode_string",

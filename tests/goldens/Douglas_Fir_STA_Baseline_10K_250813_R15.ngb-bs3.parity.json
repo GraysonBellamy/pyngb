@@ -372,8 +372,8 @@
         "time": 0.0
       }
     },
-    "timezone": "Mitteleuropäische Sommerzeit",
-    "utc_offset_minutes": 120
+    "timezone": "Eastern Daylight Time",
+    "utc_offset_minutes": -240
   },
   "num_rows": 9191
 }

@@ -11,9 +11,22 @@ grammar (verified against all six test fixtures, 25k+ records, during the
               17 fc ff ff                     (TYPE_PREFIX)
               <dtype u8>
               (80 01 <scalar> | a0 01 <count u32> <count x itemsize bytes>)
-              01 00 00 00 02 00 01 00 00      (END_FIELD)
+              <terminator>
 
 Array counts are ELEMENT counts; payload bytes = count * ITEM_SIZE[dtype].
+
+The canonical terminator — on every record of every 2022/2025 fixture — is
+the 9-byte END_FIELD ``01 00 00 00 02 00 01 00 00`` (the following
+``00 03 00``, where present, is covered as a ``table_trailer`` span). The
+underlying serialization actually ends records with a run of 6-byte units
+``01 00 00 00 <K u16>`` — the canonical 12-byte ending is unit(K=2) +
+unit(K=3) chunked as 9+3 — and STA-449F3A ``.ngb-ds3`` timezone blocks
+write variant runs: unit(3) alone, or unit(4) + unit(3). Those three forms
+are the only ones observed (25k+ records across all eight fixtures), and
+the tokenizer matches exactly them — END_FIELD first, preserving the
+canonical segmentation byte-for-byte. Anything else, including a
+truncated END_FIELD or an unobserved unit combination, stays a malformed
+span, as a drift tripwire.
 
 The tokenizer is a strict linear walk that is *total*: every byte of a
 section is either part of a decoded :class:`FieldToken` or covered by an
@@ -116,8 +129,9 @@ class Mode(IntEnum):
 
 
 class DType(IntEnum):
-    """The nine data types observed across all fixtures and streams."""
+    """The data types observed across all fixtures and streams."""
 
+    NULL = 0x00  # empty scalar, zero payload bytes (ds3 timezone blocks)
     U16 = 0x02
     I32 = 0x03
     F32 = 0x04
@@ -130,6 +144,7 @@ class DType(IntEnum):
 
 
 ITEM_SIZE: Final[dict[int, int]] = {
+    DType.NULL: 0,
     DType.U16: 2,
     DType.I32: 4,
     DType.F32: 4,
@@ -250,6 +265,8 @@ def decode_scalar(
 ) -> int | float | str | bytes | None:
     """Decode a scalar payload. Undecoded dtypes (REF/PACKED8/HASH16) and
     unknown ones return the raw bytes."""
+    if dtype == DType.NULL:
+        return None
     if dtype == DType.U16:
         return int(_U16.unpack(payload[:2])[0])
     if dtype == DType.I32:
@@ -327,6 +344,31 @@ class _Truncated:
 
 _TRUNCATED: Final = _Truncated()
 
+# Record-terminator trailer units: 01 00 00 00 <K u16>. See the module
+# docstring — the canonical END_FIELD is unit(2) plus the first 3 bytes of
+# unit(3); variant records (ds3 timezone blocks) end with unit(3) alone or
+# unit(4) + unit(3). No other form is observed in any fixture.
+_UNIT_3: Final = b"\x01\x00\x00\x00\x03\x00"
+_UNIT_4_3: Final = b"\x01\x00\x00\x00\x04\x00" + _UNIT_3
+
+
+def _match_terminator(data: bytes, pos: int, end: int) -> int | None:
+    """Byte length of the record terminator at ``pos``, or None.
+
+    Canonical END_FIELD is matched first, preserving the classic 9+3
+    segmentation (the residual ``00 03 00`` stays a table_trailer span).
+    Only the exactly-observed variant forms are accepted otherwise, so a
+    truncated terminator or an unknown unit run still surfaces as a
+    malformed span.
+    """
+    if pos + 9 <= end and data.startswith(END_FIELD, pos):
+        return 9
+    if pos + 12 <= end and data.startswith(_UNIT_4_3, pos):
+        return 12
+    if pos + 6 <= end and data.startswith(_UNIT_3, pos):
+        return 6
+    return None
+
 
 def _parse_record(
     data: bytes,
@@ -368,13 +410,14 @@ def _parse_record(
                 return None
             payload_len = item_size
         payload_end = value_start + payload_len
-        if payload_end + 9 > end or not data.startswith(END_FIELD, payload_end):
+        term = _match_terminator(data, payload_end, end)
+        if term is None:
             return None
         return (
-            payload_end + 9,
+            payload_end + term,
             FieldToken(
                 pos,
-                payload_end + 9,
+                payload_end + term,
                 _read_u16(data, pos + 7)[0],
                 _DTYPE_OF[dtype],
                 Mode.SCALAR,
@@ -390,9 +433,10 @@ def _parse_record(
         count = _read_u32(data, value_start)[0]
         payload_bytes = count * item_size
         payload_end = value_start + 4 + payload_bytes
-        if payload_end + 9 > end:
+        if payload_end + 6 > end:
             return _TRUNCATED
-        if not data.startswith(END_FIELD, payload_end):
+        term = _match_terminator(data, payload_end, end)
+        if term is None:
             return None
         if payload_bytes > max_bytes:
             raise NGBResourceLimitError(
@@ -403,10 +447,10 @@ def _parse_record(
                 limit=max_bytes,
             )
         return (
-            payload_end + 9,
+            payload_end + term,
             FieldToken(
                 pos,
-                payload_end + 9,
+                payload_end + term,
                 _read_u16(data, pos + 7)[0],
                 _DTYPE_OF[dtype],
                 Mode.ARRAY,

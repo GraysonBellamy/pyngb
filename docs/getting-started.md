@@ -210,5 +210,10 @@ pyngb supports these NETZSCH file extensions:
 
 - `.ngb-ss3` - Sample files (main data)
 - `.ngb-bs3` - Baseline files (for correction)
+- `.ngb-ds3` - Sample + Correction files (a sample run with its correction
+  run embedded in the same file)
 
-Both contain the same data structure and can be parsed identically.
+All share the same container structure. For `.ngb-ds3` files, `read_ngb`
+returns the raw sample run by default; `run="correction"` returns the
+embedded correction, and `run="corrected"` returns the corrected curves
+(see the [User Guide](user-guide.md)).

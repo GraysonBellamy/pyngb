@@ -5,6 +5,69 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-08-06
+
+Support for "Sample + Correction" measurements (`.ngb-ds3`), fixing
+[#198](https://github.com/GraysonBellamy/pyngb/issues/198). A `.ngb-ds3`
+embeds two complete raw measurements in one file — the sample run and a
+verbatim copy of the correction run it was measured against; nothing is
+pre-subtracted (Proteus applies the correction at display time). The parser
+previously collapsed the two runs onto the same columns, so every `.ngb-ds3`
+sharing a correction parsed to the identical (correction) frame.
+
+### Fixed
+
+- `.ngb-ds3` files parse to the **sample** measurement instead of the
+  embedded correction. Data streams are split into runs at repeated channel
+  headers; a repeated channel no longer silently overwrites the earlier
+  column. Run detection is strict: every run must repeat the full channel
+  signature, so a stray duplicate header — or streams disagreeing on the
+  run count — raises `NGBCorruptedFileError` instead of fabricating a
+  second run.
+- Calibration fixpoint metadata (`sensitivity_calibration`,
+  `temperature_calibration`) no longer mixes the sample's and the embedded
+  correction's calibration standards on `.ngb-ds3` files: stream-1
+  extraction is bounded to the sample measurement's blocks.
+- The record grammar's terminator model was incomplete: records actually
+  end with a run of 6-byte trailer units (`01 00 00 00 <K u16>`), of which
+  the classic 9-byte `END_FIELD` (+ 3-byte trailer span) is the K=2/K=3
+  chunking. STA-449F3A `.ngb-ds3` files write variant runs (K=3 alone,
+  K=4 + K=3) and empty `NULL`-dtype scalars; the tokenizer now decodes
+  both, dissolving what were previously opaque oversized "preamble" blobs
+  and one malformed span into ordinary records — unlocking, among others,
+  the daylight-saving fields of timezone blocks and the p0–p5 sensitivity
+  calibration constants on these files. Exactly the observed terminator
+  forms are accepted; unknown or truncated ones still surface as malformed
+  spans (drift tripwire).
+- `timezone`/`utc_offset_minutes` now come from the **run's own** snapshot
+  (the first timezone table inside the main metadata document) instead of
+  the first table in the stream, which is a calibration-file snapshot.
+  Streams carry a snapshot per referenced calibration/correction — NETZSCH
+  factory calibrations appear as German-timezone entries worldwide — so
+  the old rule reported the wrong environment whenever a referenced file
+  was measured under a different timezone or DST state than the run (a
+  fixture in this repo reported "Mitteleuropäische Sommerzeit"/+120 for an
+  Eastern-time measurement; it now reports EDT/−240).
+
+### Added
+
+- `read_ngb(path, run="sample" | "correction" | "corrected")` selects what
+  to load: the raw sample run, the embedded correction run, or the sample
+  with the embedded correction subtracted — `run="corrected"` reproduces
+  the corrected curves Proteus displays. A non-default `run` on a file
+  with no embedded correction raises `ValueError`. The selected run is
+  recorded in the table's schema metadata under the `run` key, so exports
+  of different runs stay distinguishable.
+- Any `.ngb-ds3` passed as `baseline_file` contributes its embedded
+  correction run to baseline subtraction of another file.
+- `pyngb.format.count_runs()` and `build_dataframe(doc, run=...)` expose
+  run handling at the format layer.
+- CLI: `pyngb convert --run {sample,correction,corrected}`, `.ngb-ds3`
+  accepted as input and baseline; non-default runs are suffixed
+  `_correction`/`_corrected`.
+- Batch processing: `process_directory`/`NGBDataset.from_directory` accept
+  a sequence of patterns and default to `("*.ngb-ss3", "*.ngb-ds3")`.
+
 ## [0.4.0] - 2026-07-09
 
 The parsing backbone is rewritten from the ground up: per-field regex

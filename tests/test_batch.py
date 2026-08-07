@@ -191,16 +191,26 @@ class TestNGBDataset:
         assert len(dataset) == 0
 
     def test_ngb_dataset_from_directory(self) -> None:
-        """from_directory must pick up every .ngb-ss3 fixture, and only those."""
+        """from_directory defaults to every sample-measurement fixture —
+        .ngb-ss3 and Sample + Correction .ngb-ds3, never baselines."""
         test_dir = Path(__file__).parent / "test_files"
         if not test_dir.exists():
             pytest.skip("No test files available")
 
         dataset = NGBDataset.from_directory(str(test_dir))
 
-        expected = sorted(test_dir.glob("*.ngb-ss3"))
+        expected = sorted([*test_dir.glob("*.ngb-ss3"), *test_dir.glob("*.ngb-ds3")])
         assert sorted(dataset.files) == expected
         assert len(dataset) == len(expected)
+
+    def test_ngb_dataset_from_directory_single_pattern(self) -> None:
+        """An explicit single pattern narrows the selection."""
+        test_dir = Path(__file__).parent / "test_files"
+        if not test_dir.exists():
+            pytest.skip("No test files available")
+
+        dataset = NGBDataset.from_directory(str(test_dir), pattern="*.ngb-bs3")
+        assert sorted(dataset.files) == sorted(test_dir.glob("*.ngb-bs3"))
 
     def test_ngb_dataset_get_summary(self) -> None:
         """Test getting dataset summary."""
