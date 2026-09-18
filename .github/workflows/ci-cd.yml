@@ -22,7 +22,7 @@ jobs:
       fail-fast: false
 
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v7
 
     # python-version must go through setup-uv (UV_PYTHON): the repo's
     # .python-version (a local-dev pin) otherwise overrides anything
@@ -71,7 +71,7 @@ jobs:
       contents: read
 
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v7
 
     # The floors are verified on 3.10 (see pyproject.toml); UV_PYTHON must
     # override the repo's .python-version or uv installs 3.13, where
@@ -99,7 +99,7 @@ jobs:
       contents: read
 
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v7
 
     - name: Install uv
       uses: astral-sh/setup-uv@v7
@@ -130,7 +130,7 @@ jobs:
       contents: read
 
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v7
 
     - name: Install uv
       uses: astral-sh/setup-uv@v7
@@ -155,7 +155,7 @@ jobs:
       contents: read
 
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v7
 
     - name: Install uv
       uses: astral-sh/setup-uv@v7
@@ -208,7 +208,7 @@ jobs:
     needs: [test, security]
 
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v7
 
     - name: Install uv
       uses: astral-sh/setup-uv@v7
@@ -246,7 +246,7 @@ jobs:
     if: github.event_name == 'release' && github.event.action == 'published'
 
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v7
 
     - name: Download build artifacts
       uses: actions/download-artifact@v5
