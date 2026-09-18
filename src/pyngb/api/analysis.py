@@ -19,6 +19,7 @@ __all__ = [
     "add_dtg",
     "apply_dsc_calibration",
     "calculate_table_dtg",
+    "normalize_to_initial_length",
     "normalize_to_initial_mass",
 ]
 
@@ -224,11 +225,81 @@ def normalize_to_initial_mass(
     >>> df = pl.from_arrow(normalized_table)
     >>> print(f"Normalized mass: {df['mass'][0]:.6f}")  # Now in mg/mg units
     """
+    return _normalize_by_metadata(
+        table,
+        columns,
+        default_columns=("mass", "dsc_signal"),
+        key="sample_mass",
+        divisor_unit="mg",
+    )
+
+
+def normalize_to_initial_length(
+    table: pa.Table,
+    columns: list[str] | None = None,
+) -> pa.Table:
+    """
+    Normalize the length change to the initial sample length (dL/L0).
+
+    The dilatometer counterpart of :func:`normalize_to_initial_mass`: the
+    ``length_change`` column (µm) is divided in place by the initial sample
+    length ``sample_length`` from the table's metadata (stored in mm,
+    converted to µm), giving the dimensionless relative length change
+    Proteus exports as ``dL/Lo``. Units become "µm/µm" and "normalized" is
+    added to the processing history. Apply it after ``run="corrected"`` to
+    reproduce Proteus's corrected dL/L0.
+
+    Parameters
+    ----------
+    table : pa.Table
+        PyArrow table containing dilatometer data with embedded metadata
+    columns : list of str, optional
+        Column names to normalize. If None, defaults to ['length_change']
+
+    Returns
+    -------
+    pa.Table
+        Table with the specified columns normalized in place, units updated
+        to per-length form, and "normalized" added to the processing history
+
+    Raises
+    ------
+    ValueError
+        If sample_length is not found in metadata or is zero/negative
+    KeyError
+        If specified columns are not found in the table
+
+    Examples
+    --------
+    >>> from pyngb import read_ngb, normalize_to_initial_length
+    >>> table = read_ngb("run.ngb-dla", run="corrected")
+    >>> relative = normalize_to_initial_length(table)
+    >>> df = pl.from_arrow(relative)
+    >>> print(f"dL/L0 at the end: {df['length_change'][-1]:.5f}")
+    """
+    return _normalize_by_metadata(
+        table,
+        columns,
+        default_columns=("length_change",),
+        key="sample_length",
+        divisor_unit="µm",
+        divisor_scale=1000.0,  # sample_length is stored in mm
+    )
+
+
+def _normalize_by_metadata(
+    table: pa.Table,
+    columns: list[str] | None,
+    *,
+    default_columns: tuple[str, ...],
+    key: str,
+    divisor_unit: str,
+    divisor_scale: float = 1.0,
+) -> pa.Table:
+    """Divide ``columns`` in place by the metadata value ``key`` (x scale)."""
     # Extract metadata from table schema
     if not table.schema.metadata:
-        raise ValueError(
-            "Table metadata is missing - cannot retrieve initial sample mass"
-        )
+        raise ValueError(f"Table metadata is missing - cannot retrieve {key}")
 
     metadata_bytes = table.schema.metadata.get(b"file_metadata")
     if not metadata_bytes:
@@ -239,21 +310,17 @@ def normalize_to_initial_mass(
     except (json.JSONDecodeError, UnicodeDecodeError) as e:
         raise ValueError(f"Failed to parse table metadata: {e}") from e
 
-    # Get initial sample mass from metadata
-    sample_mass = metadata.get("sample_mass")
-    if sample_mass is None:
-        raise ValueError("sample_mass not found in metadata")
+    divisor = metadata.get(key)
+    if divisor is None:
+        raise ValueError(f"{key} not found in metadata")
 
-    if not isinstance(sample_mass, (int, float)) or sample_mass <= 0:
-        raise ValueError(
-            f"Invalid sample_mass value: {sample_mass} (must be positive number)"
-        )
+    if not isinstance(divisor, (int, float)) or divisor <= 0:
+        raise ValueError(f"Invalid {key} value: {divisor} (must be positive number)")
+    divisor = float(divisor) * divisor_scale
 
     # Determine columns to normalize
     column_names = table.column_names
     if columns is None:
-        # Default to mass and DSC columns if they exist
-        default_columns = ["mass", "dsc_signal"]
         columns = [col for col in default_columns if col in column_names]
         if not columns:
             raise ValueError(
@@ -272,8 +339,8 @@ def normalize_to_initial_mass(
                 raise ValueError(
                     f"Column '{col}' is not numeric and cannot be normalized"
                 )
-            # Update the column in place by dividing by sample mass
-            normalization_exprs.append((pl.col(col) / sample_mass).alias(col))
+            # Update the column in place by dividing by the reference value
+            normalization_exprs.append((pl.col(col) / divisor).alias(col))
         return df.with_columns(normalization_exprs)
 
     new_table = with_polars(table, _normalize_columns)
@@ -283,9 +350,9 @@ def normalize_to_initial_mass(
         # Get original column metadata
         original_metadata = get_column_metadata(table, col) or {}
 
-        # Update units to show per-mass normalization
+        # Update units to show the normalization
         original_units = original_metadata.get("units", "unknown")
-        updated_units = f"{original_units}/mg"
+        updated_units = f"{original_units}/{divisor_unit}"
 
         # Update metadata
         updated_metadata = {

@@ -1,11 +1,12 @@
 ---
-description: pyngb is a Python library for parsing NETZSCH STA NGB binary files into Polars and PyArrow tables with embedded metadata for thermal analysis workflows.
+description: pyngb is a Python library for parsing NETZSCH NGB binary files from STA (Simultaneous Thermal Analysis) instruments and dilatometers into Polars and PyArrow tables with embedded metadata for thermal analysis and dilatometry workflows.
 ---
 
 # pyNGB
 
-pyNGB is an unofficial Python library for parsing and analyzing NETZSCH STA
-NGB binary files. It converts instrument output into analysis-ready tables,
+pyNGB is an unofficial Python library for parsing and analyzing NETZSCH NGB
+binary files from simultaneous thermal analyzers (STA) and push-rod
+dilatometers (DIL). It converts instrument output into analysis-ready tables,
 preserves embedded metadata, and includes helpers for common thermal analysis
 workflows.
 
@@ -36,6 +37,8 @@ print(f"Sample: {metadata.get('sample_name', 'Unknown')}")
 
 - Parse `.ngb-ss3` sample files, `.ngb-bs3` baseline files, and `.ngb-ds3`
   Sample + Correction files (raw, correction, or corrected curves)
+- Parse dilatometer `.ngb-dla` and `.ngb-cla` files, including the corrected
+  length change and dL/L0 that Proteus displays
 - Extract metadata, temperature programs, mass data, and instrument details
 - Apply baseline correction and derivative thermogravimetry analysis
 - Export parsed data to Parquet, CSV, and JSON-friendly metadata

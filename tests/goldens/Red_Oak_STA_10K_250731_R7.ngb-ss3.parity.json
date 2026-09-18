@@ -1,6 +1,6 @@
 {
   "column_dtypes": {
-    "31": "double",
+    "cooling_power": "double",
     "dsc_signal": "double",
     "furnace_power": "double",
     "furnace_temperature": "double",
@@ -12,7 +12,7 @@
     "time": "double"
   },
   "column_sha256": {
-    "31": "5c54e4eb528c10003de99c52324adb40b1cb021261c8f229412a0fcaf538c0a6",
+    "cooling_power": "5c54e4eb528c10003de99c52324adb40b1cb021261c8f229412a0fcaf538c0a6",
     "dsc_signal": "fc1b403e07eb9e670d6ce76274f81b1b16dfacd8c2dcc6325555e84422c20b1a",
     "furnace_power": "5c1ed2e2d6aadb77fb17ba17975f576195d4563914e15de5f8bd9ef934f5b97f",
     "furnace_temperature": "fa0a4510d445a0cd9a176c8a2d7d389f97486f5b050b0b96f0f4ecb4a90e2187",
@@ -24,7 +24,7 @@
     "time": "983d4499b187950f1ea7c9030e5db246de0647349c994ee9ca0e5a8166b8e934"
   },
   "column_stats": {
-    "31": {
+    "cooling_power": {
       "first": 0.0,
       "last": 0.0,
       "max": 0.0,
@@ -103,7 +103,7 @@
     "protective_flow",
     "mass",
     "furnace_temperature",
-    "31",
+    "cooling_power",
     "furnace_power",
     "h_foil_temperature"
   ],
@@ -125,6 +125,7 @@
     "crucible_mass": 253.516,
     "crucible_type": "PtRh20 85 µl, with lid",
     "date_performed": "2025-07-31T15:58:37+00:00",
+    "dsc_range": 5000.0,
     "file_hash": {
       "file": "Red_Oak_STA_10K_250731_R7.ngb-ss3",
       "hash": "ab51e0a6692a4daca7a86c5fc796140a77f0ca51f98ddb12cdaecf7a3d706d982ba2e94b3871ab09b601cec99b2b340dfea30b0d738e4dd65106a8178af871de",
@@ -135,9 +136,12 @@
     "furnace_type": "Low Temp Steel K",
     "furnace_xp": 5.25,
     "instrument": "STA449F3A-0333-M",
+    "instrument_model": "NETZSCH STA 449F3",
     "lab": "UMD",
     "licensed_to": "University of Maryland\nCollege Park\nUSA",
+    "mass_range": 35000.0,
     "material": "Red Oak",
+    "measurement_type": "sample",
     "operator": "Grayson",
     "project": "Material Flammability",
     "protective_mfc_flow": 20.0,

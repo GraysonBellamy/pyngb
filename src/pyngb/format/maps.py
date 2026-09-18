@@ -22,8 +22,13 @@ __all__ = [
     "APP_LICENSE_CATEGORY",
     "CAL_CONSTANTS",
     "CAL_CONSTANTS_CATEGORY",
+    "CAL_RECORD_PATH_FIELD",
+    "CHANNEL_CONFIG_TYPE",
+    "CHANNEL_DEF_NAME_FIELD",
     "CHANNEL_HEADER_TYPE",
     "CHANNEL_MAP",
+    "CHANNEL_RANGE_FIELD",
+    "CHANNEL_RANGE_KEYS",
     "CORRECTION_LINK_CATEGORY",
     "CORRECTION_LINK_FIELD",
     "CRUCIBLE_CATEGORY",
@@ -36,16 +41,26 @@ __all__ = [
     "DEVICE_PARAM_NAME_FIELD",
     "DEVICE_PARAM_VALUE_FIELD",
     "DEVICE_STATE_TYPE",
+    "EXPANSION_CURVE_FIELD",
+    "EXPANSION_CURVE_TYPE",
+    "EXPANSION_STANDARD_FIELDS",
+    "EXPANSION_STANDARD_TYPE",
     "FIELD_MAP",
     "FIXPOINT_CATEGORIES",
     "FIXPOINT_FIELDS",
+    "FORCE_DEVICE_ID",
     "GAS_DENSITY_FIELD",
     "GAS_FORMULA_FIELD",
     "GAS_GUID_FIELD",
     "GAS_NAME_FIELD",
     "GAS_RECORD_GUID_FIELD",
     "GAS_RECORD_TYPE",
+    "INSTRUMENT_CODE_FIELD",
+    "INSTRUMENT_MODEL_FIELD",
+    "INSTRUMENT_TABLE_TYPE",
     "KNOWN_FIELD_IDS",
+    "MEASUREMENT_TYPES",
+    "MEASUREMENT_TYPE_FIELD",
     "MFC_DEVICE_KIND",
     "MFC_RANGE_FACTOR_FIELD",
     "MFC_RANGE_FIELD",
@@ -55,22 +70,30 @@ __all__ = [
     "PID_FIELDS",
     "PROVENANCE_FIELDS",
     "REF_NEIGHBOR_FIELD",
+    "SAMPLE_GEOMETRY_CATEGORY",
+    "SAMPLE_GEOMETRY_FIELDS",
+    "SAMPLE_GEOMETRY_TYPE",
+    "SAMPLE_LENGTH_FIELD",
     "SAMPLE_NEIGHBOR_FIELD",
+    "SAMPLE_TABLE_TYPE",
     "SEGMENT_VALUES_TYPE",
-    "SENSITIVITY_SUFFIX",
+    "SENS_CAL_RECORD_TYPE",
     "SENS_FIXPOINT_EXCLUDES",
     "SENS_FIXPOINT_FIELDS",
     "SENS_FIXPOINT_REQUIRES",
     "STAGE_CATEGORY_BASE",
     "STAGE_FIELDS",
     "STAGE_FLOW_FIELD",
+    "STAGE_FORCE_FIELD",
     "STAGE_TABLE_TYPE",
     "STAGE_TYPE_BODY",
     "STAGE_TYPE_FINAL",
     "STAGE_TYPE_INITIAL",
+    "STREAM_3_CHANNEL_DEF_TYPE",
+    "STREAM_3_CHANNEL_LABELS",
     "TEMP_CAL_CATEGORY",
     "TEMP_CAL_COEFF_FIELD",
-    "TEMP_CAL_SUFFIX",
+    "TEMP_CAL_RECORD_TYPE",
     "TEMP_FIXPOINT_EXCLUDES",
     "TEMP_FIXPOINT_REQUIRES",
     "TIMEZONE_CATEGORY",
@@ -95,11 +118,14 @@ DATA_FIELDS: Final[frozenset[tuple[int, DType]]] = frozenset(
 )
 
 #: Channel id (low byte of the header table's category) -> column name.
-#: 0x87 is a data-less trailing header and intentionally unmapped; unmapped
-#: ids pass through as two-digit hex column names (e.g. the all-zero
-#: stream_3 channel "31") via :func:`channel_name`.
+#: Header categories are ``<ch> 17`` (STA channels) or ``<ch> 18`` (the
+#: dilatometer's dL and force channels) in stream 2 and ``<ch> 75`` in
+#: stream 3; only the low byte identifies the channel. 0x87 is a data-less
+#: trailing header and intentionally unmapped, as is the dilatometer's
+#: all-zero second displacement channel 0x82 (meaning unknown); unmapped ids
+#: pass through as two-digit hex column names via :func:`channel_name`.
 CHANNEL_MAP: Final[dict[int, str]] = {
-    # stream_2 channels
+    # stream_2 channels: STA
     0x8C: "time",
     0x8D: "sample_temperature",
     0x8E: "dsc_signal",
@@ -107,8 +133,14 @@ CHANNEL_MAP: Final[dict[int, str]] = {
     0x9D: "purge_flow_2",
     0x9E: "protective_flow",
     0x90: "mass",
-    # stream_3 channels
+    # stream_2 channels: DIL (push-rod dilatometer; verified against Proteus
+    # CSV exports — dL in µm as f64, force in N as f32, the setpoint constant)
+    0x8F: "length_change",
+    0x4E: "force",
+    0x4F: "force_setpoint",
+    # stream_3 channels (named in the file itself: STREAM_3_CHANNEL_LABELS)
     0x30: "furnace_temperature",
+    0x31: "cooling_power",
     0x32: "furnace_power",
     0x33: "h_foil_temperature",
     0x34: "uc_module",
@@ -123,6 +155,47 @@ def channel_name(category: int) -> str:
     """Public column name for a channel-header table's category."""
     channel_id = category & 0xFF
     return CHANNEL_MAP.get(channel_id, f"{channel_id:02x}")
+
+
+#: Stream-3 channels are self-describing: stream 1 carries one definition
+#: table per channel (type ref STREAM_3_CHANNEL_DEF_TYPE, category 0x7530 +
+#: channel ordinal, i.e. the same category as the channel's stream-3
+#: header) with Proteus's display name in CHANNEL_DEF_NAME_FIELD and two
+#: class codes (0x10C4, 0x10C9) that group channels by kind: the "Cooling"
+#: channel shares the furnace-power class (1, 6), the two "Furnace"
+#: entries are the furnace temperature (2, 1) and the furnace power (1, 6).
+#: The names are NOT unique ("Furnace" twice) and are display strings, so
+#: CHANNEL_MAP stays the naming authority; the labels below are the
+#: observed names, pinned by a test over every fixture as a drift tripwire.
+STREAM_3_CHANNEL_DEF_TYPE: Final = 0x2BA9
+CHANNEL_DEF_NAME_FIELD: Final = 0x10C3
+STREAM_3_CHANNEL_LABELS: Final[dict[int, str]] = {
+    0x30: "Furnace",
+    0x31: "Cooling",
+    0x32: "Furnace",
+    0x33: "HFoilTemp",
+    0x34: "uC Module",
+    0x35: "Air Pressure",
+    0x36: "Acc. X",
+    0x37: "Acc. Y",
+    0x38: "Acc. Z",
+}
+
+#: Channel configuration tables (type CHANNEL_CONFIG_TYPE), one per stream-2
+#: channel, categorised by the channel's header category. CHANNEL_RANGE_FIELD
+#: (f32) is the channel's measuring range in the column's units: 20000 µm
+#: for the dilatometer's dL (the "M.RANGE" of Proteus exports), 35000 mg
+#: for the STA mass channel, 5000 µV for DSC; extracted as the metadata keys
+#: in CHANNEL_RANGE_KEYS (column name -> key). Also carried, not extracted:
+#: 0x083F (the instrument-internal channel id), 0x0BB9 (1 on every channel
+#: stored as f64, 0 on f32 channels).
+CHANNEL_CONFIG_TYPE: Final = 0x2B06
+CHANNEL_RANGE_FIELD: Final = 0x0BBC
+CHANNEL_RANGE_KEYS: Final[dict[str, str]] = {
+    "length_change": "length_change_range",
+    "mass": "mass_range",
+    "dsc_signal": "dsc_range",
+}
 
 
 # -- Basic stream-1 metadata fields -------------------------------------------
@@ -166,6 +239,9 @@ class MetaField(NamedTuple):
     convert: Callable[[object], object | None]
 
 
+#: Initial sample length L0 (mm) of a dilatometer sample descriptor table.
+SAMPLE_LENGTH_FIELD: Final = 0x0C9F
+
 FIELD_MAP: Final[tuple[MetaField, ...]] = (
     MetaField("instrument", 0x1775, 0x1059, _clean_str),
     MetaField("project", 0x1772, 0x083C, _clean_str),
@@ -180,7 +256,49 @@ FIELD_MAP: Final[tuple[MetaField, ...]] = (
     MetaField("sample_name", 0x7530, 0x0840, _clean_str),
     MetaField("material", 0x7530, 0x0962, _clean_str),
     MetaField("sample_mass", 0x7530, 0x0C9E, _positive_float),
+    # Dilatometer: the initial sample length L0 (mm) sits in the id next to
+    # the STA sample mass. Blank correction runs store 0.0, rejected like a
+    # zero mass.
+    MetaField("sample_length", 0x7530, SAMPLE_LENGTH_FIELD, _positive_float),
 )
+
+#: The sample descriptor table (type ref), for the embedded correction's
+#: descriptor (see extract.embedded_correction_sample_length).
+SAMPLE_TABLE_TYPE: Final = 0x2AFB
+
+#: Dilatometer sample geometry table: diameter (mm) and cross-section
+#: (mm², exactly pi*d²/4), both f64. Also carried, not extracted: 0x111E =
+#: cross_section / (1000 * length) (derived) and 0x1120, a shape code (3 is
+#: the only observed value; presumably cylinder). Extracted only alongside
+#: a positive sample_length: blank correction runs can carry stale form
+#: values (the three RO_Para corrections store d = 7.98 mm with L0 = 0).
+SAMPLE_GEOMETRY_CATEGORY: Final = 0x1857
+SAMPLE_GEOMETRY_TYPE: Final = 0x2BCF
+SAMPLE_GEOMETRY_FIELDS: Final[dict[str, int]] = {
+    "sample_diameter": 0x111B,
+    "sample_cross_section": 0x111D,
+}
+
+#: Instrument identity table: the model string ("NETZSCH DIL 402 Expedis
+#: Select", "NETZSCH STA 449F3"; absent from the STA-449F3A .ngb-ds3
+#: fixtures) and an instrument type code (44 = STA 449, 69 = DIL 402 — the
+#: same number Proteus embeds in its calibration record file names,
+#: "K_44_STA449F3A-…"). The code is documented, not extracted.
+INSTRUMENT_TABLE_TYPE: Final = 0x2B17
+INSTRUMENT_MODEL_FIELD: Final = 0x0432
+INSTRUMENT_CODE_FIELD: Final = 0x083F
+
+#: Measurement kind, from the measurement-definition table (category
+#: CORRECTION_LINK_CATEGORY): 1 = a correction run (.ngb-bs3/.ngb-cla),
+#: 2 = a sample run (.ngb-ss3), 3 = "Sample + Correction" (.ngb-ds3/
+#: .ngb-dla). The same table's 0x083F holds 2 for sample kinds and 4 for
+#: corrections.
+MEASUREMENT_TYPE_FIELD: Final = 0x103A
+MEASUREMENT_TYPES: Final[dict[int, str]] = {
+    1: "correction",
+    2: "sample",
+    3: "sample_correction",
+}
 
 # -- Control parameters (PID) --------------------------------------------------
 
@@ -270,14 +388,19 @@ TEMP_FIXPOINT_EXCLUDES: Final = SENS_FIXPOINT_FIELDS["temperature_c"]
 SENS_FIXPOINT_REQUIRES: Final = (SENS_FIXPOINT_FIELDS["temperature_c"],)
 SENS_FIXPOINT_EXCLUDES: Final = FIXPOINT_FIELDS["actual_c"]
 
-#: External calibration record path suffixes (values of string fields in the
-#: 0x01F5 calibration-source tables).
-TEMP_CAL_SUFFIX: Final = ".ngb-ts3"
-SENSITIVITY_SUFFIX: Final = ".ngb-es3"
+#: External calibration records are category-0x01F5 source tables told
+#: apart by TYPE ref, with the record path in CAL_RECORD_PATH_FIELD: the
+#: temperature calibration (paths end in .ngb-ts3, or the identity records
+#: TCALZERO.TMX / TCALZERO.TCX on dilatometer and STA-449F3A files) and the
+#: DSC sensitivity calibration (.ngb-es3, or SENSZERO.EXX). Matching on the
+#: path suffix — the pre-0.6 rule — missed every zero record.
+TEMP_CAL_RECORD_TYPE: Final = 0x2422
+SENS_CAL_RECORD_TYPE: Final = 0x23F0
+CAL_RECORD_PATH_FIELD: Final = 0x07D4
 
 #: Calibration provenance scalar field ids within the calibration-source
-#: table (the table whose record path ends in the suffix). Candidate ids are
-#: tried in order: the ts3 table stores the crucible in 0x0433, es3 in 0x044C.
+#: table. Candidate ids are tried in order: the ts3 table stores the
+#: crucible in 0x0433, es3 in 0x044C.
 PROVENANCE_FIELDS: Final[dict[str, tuple[int, ...]]] = {
     "date_measured": (0x083E,),  # i32 Unix timestamp
     "gas": (0x0431,),  # string
@@ -301,6 +424,29 @@ TIMEZONE_FIELDS: Final[dict[str, int]] = {
 #: Linked correction/measurement file (measurement-definition table).
 CORRECTION_LINK_CATEGORY: Final = 0x1770
 CORRECTION_LINK_FIELD: Final = 0x0843
+
+# -- Dilatometer expansion standard ----------------------------------------------
+
+#: The reference-material expansion record (category 0x01F5, like the other
+#: calibration sources) names the standard the push-rod system is corrected
+#: against and its validity range; the literature expansion curve itself is
+#: the EXPANSION_CURVE_FIELD byte array of the adjacent category-0x01F7
+#: table: ``u16 byte_length, u16 n, then n x (f32 T [°C], f32 dL/L0)``,
+#: relative to 20 °C. The record appears in nested copies (the original
+#: NETZSCH record and the instrument PC's copy, differing only in path and
+#: date); every copy of the curve is identical. First match wins.
+EXPANSION_STANDARD_TYPE: Final = 0x2454
+EXPANSION_STANDARD_FIELDS: Final[dict[str, int]] = {
+    "name": 0x0462,  # string, e.g. "FUSED SILICA"
+    "source": 0x0463,  # string, e.g. "NBS 739/1971"
+    "comment": 0x083D,  # string
+    "temperature_min": 0x0464,  # f32, °C
+    "temperature_max": 0x0465,  # f32, °C
+    "record_path": 0x07D4,  # string, the .scl record
+    "date": 0x083E,  # i32 Unix timestamp of the record
+}
+EXPANSION_CURVE_TYPE: Final = 0x2459
+EXPANSION_CURVE_FIELD: Final = 0x04C0
 
 # -- MFC device tree ----------------------------------------------------------
 
@@ -352,6 +498,13 @@ MFC_RANGE_MAX_FIELD: Final = 0x104D  # overrange limit (full scale x 1.02)
 MFC_RANGE_FACTOR_FIELD: Final = 0x104C  # gas correction factor
 STAGE_FLOW_FIELD: Final = 0x1047
 
+#: The dilatometer's push-rod force controller is device id 58 (definition
+#: category 0x1C00, kind 10, no gas or range). Its per-stage state table is
+#: followed by a type-MFC_RANGE_TYPE table whose STAGE_FORCE_FIELD (f32, N)
+#: is that stage's force setpoint — the same pattern as the MFC flows.
+FORCE_DEVICE_ID: Final = 58
+STAGE_FORCE_FIELD: Final = 0x10FA
+
 #: Device-parameter tables (type 0x2B65: UTF-16LE name in 0x1062, f32 value
 #: in 0x1061). Documented but NOT extracted: their *_LastUsedFlow values
 #: are persisted instrument config (the last flow ever used on a channel,
@@ -398,8 +551,13 @@ KNOWN_FIELD_IDS: Final[frozenset[int]] = frozenset(
     | {GAS_NAME_FIELD, GAS_GUID_FIELD, GAS_RECORD_GUID_FIELD}
     | {GAS_FORMULA_FIELD, GAS_DENSITY_FIELD}
     | {MFC_RANGE_FIELD, MFC_RANGE_MAX_FIELD, MFC_RANGE_FACTOR_FIELD}
-    | {STAGE_FLOW_FIELD}
+    | {STAGE_FLOW_FIELD, STAGE_FORCE_FIELD}
     | {DEVICE_PARAM_NAME_FIELD, DEVICE_PARAM_VALUE_FIELD}
     | {SAMPLE_NEIGHBOR_FIELD, REF_NEIGHBOR_FIELD}
     | {field_id for field_id, _ in DATA_FIELDS}
+    | {CAL_RECORD_PATH_FIELD, MEASUREMENT_TYPE_FIELD, INSTRUMENT_MODEL_FIELD}
+    | {CHANNEL_RANGE_FIELD, CHANNEL_DEF_NAME_FIELD}
+    | set(SAMPLE_GEOMETRY_FIELDS.values())
+    | set(EXPANSION_STANDARD_FIELDS.values())
+    | {EXPANSION_CURVE_FIELD}
 )

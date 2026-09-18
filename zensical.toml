@@ -1,6 +1,6 @@
 [project]
-site_name = "pyngb - NETZSCH STA File Parser"
-site_description = "Comprehensive Python library for parsing and analyzing NETZSCH STA NGB files"
+site_name = "pyngb - NETZSCH STA and Dilatometer File Parser"
+site_description = "Python library for parsing and analyzing NETZSCH NGB files from STA (Simultaneous Thermal Analysis) instruments and push-rod dilatometers"
 site_author = "Grayson Bellamy"
 site_url = "https://pyngb.graysonbellamy.dev/"
 

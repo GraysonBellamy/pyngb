@@ -1,6 +1,6 @@
 {
   "column_dtypes": {
-    "31": "double",
+    "cooling_power": "double",
     "dsc_signal": "double",
     "furnace_power": "double",
     "furnace_temperature": "double",
@@ -11,7 +11,7 @@
     "time": "double"
   },
   "column_sha256": {
-    "31": "c87d9be8ffddb1c4cf6cc7faecf381401ba86eec36a1d733f86b747f808e24fb",
+    "cooling_power": "c87d9be8ffddb1c4cf6cc7faecf381401ba86eec36a1d733f86b747f808e24fb",
     "dsc_signal": "2af6f935b5e716843829d3028cea2487ad22f6b1fe2612726fbcaa57ca58275e",
     "furnace_power": "8754fd39b469b517e1216aad821b476b163c7e52548b2416b98c2beeb3e7fe2a",
     "furnace_temperature": "12e9d558c5fc4a37311e7364259290e13ecfead4233ca5b2d482f77dd1a21472",
@@ -22,7 +22,7 @@
     "time": "5bc7df271f89f8c4da8a073f689796f454f33a7284d4cf59798d171227de70d3"
   },
   "column_stats": {
-    "31": {
+    "cooling_power": {
       "first": 0.0,
       "last": 0.0,
       "max": 0.0,
@@ -94,7 +94,7 @@
     "protective_flow",
     "mass",
     "furnace_temperature",
-    "31",
+    "cooling_power",
     "furnace_power"
   ],
   "fixture": "02_Messung_Probe_E_300_Grad_Ar.ngb-ds3",
@@ -115,6 +115,7 @@
     "crucible_mass": 23.0,
     "crucible_type": "DSC/TG pan Al",
     "date_performed": "2026-08-04T12:23:04+00:00",
+    "dsc_range": 5000.0,
     "file_hash": {
       "file": "02_Messung_Probe_E_300_Grad_Ar.ngb-ds3",
       "hash": "436ba625e8f0d9ca07d00a0f83fe10196d2acb74e8000039c8fc377d0de3a9a47c35b898b0393c39f9926c68643d991b7868078d94cd89873ba92a46a43fcf3d",
@@ -127,7 +128,9 @@
     "instrument": "STA449F3A-0042-M",
     "lab": "WST",
     "licensed_to": "HTWK Leipzig\nFachbereich Maschinen- und Energietechnik\nD-04416 Markkleeberg",
+    "mass_range": 35000.0,
     "material": "Papier E",
+    "measurement_type": "sample_correction",
     "operator": "Ja",
     "project": "Trocknung",
     "protective_mfc_flow": 20.0,
@@ -151,6 +154,8 @@
     "sample_tv": 4.0,
     "sample_xp": 4.0,
     "sensitivity_calibration": {
+      "comment": "Sensitivity file with constant value \"1\" over whole temp. range. Use it  for calibration measurements.",
+      "date_measured": "1999-10-04T08:28:21+00:00",
       "fixpoints": [
         {
           "enthalpy": -79.01000213623047,
@@ -260,7 +265,8 @@
           "temperature_c": 1455.0,
           "weight": 1.0
         }
-      ]
+      ],
+      "record_path": "C:\\NETZSCH\\Proteus6\\cal\\SENSZERO.EXX"
     },
     "temperature_calibration": {
       "coefficients": [
@@ -268,6 +274,8 @@
         0.0,
         0.0
       ],
+      "comment": "TCALZERO.TCX may only be used for temperature recalibration measurements with Curie standards.",
+      "date_measured": "1999-10-04T08:30:30+00:00",
       "fixpoints": [
         {
           "actual_c": 74.0,
@@ -311,7 +319,9 @@
           "name": "CURIE_F",
           "weight": 1.0
         }
-      ]
+      ],
+      "gas": "N2",
+      "record_path": "C:\\NETZSCH\\Proteus6\\cal\\TCALZERO.TCX"
     },
     "temperature_program": {
       "stage_0": {

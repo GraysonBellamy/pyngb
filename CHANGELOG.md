@@ -5,6 +5,81 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-09-18
+
+Support for NETZSCH push-rod dilatometer files (DIL 402 Expedis, Proteus
+8.0.3): `.ngb-dla` ("Sample + Correction") and `.ngb-cla` (correction). They
+use the same container, record grammar and dual-run layout as the STA files,
+so parsing needed no format-layer changes; what is new is the dilatometer
+channel set and metadata, and a correction that reproduces Proteus's
+corrected dL/L0. Several findings from that work also apply to STA files.
+
+### Added
+
+- Dilatometer channels: `length_change` (push-rod displacement dL, µm),
+  `force` (measured push-rod force, N) and `force_setpoint` (N). The
+  all-zero channel `0x82` stays unmapped (column `82`).
+- `read_ngb(path, run="corrected")` on a `.ngb-dla` subtracts the embedded
+  blank correction from `length_change` and restores the reference
+  standard's literature expansion over the sample length
+  (`dL += L0 · curve(T)`), as Proteus does. Verified against Proteus CSV
+  exports of four runs: residual standard deviation ~2.3e-6 in dL/L0,
+  maximum ~7e-6. The step is public as `pyngb.apply_expansion_standard`.
+  Corrections measured with a reference sample (L0 > 0) are refused: the
+  scaling they need could not be verified.
+- `normalize_to_initial_length(table)`, the dilatometer counterpart of
+  `normalize_to_initial_mass`: divides `length_change` in place by
+  `sample_length`, giving dL/L0 (units `µm/µm`).
+- Dilatometer metadata: `sample_length` (L0, mm), `sample_diameter` (mm),
+  `sample_cross_section` (mm²), `expansion_standard` (reference material,
+  literature source, validity range, record provenance and the literature
+  curve; new `ExpansionStandard`/`ExpansionCurve` TypedDicts), and
+  `force_setpoint` (N) per program stage and run-level when uniform across
+  the body stages. Geometry is reported only alongside a sample length:
+  blank corrections can carry stale form values.
+- For every instrument: `measurement_type` (`sample`, `correction` or
+  `sample_correction`, from the file itself rather than its extension),
+  `instrument_model` (e.g. `NETZSCH STA 449F3`) and the measuring ranges
+  `mass_range`, `dsc_range` and `length_change_range`.
+- The CLI and batch processing accept `.ngb-dla`/`.ngb-cla` without an
+  extension warning; `DEFAULT_PATTERNS` now includes `*.ngb-dla`.
+
+### Changed
+
+- **Breaking:** stream-3 channel `0x31` is now the column `cooling_power`
+  instead of `31`. Proteus names the channel "Cooling" in the file, and it
+  shares the furnace power's channel class; it has never been observed
+  non-zero.
+- `furnace_power` and `cooling_power` are labelled `%` (heater output as a
+  percentage of maximum) instead of `W`. The file stores no unit; watts are
+  physically implausible (the DIL holds 952 °C at 7–12, the STA 449 holds
+  834 °C at about 37) and no run exceeds 100.
+- **Breaking:** the table schema metadata `type` is the instrument family
+  read from the file (`STA`, `DIL`) instead of always `STA`.
+- **Breaking:** `dynamic_axis` defaults to `None`, meaning `"time"` for
+  dilatometer data and `"sample_temperature"` otherwise (unchanged for
+  STA). Time alignment reproduces Proteus's corrected dL/L0 3–10× more
+  closely at the maximum. `pyngb convert --dynamic-axis` follows the same
+  default.
+- **Breaking:** `pyngb.format.maps.TEMP_CAL_SUFFIX` and
+  `SENSITIVITY_SUFFIX` are replaced by `TEMP_CAL_RECORD_TYPE`,
+  `SENS_CAL_RECORD_TYPE` and `CAL_RECORD_PATH_FIELD` (see Fixed).
+- Baseline subtraction operates on every column listed as baseline-
+  correctable (`mass`, `dsc_signal`, `length_change`) instead of a
+  hard-coded pair.
+- The validation report is titled "NGB Data Validation Report".
+
+### Fixed
+
+- Calibration record provenance is located by the record table's type
+  instead of the path suffix. Identity records Proteus ships
+  (`TCALZERO.TCX` and `SENSZERO.EXX` on the two `.ngb-ds3` fixtures,
+  `TCALZERO.TMX` on dilatometers) previously lost their `record_path`,
+  `date_measured`, `gas` and `comment`.
+- `read_ngb(dla, run="corrected")` raised "Column 'mass' not found in
+  table".
+- `pyngb convert --run corrected` ignored `--dynamic-axis`.
+
 ## [0.5.0] - 2026-08-06
 
 Support for "Sample + Correction" measurements (`.ngb-ds3`), fixing

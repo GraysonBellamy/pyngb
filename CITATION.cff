@@ -1,10 +1,11 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it using the metadata from this file."
-title: "pyngb: Unofficial parser for NETZSCH STA NGB files"
+title: "pyngb: Unofficial parser for NETZSCH STA and dilatometer NGB files"
 abstract: >-
-  A high-performance, unofficial Python library for parsing NETZSCH STA
-  (Simultaneous Thermal Analysis) NGB instrument binary files, with
-  comprehensive metadata extraction and analysis tools. Not affiliated with,
+  A high-performance, unofficial Python library for parsing NETZSCH NGB
+  instrument binary files from STA (Simultaneous Thermal Analysis)
+  instruments and push-rod dilatometers (DIL), with comprehensive metadata
+  extraction and analysis tools. Not affiliated with,
   endorsed by, or approved by NETZSCH-Gerätebau GmbH.
 type: software
 authors:
@@ -12,8 +13,8 @@ authors:
     family-names: Bellamy
     email: gbellamy@umd.edu
     orcid: "https://orcid.org/0000-0001-8778-0991"
-version: 0.4.0
-date-released: 2026-07-09
+version: 0.6.0
+date-released: 2026-09-18
 license: MIT
 repository-code: "https://github.com/GraysonBellamy/pyngb"
 url: "https://pyngb.graysonbellamy.dev/"
@@ -21,7 +22,11 @@ keywords:
   - ngb
   - netzsch
   - sta
+  - simultaneous-thermal-analysis
   - thermal-analysis
+  - dilatometer
+  - dilatometry
+  - thermal-expansion
   - scientific-data
   - binary-parsing
   - unofficial

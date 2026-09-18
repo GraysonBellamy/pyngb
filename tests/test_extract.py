@@ -546,6 +546,13 @@ class TestCalibration:
                 build_scalar(0x0447, DType.F32, 156.5),
             ],
         )
+        # Records are identified by table type, not by the path's suffix: a
+        # decoy of another type carrying a .ngb-ts3 path must be ignored.
+        decoy = build_table(
+            0x01F5,
+            [build_scalar(0x07D4, DType.STRING, "C:\\cal\\other.ngb-ts3")],
+            type_ref=0x23F0,
+        )
         source = build_table(
             0x01F5,
             [
@@ -555,8 +562,9 @@ class TestCalibration:
                 build_scalar(0x0433, DType.STRING, "DSC/TG pan"),
                 build_scalar(0x0435, DType.F32, 10.0),
             ],
+            type_ref=0x2422,
         )
-        doc = doc_of(tmp_path, [opener(), coeff_table, fixpoint, source])
+        doc = doc_of(tmp_path, [opener(), coeff_table, fixpoint, decoy, source])
         cal = build_metadata(doc)["temperature_calibration"]
         assert cal["coefficients"] == [
             float(np.float32(0.1)),
@@ -573,18 +581,34 @@ class TestCalibration:
         assert row["actual_c"] == float(np.float32(156.6))
         assert row["corrected_c"] == float(np.float32(156.5))
 
-    def test_sensitivity_calibration_from_es3_table(self, tmp_path: Path) -> None:
+    def test_sensitivity_calibration_from_record_table(self, tmp_path: Path) -> None:
+        """The record type, not the path suffix, identifies the source table:
+        Proteus's identity records are named SENSZERO.EXX."""
         source = build_table(
             0x01F5,
             [
-                build_scalar(0x07D4, DType.STRING, "C:\\cal\\sens.ngb-es3"),
+                build_scalar(0x07D4, DType.STRING, "C:\\cal\\SENSZERO.EXX"),
                 build_scalar(0x0431, DType.STRING, "ARGON"),
             ],
+            type_ref=0x23F0,
         )
         doc = doc_of(tmp_path, [opener(), source])
         sensitivity = build_metadata(doc)["sensitivity_calibration"]
-        assert sensitivity["record_path"] == "C:\\cal\\sens.ngb-es3"
+        assert sensitivity["record_path"] == "C:\\cal\\SENSZERO.EXX"
         assert sensitivity["gas"] == "ARGON"
+
+    def test_record_without_a_path_is_skipped(self, tmp_path: Path) -> None:
+        empty = build_table(
+            0x01F5, [build_scalar(0x0431, DType.STRING, "ARGON")], type_ref=0x23F0
+        )
+        source = build_table(
+            0x01F5,
+            [build_scalar(0x07D4, DType.STRING, "C:\\cal\\sens.ngb-es3")],
+            type_ref=0x23F0,
+        )
+        doc = doc_of(tmp_path, [opener(), empty, source])
+        sensitivity = build_metadata(doc)["sensitivity_calibration"]
+        assert sensitivity["record_path"] == "C:\\cal\\sens.ngb-es3"
 
 
 class TestRunEnvironment:
@@ -640,6 +664,126 @@ class TestAppLicense:
         )
         doc = doc_of(tmp_path, [opener(), table])
         assert build_metadata(doc)["application_version"] == "Version 9.1.0 build"
+
+
+class TestDilatometer:
+    """Dilatometer extraction rules on synthetic documents (the real-file
+    values are pinned in test_dil.py)."""
+
+    def sample(self, length: float) -> bytes:
+        return build_table(
+            0x7530,
+            [
+                build_scalar(0x0840, DType.STRING, "rod"),
+                build_scalar(0x0C9F, DType.F64, length),
+            ],
+            type_ref=0x2AFB,
+        )
+
+    def geometry(self, diameter: float) -> bytes:
+        return build_table(
+            0x1857,
+            [
+                build_scalar(0x111B, DType.F64, diameter),
+                build_scalar(0x111D, DType.F64, np.pi * diameter**2 / 4),
+            ],
+            type_ref=0x2BCF,
+        )
+
+    def curve_table(self, points: list[tuple[float, float]], count=None) -> bytes:
+        n = len(points) if count is None else count
+        payload = np.array(points, dtype="<f4").tobytes()
+        raw = (4 + len(payload)).to_bytes(2, "little") + n.to_bytes(2, "little")
+        return build_table(
+            0x01F7, [build_array(0x04C0, DType.U8, raw + payload)], type_ref=0x2459
+        )
+
+    def force_state(self, force: float) -> list[bytes]:
+        return [
+            build_table(0x1C00, [build_scalar(0x083F, DType.I32, 58)], type_ref=0x2B11),
+            build_table(
+                0x1780, [build_scalar(0x10FA, DType.F32, force)], type_ref=0x2B0A
+            ),
+        ]
+
+    def test_geometry_accompanies_a_sample_length(self, tmp_path: Path) -> None:
+        doc = doc_of(tmp_path, [opener(), self.sample(25.0), self.geometry(6.0)])
+        metadata = build_metadata(doc)
+        assert metadata["sample_length"] == 25.0
+        assert metadata["sample_diameter"] == 6.0
+        assert metadata["sample_cross_section"] == pytest.approx(9 * np.pi)
+
+    def test_blank_run_reports_no_geometry(self, tmp_path: Path) -> None:
+        """A blank correction (L0 = 0) can carry a stale form diameter."""
+        doc = doc_of(tmp_path, [opener(), self.sample(0.0), self.geometry(7.98)])
+        metadata = build_metadata(doc)
+        for key in ("sample_length", "sample_diameter", "sample_cross_section"):
+            assert key not in metadata
+
+    def test_expansion_curve_decoding(self, tmp_path: Path) -> None:
+        points = [(-100.0, -1e-4), (20.0, 0.0), (500.0, 2.5e-4)]
+        doc = doc_of(tmp_path, [opener(), self.curve_table(points)])
+        curve = build_metadata(doc)["expansion_standard"]["curve"]
+        assert curve["temperature_c"] == [-100.0, 20.0, 500.0]
+        assert curve["expansion"] == [float(np.float32(e)) for _, e in points]
+
+    def test_overlong_point_count_is_rejected(self, tmp_path: Path) -> None:
+        doc = doc_of(tmp_path, [opener(), self.curve_table([(20.0, 0.0)], count=9)])
+        assert "expansion_standard" not in build_metadata(doc)
+
+    def test_force_setpoint_uniform_and_varying(self, tmp_path: Path) -> None:
+        def program(forces: list[float]) -> list[bytes]:
+            tables = []
+            for ordinal, force in enumerate(forces):
+                tables += [
+                    stage_table(ordinal, 100.0, 10.0),
+                    *self.force_state(force),
+                ]
+            return tables
+
+        uniform = build_metadata(doc_of(tmp_path, [opener(), *program([0.2, 0.2])]))
+        assert uniform["force_setpoint"] == pytest.approx(0.2)
+        assert uniform["temperature_program"]["stage_1"]["force_setpoint"] == (
+            pytest.approx(0.2)
+        )
+        varying = build_metadata(doc_of(tmp_path, [opener(), *program([0.2, 0.5])]))
+        assert "force_setpoint" not in varying
+        assert varying["temperature_program"]["stage_1"]["force_setpoint"] == (
+            pytest.approx(0.5)
+        )
+
+    def test_measurement_type_codes(self, tmp_path: Path) -> None:
+        def kind(code: int):
+            table = build_table(0x1770, [build_scalar(0x103A, DType.I32, code)])
+            return build_metadata(doc_of(tmp_path, [opener(), table])).get(
+                "measurement_type"
+            )
+
+        assert kind(1) == "correction"
+        assert kind(2) == "sample"
+        assert kind(3) == "sample_correction"
+        assert kind(7) is None
+
+    def test_channel_ranges_resolve_through_the_channel_map(
+        self, tmp_path: Path
+    ) -> None:
+        def config(category: int, value: float) -> bytes:
+            return build_table(
+                category, [build_scalar(0x0BBC, DType.F32, value)], type_ref=0x2B06
+            )
+
+        doc = doc_of(
+            tmp_path,
+            [
+                opener(),
+                config(0x178F, 20000.0),
+                config(0x184E, 6.0),
+                config(0x1790, 0.0),
+            ],
+        )
+        metadata = build_metadata(doc)
+        assert metadata["length_change_range"] == 20000.0
+        assert "mass_range" not in metadata  # zero is not a range
 
 
 class TestRobustness:

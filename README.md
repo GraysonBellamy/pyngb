@@ -1,11 +1,11 @@
-# pyNGB - NETZSCH STA File Parser
+# pyNGB - NETZSCH STA and Dilatometer File Parser
 
 [![PyPI version](https://badge.fury.io/py/pyngb.svg)](https://badge.fury.io/py/pyngb)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Tests](https://github.com/GraysonBellamy/pyngb/workflows/Tests/badge.svg)](https://github.com/GraysonBellamy/pyngb/actions)
 
-A high-performance Python library for parsing NETZSCH STA (Simultaneous Thermal Analysis) NGB files with comprehensive metadata extraction and analysis tools.
+A high-performance Python library for parsing NETZSCH NGB files from STA (Simultaneous Thermal Analysis) instruments and push-rod dilatometers (DIL), with comprehensive metadata extraction and analysis tools.
 
 **⚠️ Disclaimer**: This package is not affiliated with NETZSCH-Gerätebau GmbH. NETZSCH is a trademark of NETZSCH-Gerätebau GmbH.
 
@@ -13,7 +13,8 @@ A high-performance Python library for parsing NETZSCH STA (Simultaneous Thermal 
 
 - **Strict Binary Parsing**: a record-grammar tokenizer parses every byte of the file — no pattern-match guessing (tens of milliseconds per file)
 - **Complete Metadata**: Extract instrument settings, sample info, and experimental conditions
-- **Baseline Correction**: Automatic baseline subtraction with validation, including the correction run embedded in Sample + Correction (`.ngb-ds3`) files
+- **Baseline Correction**: Automatic baseline subtraction with validation, including the correction run embedded in Sample + Correction (`.ngb-ds3`, `.ngb-dla`) files
+- **Dilatometry**: Dilatometer files (`.ngb-dla`, `.ngb-cla`) with the corrected length change and dL/L0 that Proteus displays
 - **DTG Analysis**: Derivative thermogravimetry calculation with smoothing options
 - **Batch Processing**: Parallel processing of multiple files
 - **Data Export**: Convert data to Parquet or CSV; export metadata to JSON
@@ -52,6 +53,10 @@ corrected = read_ngb("sample.ngb-ss3", baseline_file="baseline.ngb-bs3")
 raw = read_ngb("run.ngb-ds3")
 corr = read_ngb("run.ngb-ds3", run="correction")
 corrected = read_ngb("run.ngb-ds3", run="corrected")
+
+# Dilatometer: corrected length change, then dL/L0
+from pyngb import normalize_to_initial_length
+dl_l0 = normalize_to_initial_length(read_ngb("run.ngb-dla", run="corrected"))
 
 # DTG analysis
 from pyngb.api.analysis import add_dtg

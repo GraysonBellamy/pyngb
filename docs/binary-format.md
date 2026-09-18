@@ -1,22 +1,33 @@
 ---
-description: Reverse-engineered reference for the NETZSCH STA NGB binary format — container layout, section directory, record grammar, data types, table object model, and stream contents.
+description: Reverse-engineered reference for the NETZSCH NGB binary format (STA and push-rod dilatometer) — container layout, section directory, record grammar, data types, table object model, and stream contents.
 ---
 
 # NGB Binary Format Reference
 
 ## Overview
 
-NETZSCH STA NGB files are proprietary binary files containing thermal analysis
+NETZSCH NGB files are proprietary binary files containing thermal analysis
 data. This document describes the reverse-engineered format as pyngb parses it:
 a ZIP container of streams, each stream a sectioned blob of serialized objects,
 every object a **table** of **fields** following one uniform record grammar.
 
-Everything here was verified empirically against six real fixtures (two
+Everything here was verified empirically against six real STA fixtures (two
 Proteus vintages, 2022 and 2025, including two baseline files) during the
 2026-07 format investigation — 25,075 grammar records across all streams with
 zero counter-examples. Numbers quoted below (record censuses, span sizes) come
 from those fixtures via `scripts/make_goldens.py census`; regenerate them with
 `pyngb inspect` if the fixture set changes.
+
+The same container, grammar and table model carry **push-rod dilatometer**
+data. Dilatometer support (2026-09) was verified against eight DIL 402
+Expedis Select fixtures (Proteus 8.0.3: four Sample + Correction `.ngb-dla`
+files and the four `.ngb-cla` corrections they embed) — every stream of every
+file tokenizes with zero malformed or truncated spans — and cross-checked
+against Proteus's own CSV exports of the four runs; three of those files
+are committed as test fixtures. The dilatometer-specific
+structures are described in [Dilatometer metadata](#dilatometer-metadata),
+[the channel map](#streams-2-and-3-measurement-channels) and
+[the dilatometer correction](#the-dilatometer-correction).
 
 ⚠️ **Disclaimer**: This format documentation is based on reverse engineering
 and may not be complete or accurate for all NGB file versions. This is an
@@ -49,9 +60,18 @@ file.ngb-ss3
 ```
 
 `.ngb-ss3` is a sample run; `.ngb-bs3` is a baseline (correction) run with the
-same structure. `read_ngb` requires streams 1 and 2 and uses stream 3 when
-present; `read_ngb_metadata` reads stream 1 only; `load_document` models any
-requested stream, including 4–6.
+same structure. The dilatometer writes `.ngb-dla` (Sample + Correction, the
+counterpart of `.ngb-ds3` below) and `.ngb-cla` (correction, the counterpart
+of `.ngb-bs3`); no stand-alone dilatometer sample extension was observed.
+`read_ngb` requires streams 1 and 2 and uses stream 3 when present;
+`read_ngb_metadata` reads stream 1 only; `load_document` models any requested
+stream, including 4–6.
+
+The measurement definition table records which kind a file is, independent
+of its extension: field `0x103A` of the category-`0x1770` table is 1 for a
+correction, 2 for a sample and 3 for Sample + Correction (→
+`measurement_type`: `correction` / `sample` / `sample_correction`; the same
+table's `0x083F` is 2 for the sample kinds and 4 for corrections).
 
 `.ngb-ds3` ("Sample + Correction") uses the same container but packs **two
 complete measurements per stream, back-to-back**: the raw sample run first,
@@ -64,6 +84,13 @@ appends the correction's calibration-context block after a second section
 prologue; metadata extraction is bounded to the sample's blocks. Neither run
 is subtracted from the other in the stored data — Proteus applies the
 correction at display time.
+
+`.ngb-dla` files follow the same layout. The embedded correction's channel
+header and segment tables are byte-identical to the stand-alone `.ngb-cla`
+correction file (the structural tables between runs differ), so
+`read_ngb(dla, run="correction")` equals `read_ngb(cla)` on all four
+fixture pairs. The two runs need not have the same length: in two of the
+fixtures the sample run has one more row than its correction.
 
 ### Stream header and section directory
 
@@ -234,6 +261,14 @@ Known type_refs (the full per-fixture set is pinned by the census goldens):
 |----------|-----------|
 | `0x2B22` | channel header (streams 2/3) |
 | `0x2B23` | channel segment values (streams 2/3) |
+| `0x2AFB` | sample descriptor (stream 1) |
+| `0x2B06` | stream-2 channel configuration: measuring range |
+| `0x2BA9` | stream-3 channel definition: display name |
+| `0x2B17` | instrument identity: model string |
+| `0x2422` / `0x23F0` | temperature / DSC-sensitivity calibration record |
+| `0x2454` / `0x2459` | dilatometer expansion standard / its literature curve |
+| `0x2BCF` | dilatometer sample geometry |
+| `0x2B07` / `0x2B11` / `0x2B0A` | device definition / per-stage device state / device range (MFC tree, force controller) |
 | `0x0Bxx` | stream-1 metadata table families |
 | others | structural/device tables, ignored by extraction |
 
@@ -259,6 +294,7 @@ Extraction resolves each metadata key against the document with one rule:
 | `sample_name` | `0x7530` | `0x0840` | string |
 | `material` | `0x7530` | `0x0962` | string |
 | `sample_mass` | `0x7530` | `0x0C9E` | positive float |
+| `sample_length` | `0x7530` | `0x0C9F` | positive float (mm; dilatometer L0) |
 
 The remaining structures are procedural (each one function in
 `pyngb.format.extract`, all warn-and-continue):
@@ -375,10 +411,17 @@ curve evaluated at each standard's transition temperature. Values were stored
 negative (endothermic-negative convention) and are reported as stored.
 
 **Record paths and provenance** — each external calibration record has one
-category-`0x01F5` source table, located by the suffix of its path string
-field: `.ngb-ts3` → `temperature_calibration.record_path`, `.ngb-es3` →
-`sensitivity_calibration.record_path`. The same table carries the conditions
-of the calibration run, extracted into both blocks:
+category-`0x01F5` source table, identified by its **type ref**, with the path
+in field `0x07D4`: type `0x2422` → `temperature_calibration.record_path`,
+type `0x23F0` → `sensitivity_calibration.record_path`. The type ref is what
+identifies the record, not the path: besides measured `.ngb-ts3` / `.ngb-es3`
+records, Proteus ships identity records — `TCALZERO.TMX` on the
+dilatometer, `TCALZERO.TCX` and `SENSZERO.EXX` on the STA-449F3A `.ngb-ds3`
+fixtures — whose provenance the pre-0.6 suffix rule missed. (The
+`TCALZERO.TMX` record carries twelve metal fixpoints with `measured_c ==
+corrected_c` and coefficients `[0, 0, 0]`: an identity calibration.) The
+same table carries the conditions of the calibration run, extracted into
+both blocks:
 
 | Field | Key | Description |
 |-------|-----|-------------|
@@ -455,6 +498,75 @@ ever used on the channel, stale for MFCs the run did not use — and Proteus
 8.0.3 writes parameter blocks even for hardware that does not exist
 (`Purge 3` on a three-MFC instrument).
 
+### Instrument, measurement kind and measuring ranges
+
+- **Instrument model** — field `0x0432` of the type-`0x2B17` instrument
+  table: `NETZSCH DIL 402 Expedis Select`, `NETZSCH STA 449F3`, `NETZSCH
+  STA 449 F3 Jupiter` (→ `instrument_model`; absent from the two
+  STA-449F3A `.ngb-ds3` fixtures). The same table's `0x083F` is an
+  instrument type code (44 = STA 449, 69 = DIL 402 — the number Proteus
+  embeds in calibration record file names, `K_44_STA449F3A-…`); not
+  extracted. `instrument` (`0x1775`/`0x1059`) is the serial-style string
+  (`STA449F3A-0333-M`, `DIL402SEA-0342-L`); its leading letters give the
+  `type` tag `read_ngb` writes into the table's schema metadata (`STA`,
+  `DIL`).
+- **Measurement kind** — see [Container](#container).
+- **Measuring ranges** — one type-`0x2B06` channel-configuration table per
+  stream-2 channel, categorised like the channel's header; f32 field
+  `0x0BBC` is the range in the column's units: 20000 µm for `length_change`
+  (the `M.RANGE` of Proteus exports), 35000 mg for `mass`, 5000 µV for
+  `dsc_signal` (→ `length_change_range`, `mass_range`, `dsc_range`); force
+  channels read 6 N, MFC flows their full scale. `0x0BB9` is 1 on every
+  channel stored as f64 and 0 on f32 channels.
+
+### Dilatometer metadata
+
+- **Sample length** — the initial length L0 in mm, field `0x0C9F` of the
+  sample descriptor (type `0x2AFB`), the id next to the STA sample mass
+  (→ `sample_length`). Blank corrections store 0.0 (rejected, like a zero
+  mass). A Sample + Correction file carries two descriptors in its main
+  document — the sample's, then the embedded correction's — and the second
+  one decides whether the correction was measured blank.
+- **Sample geometry** — the category-`0x1857` table (type `0x2BCF`): `0x111B`
+  diameter (mm), `0x111D` cross-section (mm², exactly π·d²/4), `0x111E` =
+  cross-section / (1000·L0) (derived, not extracted), `0x1120` a shape code
+  (3 is the only observed value). Extracted as `sample_diameter` /
+  `sample_cross_section` only alongside a positive `sample_length`: the
+  three RO_Para corrections carry a stale 7.98 mm diameter with L0 = 0.
+- **Expansion standard** — the reference material the push-rod system is
+  corrected against, a category-`0x01F5` record of type `0x2454`: `0x0462`
+  name (`FUSED SILICA`), `0x0463` source (`NBS 739/1971`), `0x083D`
+  comment, `0x0464`/`0x0465` validity range in °C (−200 to 1100), `0x07D4`
+  record path (`.scl`), `0x083E` date (Unix time); `0x0461` = 154 equals
+  the channel-config id of the unmapped channel `0x82`. The literature curve
+  is field `0x04C0` (u8 array) of the adjacent category-`0x01F7` table of
+  type `0x2459`:
+
+  ```
+  u16 byte_length | u16 n | n × (f32 T [°C], f32 dL/L0)
+  ```
+
+  with dL/L0 relative to 20 °C (53 points in the fixtures). Stream 1 holds
+  the record in nested copies — the original NETZSCH record (1994,
+  `S:\NGBWIN\…\FUSED_SI.SCL`) and the instrument PC's copy (2006,
+  `C:\NETZSCH\Proteus80\_Records\cal\Fused_si.scl`), four per run —
+  with identical curves; first match wins (→ `expansion_standard`, the
+  curve as `{"temperature_c": [...], "expansion": [...]}`).
+- **Force setpoint** — the push-rod force controller is device id 58 in the
+  [device tree](#mfc-gas-metadata-the-device-tree) (definition category
+  `0x1C00`, kind 10, no gas or range). Its per-stage state table is
+  followed by a type-`0x2B0A` table carrying the stage's force setpoint in
+  `0x10FA` (f32, N), merged into the stage dicts as `force_setpoint`; the
+  run-level `force_setpoint` follows the MFC-flow rule (emitted when
+  uniform across the body stages). 0.2 N in every fixture.
+- **Deliberately not extracted** — a third PID table (category `0x185B`,
+  type `0x2BD6`, xp/tn/tv 4/4/4, controller unknown; the furnace/sample PID
+  rule is unaffected because it takes the first two), the force hardware
+  limits (0.01–3 N), the calibration record's author, the `*.ngb-dla-cc`
+  path in field `0x1170`, and the −1000 sentinels in sample-table fields
+  `0x0C84`/`0x0C85`. The export header's `MEASMODE Standard Expansion` and
+  `CORR. CODE 080` are not stored in the file; Proteus derives them.
+
 ### Application and license
 
 Strings of the category-`0x0300` table: the first matching
@@ -468,9 +580,11 @@ channel's **segment value tables** — a type_ref state machine, not byte
 positions, drives assembly:
 
 - **Header table** — type_ref `0x2B22`. The category's **low byte is the
-  channel id** (header categories are `<ch> 17` in stream 2 and `<ch> 75` in
-  stream 3 — the latter collide with segment categories and are
-  disambiguated purely by type_ref).
+  channel id** (header categories are `<ch> 17` in stream 2 — `<ch> 18` for
+  the dilatometer's dL and force channels `0x82`, `0x4E`, `0x4F` — and
+  `<ch> 75` in stream 3; the latter collide with segment categories and are
+  disambiguated purely by type_ref). The low byte is unique across both
+  streams in every fixture.
 - **Segment value tables** — type_ref `0x2B23`, categories `0x7530`,
   `0x7531`, … (segment ordinals). Each carries **exactly one data array**:
   field `0x0F40` (f64) for f64 channels (time `8c`, mass `90`) or field
@@ -486,16 +600,88 @@ Channel id → column name (`CHANNEL_MAP`):
 | id | Column | id | Column |
 |----|--------|----|--------|
 | `0x8C` | `time` | `0x30` | `furnace_temperature` |
-| `0x8D` | `sample_temperature` | `0x32` | `furnace_power` |
-| `0x8E` | `dsc_signal` | `0x33` | `h_foil_temperature` |
-| `0x90` | `mass` | `0x34` | `uc_module` |
-| `0x9C` | `purge_flow_1` | `0x35` | `environmental_pressure` |
-| `0x9D` | `purge_flow_2` | `0x36`–`0x38` | `environmental_acceleration_x/y/z` |
-| `0x9E` | `protective_flow` | | |
+| `0x8D` | `sample_temperature` | `0x31` | `cooling_power` |
+| `0x8E` | `dsc_signal` | `0x32` | `furnace_power` |
+| `0x90` | `mass` | `0x33` | `h_foil_temperature` |
+| `0x9C` | `purge_flow_1` | `0x34` | `uc_module` |
+| `0x9D` | `purge_flow_2` | `0x35` | `environmental_pressure` |
+| `0x9E` | `protective_flow` | `0x36`–`0x38` | `environmental_acceleration_x/y/z` |
+| `0x8F` | `length_change` (DIL, µm, f64) | | |
+| `0x4E` | `force` (DIL, N) | | |
+| `0x4F` | `force_setpoint` (DIL, N) | | |
 
 Channel presence varies by configuration: the 2022 fixture has all three MFC
 flow channels; the 2025 fixtures lack `0x9D` (`purge_flow_2`) — its flow
-setpoint metadata is then the only record of that flow.
+setpoint metadata is then the only record of that flow. The dilatometer
+fixtures carry `time`, `sample_temperature`, `length_change`, `0x82`,
+`force`, `force_setpoint`, `purge_flow_2`, `protective_flow` in stream 2 and
+`0x30`–`0x33` in stream 3.
+
+Dilatometer channels, verified against Proteus CSV exports and the plot
+preview embedded in stream 6: `0x8F` is the push-rod displacement dL in µm
+(zero at the start); `0x4E` is the measured push-rod force, matching the
+export's `Force/N` to 1e-4 N; `0x4F` is the force setpoint (constant 0.2 N).
+`0x82` (f64) is zero in all twelve runs; its channel configuration gives the
+same ±20000 range as dL, and the expansion-standard record's `0x0461`
+equals its configuration id, so it may be a second (reference) displacement
+— its meaning is unknown and it stays unmapped (column `82`).
+
+**Stream-3 channels are named in the file.** Stream 1 carries one
+type-`0x2BA9` definition table per stream-3 channel, categorised like the
+channel's header (`0x7530` + ordinal), with the Proteus display name in
+field `0x10C3`: `0x30` "Furnace", `0x31` "Cooling", `0x32` "Furnace",
+`0x33` "HFoilTemp", `0x34` "uC Module", `0x35` "Air Pressure", `0x36`–`0x38`
+"Acc. X/Y/Z" (identical in every fixture). Two class codes (`0x10C4`,
+`0x10C9`) group channels by kind: "Cooling" shares the class of the furnace
+power (1, 6), so `0x31` is named `cooling_power`; it has never been
+observed non-zero.
+
+**Power units.** No unit is stored for the power channels. They are
+labelled `%`, heater output as a percentage of maximum, because watts are
+physically implausible: the DIL holds 952 °C at 7–12, the STA 449 holds
+834 °C at about 37, and the STA-449F3A `.ngb-ds3` runs reach 316 °C at 0.4.
+Across all 22 runs the channel never exceeds 100 (maximum 94.1, during a DIL
+correction ramp). `cooling_power` takes the same unit by its shared channel
+class. The names are display strings and not unique
+("Furnace" twice), so `CHANNEL_MAP` stays the naming authority; a test pins
+it against the in-file names on every fixture as a drift tripwire.
+
+The flow columns hold exactly the configured flow value for the whole run in
+all 22 runs of the 16 fixtures (the 2022 fixture shows one 0 at t = 0, then a
+clean step). The files cannot tell a commanded value from a steadily held
+MFC readback stored at coarse resolution; Proteus labels the column "Gas
+Flow".
+
+## The dilatometer correction
+
+A push-rod dilatometer measures the sample's length change against its own
+sample holder and push rod. The correction run is measured **blank** (no
+sample, L0 = 0) and records the whole system's expansion; subtracting it
+over-corrects by the holder material's expansion along the sample length,
+which Proteus restores from the expansion standard's literature curve.
+Corrected dL/L0, as Proteus exports it:
+
+```
+dL/L0(t) = (dL_sample(t) − dL_correction(t)) / L0 + curve(T_sample(t))
+```
+
+- The correction run is aligned to the sample on **time**. Aligning on
+  temperature over the heating ramp is 3–10× worse at the maximum (max
+  residual 2e-5 to 6e-5 against 5e-6 to 7e-6).
+- `curve` is the literature curve, linearly interpolated (cubic, PCHIP and
+  Akima make no difference) and used as stored, relative to 20 °C — not
+  re-zeroed at the run's start temperature.
+- Against the four Proteus exports of the heating ramp (segment 2,
+  resampled at 1 °C) the residual has mean ~5e-8, standard deviation
+  ~2.3e-6 (about 0.04 µm on a 16 mm sample) and maximum ~7e-6; without the
+  correction the error reaches 1.3e-3.
+
+`read_ngb(dla, run="corrected")` applies it: baseline subtraction of
+`length_change`, then `apply_expansion_standard` adds `L0 · curve(T)`;
+`normalize_to_initial_length` divides by L0. Only blank corrections were
+verifiable. A correction measured with a real reference sample presumably
+needs a length-scaling term, so a correction with a positive sample length
+is refused rather than corrected wrongly.
 
 ## Streams 4, 5, 6: modeled but not extracted
 
@@ -510,6 +696,11 @@ bytes); no metadata or data is extracted from them yet. What they contain
 - **stream_6** (~215–283 KB): two embedded Windows EMF vector images (the
   Proteus plot previews) inside `0x10E4` byte arrays, plus 16-byte dtype-`0x48`
   hash records with counts.
+
+Dilatometer files add a component registry to stream 4 (hardware ids of
+sample holders and push rods with last-used dates as OLE dates); not
+extracted. No dilatometer file carries a pressure channel or an event/alarm
+log.
 
 ## Corruption semantics and coverage
 
@@ -554,7 +745,7 @@ Each data column in the output table carries metadata:
 | `units` | string | measurement units |
 | `processing_history` | list[string] | processing steps applied |
 | `source` | string | data source identifier |
-| `baseline_subtracted` | bool | mass/DSC only |
+| `baseline_subtracted` | bool | mass, DSC and `length_change` only |
 | `calibration_applied` | bool | DSC only |
 
 ## Discovery methodology

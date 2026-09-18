@@ -6,6 +6,7 @@ from .analysis import (
     add_dtg,
     apply_dsc_calibration,
     calculate_table_dtg,
+    normalize_to_initial_length,
     normalize_to_initial_mass,
 )
 from .loaders import read_ngb, read_ngb_metadata
@@ -35,6 +36,7 @@ __all__ = [
     "inspect_column_metadata",
     "is_column_baseline_correctable",
     "mark_baseline_corrected",
+    "normalize_to_initial_length",
     "normalize_to_initial_mass",
     "read_ngb",
     "read_ngb_metadata",

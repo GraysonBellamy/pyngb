@@ -1,6 +1,6 @@
 {
   "column_dtypes": {
-    "31": "double",
+    "cooling_power": "double",
     "dsc_signal": "double",
     "furnace_power": "double",
     "furnace_temperature": "double",
@@ -12,7 +12,7 @@
     "time": "double"
   },
   "column_sha256": {
-    "31": "b15ab1a1a55571a251a999c9b1c06fb9ed4b8ebc14844dc848f89d80a218fcee",
+    "cooling_power": "b15ab1a1a55571a251a999c9b1c06fb9ed4b8ebc14844dc848f89d80a218fcee",
     "dsc_signal": "1bb23ee425ff1a0b4cf7fad30f80389f07bef2d51da58757fd910b82b37bed60",
     "furnace_power": "b1838b349c2d7f9d9cff107b55d90a4f33ddc07fef97eb780ba0228d7eefa549",
     "furnace_temperature": "bfabdd98c6e90a7a6af14845850b3f81571c7b9148f3e228370a54535b2c862d",
@@ -24,7 +24,7 @@
     "time": "451b8cd24952b42b3102620f5cec869d9120614f71bef8c4f8090dc99b08eeac"
   },
   "column_stats": {
-    "31": {
+    "cooling_power": {
       "first": 0.0,
       "last": 0.0,
       "max": 0.0,
@@ -103,7 +103,7 @@
     "protective_flow",
     "mass",
     "furnace_temperature",
-    "31",
+    "cooling_power",
     "furnace_power",
     "h_foil_temperature"
   ],
@@ -125,6 +125,7 @@
     "crucible_mass": 253.517,
     "crucible_type": "PtRh20 85 µl, with lid",
     "date_performed": "2025-07-30T10:30:23+00:00",
+    "dsc_range": 5000.0,
     "file_hash": {
       "file": "Douglas_Fir_STA_Baseline_10K_250730_R13.ngb-bs3",
       "hash": "3e50cab482191733791290384e61be66dba205783be05d88a56b2a34d361d8dbd04bb080b61dec8490479a606b644d16e3fcf2581670a0190b1495b4308f5f65",
@@ -135,9 +136,12 @@
     "furnace_type": "Low Temp Steel K",
     "furnace_xp": 5.25,
     "instrument": "STA449F3A-0333-M",
+    "instrument_model": "NETZSCH STA 449F3",
     "lab": "UMD",
     "licensed_to": "University of Maryland\nCollege Park\nUSA",
+    "mass_range": 35000.0,
     "material": "Douglas Fir",
+    "measurement_type": "correction",
     "operator": "Grayson",
     "project": "Material Flammability",
     "protective_mfc_flow": 20.0,

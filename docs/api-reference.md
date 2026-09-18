@@ -1,5 +1,5 @@
 ---
-description: Complete API reference for pyngb — read_ngb, read_ngb_metadata, the document layer, BatchProcessor, the CLI subcommands, and utilities for parsing NETZSCH STA NGB files.
+description: Complete API reference for pyngb — read_ngb, read_ngb_metadata, the document layer, BatchProcessor, the CLI subcommands, and utilities for parsing NETZSCH NGB files (STA and dilatometer).
 ---
 
 # API Reference
@@ -21,36 +21,47 @@ def read_ngb(
     return_metadata: bool = False,
     run: Literal["sample", "correction", "corrected"] = "sample",
     baseline_file: str | Path | None = None,
-    dynamic_axis: str = "sample_temperature",
+    dynamic_axis: str | None = None,
     limits: ParsingConfig | None = None,
 ) -> pa.Table | tuple[FileMetadata, pa.Table]
 ```
 
 **Parameters:**
 
-- `path`: Path to NGB file (`.ngb-ss3`, `.ngb-bs3`, or `.ngb-ds3`)
+- `path`: Path to NGB file — STA (`.ngb-ss3`, `.ngb-bs3`, `.ngb-ds3`) or
+  dilatometer (`.ngb-dla`, `.ngb-cla`)
 - `return_metadata`: If True, return a `(metadata, table)` tuple instead of a
   table with embedded metadata
 - `run`: What to return — `"sample"` (default) or, for "Sample +
-  Correction" `.ngb-ds3` files, `"correction"` for the embedded correction
-  run or `"corrected"` for the sample with the embedded correction
-  subtracted; non-default values cannot be combined with `baseline_file`.
-  The selected run is recorded in the table's schema metadata under `run`
+  Correction" files (`.ngb-ds3`, `.ngb-dla`), `"correction"` for the
+  embedded correction run or `"corrected"` for the sample with the embedded
+  correction subtracted; non-default values cannot be combined with
+  `baseline_file`. The selected run is recorded in the table's schema
+  metadata under `run`
 - `baseline_file`: Path to a file providing correction curves; a `.ngb-bs3`
-  contributes its only run, a `.ngb-ds3` (typically the sample file itself)
-  its embedded correction run. Mass and DSC columns are baseline-subtracted
-  and marked in column metadata
+  or `.ngb-cla` contributes its only run, a `.ngb-ds3` or `.ngb-dla`
+  (typically the sample file itself) its embedded correction run. The mass,
+  DSC and `length_change` columns present are baseline-subtracted and
+  marked in column metadata. On dilatometer data the reference standard's
+  expansion is then restored (see
+  [the dilatometer correction](#apply_expansion_standard)); the correction
+  must have been measured blank
 - `dynamic_axis`: Axis for dynamic-segment alignment during baseline
-  subtraction — `"time"`, `"sample_temperature"`, or `"furnace_temperature"`
+  subtraction — `"time"`, `"sample_temperature"`, or
+  `"furnace_temperature"`. `None` (default) uses `"time"` for dilatometer
+  data, which reproduces Proteus's corrected dL/L0 most closely, and
+  `"sample_temperature"` otherwise
 - `limits`: Optional `ParsingConfig` overriding the default resource limits
 
 **Returns:** a PyArrow table with metadata embedded in the schema (default),
 or `(FileMetadata, pa.Table)` when `return_metadata=True`. The metadata
 includes a BLAKE2b `file_hash` of the source file and always describes the
-sample measurement.
+sample measurement. The schema metadata also carries `type`, the instrument
+family read from the file (`"STA"` or `"DIL"`), and `run`.
 
-**Raises:** `ValueError` (bad `dynamic_axis`/`run`, or a non-`"sample"`
-run on a file with no embedded correction), `FileNotFoundError`,
+**Raises:** `ValueError` (bad `dynamic_axis`/`run`, a non-`"sample"` run on
+a file with no embedded correction, or a dilatometer correction that cannot
+be completed), `FileNotFoundError`,
 `zipfile.BadZipFile`, `NGBStreamNotFoundError` (streams 1/2 required; 3
 optional), `NGBCorruptedFileError`, `NGBResourceLimitError`.
 
@@ -68,6 +79,10 @@ corrected = read_ngb("sample.ngb-ss3", baseline_file="baseline.ngb-bs3")
 raw = read_ngb("run.ngb-ds3")                      # raw sample run
 corr = read_ngb("run.ngb-ds3", run="correction")   # embedded correction
 corrected = read_ngb("run.ngb-ds3", run="corrected")  # as Proteus displays
+
+# Dilatometer: corrected dL, then dL/L0 as Proteus exports it
+dl = read_ngb("run.ngb-dla", run="corrected")
+dl_l0 = normalize_to_initial_length(dl)
 ```
 
 ### read_ngb_metadata()
@@ -207,6 +222,49 @@ by the initial sample mass from the embedded metadata, **in place** — the
 column names do not change; units gain a `/mg` suffix and `"normalized"` is
 appended to their processing history.
 
+### normalize_to_initial_length()
+
+```python
+def normalize_to_initial_length(
+    table: pa.Table,
+    columns: list[str] | None = None,
+) -> pa.Table
+```
+
+The dilatometer counterpart: divides `length_change` (default) by the
+initial sample length `sample_length` from the embedded metadata (mm,
+converted to µm), **in place**, giving the relative length change dL/L0.
+Units become `µm/µm` and `"normalized"` is appended to the processing
+history. Raises `ValueError` when the metadata has no positive
+`sample_length` (STA files, blank corrections).
+
+### apply_expansion_standard()
+
+```python
+def apply_expansion_standard(
+    df: pl.DataFrame,
+    metadata: FileMetadata,
+    baseline_metadata: FileMetadata | None = None,
+) -> pl.DataFrame
+```
+
+The second half of the dilatometer correction, applied by `read_ngb` after
+subtracting the blank correction run. A push-rod dilatometer measures the
+sample against its own holder; the blank run removes the holder's expansion
+along the sample too, which this adds back from the reference standard's
+literature curve:
+
+```
+length_change += sample_length [µm] * curve(sample_temperature)
+```
+
+The curve (`expansion_standard["curve"]`) is linearly interpolated and used
+as stored, relative to 20 °C. Verified against Proteus CSV exports of four
+runs to ~2e-6 in dL/L0. Raises `ValueError` when `length_change` or
+`sample_temperature` is missing, when the metadata lacks `sample_length` or
+the curve, or when `baseline_metadata` has a positive `sample_length`:
+corrections measured with a reference sample are not supported.
+
 ### apply_dsc_calibration()
 
 Convert the DSC signal from µV to mW using the calibration constants
@@ -251,7 +309,7 @@ class BatchProcessor:
                       output_dir=None, skip_errors=True) -> list[BatchResult]
 
     def process_directory(self, directory,
-                          pattern=("*.ngb-ss3", "*.ngb-ds3"),
+                          pattern=("*.ngb-ss3", "*.ngb-ds3", "*.ngb-dla"),
                           output_format="parquet", output_dir=None,
                           skip_errors=True) -> list[BatchResult]
 ```
@@ -299,6 +357,9 @@ The public path is `read_ngb(path, baseline_file=...)` (see above), which
 also tags column metadata. `BaselineSubtractor` is exported for advanced use
 on already-parsed data: dynamic segments are aligned per temperature-program
 stage on the chosen `dynamic_axis`; isothermal segments subtract on time.
+It subtracts `mass`, `dsc_signal` and `length_change` where both frames
+carry them. On dilatometer data, follow it with
+[`apply_expansion_standard`](#apply_expansion_standard).
 
 ## Data Structures
 
@@ -308,12 +369,36 @@ TypedDict of everything extracted from stream 1. All fields are optional —
 absence means the file didn't carry it. Keys:
 
 **Sample and run identity:** `sample_name`, `sample_id`, `material`,
-`sample_mass` (mg), `instrument`, `project`, `lab`, `operator`, `comment`,
+`sample_mass` (mg), `instrument`, `instrument_model` (e.g. `NETZSCH STA
+449F3`), `measurement_type` (`sample`, `correction` or `sample_correction`,
+as recorded in the file), `project`, `lab`, `operator`, `comment`,
 `date_performed` (ISO 8601 UTC), `application_version`, `licensed_to`,
 `file_hash` (`{"file", "method": "BLAKE2b", "hash"}`; full parse only).
 
 **Hardware configuration:** `crucible_type`, `furnace_type`, `carrier_type`,
-`crucible_mass`, `reference_mass`, `reference_crucible_mass` (mg).
+`crucible_mass`, `reference_mass`, `reference_crucible_mass` (mg), and the
+measuring ranges of the primary channels in their column units
+(`mass_range`, `dsc_range`, `length_change_range`).
+
+**Dilatometer:** `sample_length` (initial length L0, mm), `sample_diameter`
+(mm) and `sample_cross_section` (mm²) — geometry only alongside a length,
+since blank corrections can carry stale form values — `force_setpoint`
+(push-rod force, N; emitted when uniform across the body stages, per-stage
+values in `temperature_program`), and `expansion_standard`, the reference
+material the correction restores:
+
+```python
+{
+    "name": "FUSED SILICA",
+    "source": "NBS 739/1971",
+    "comment": ">750°C extrapoliert",
+    "temperature_min": -200.0, "temperature_max": 1100.0,   # °C
+    "record_path": r"S:\NGBWIN\NEW49_CFR\CAL5\FUSED_SI.SCL",
+    "date": "1994-08-31T22:00:00+00:00",
+    "curve": {"temperature_c": [-200.0, ...],   # °C
+              "expansion": [-3.4e-06, ...]},    # dL/L0, relative to 20 °C
+}
+```
 
 **Temperature program** — keyed by program ordinal (execution order),
 durations in seconds, per-stage MFC flow setpoints in ml/min:
@@ -415,6 +500,13 @@ Standard column names in processed data:
   `dtg` (mg/min, when calculated)
 - `purge_flow_1`, `purge_flow_2`, `protective_flow` (ml/min) — presence
   depends on the instrument configuration
+- Dilatometer: `length_change` (push-rod displacement dL, µm; µm/µm after
+  `normalize_to_initial_length`), `force` and `force_setpoint` (N)
+- Stream 3: `furnace_power` and `cooling_power` (% of maximum heater
+  output; inferred, no unit is stored), `h_foil_temperature`,
+  `uc_module`, `environmental_pressure`, `environmental_acceleration_x/y/z`
+- Unmapped channels pass through as two-digit hex names (e.g. `82`, the
+  dilatometer's all-zero channel of unknown meaning)
 
 Each column carries metadata (`units`, `processing_history`, `source`, and
 where applicable `baseline_subtracted` / `calibration_applied`) readable via
@@ -464,9 +556,9 @@ pyngb convert FILE... [-o DIR] [-f {parquet,csv,both}] [-b BASELINE]
 |------|---------|---------|
 | `-o, --output` | `.` | Output directory |
 | `-f, --format` | `parquet` | Output format |
-| `-b, --baseline` | — | Baseline file for subtraction — a `.ngb-bs3`, or a `.ngb-ds3` whose embedded correction is used (output gains a `_baseline_subtracted` suffix) |
-| `--run` | `sample` | What to export from `.ngb-ds3` files: `sample`, `correction`, or `corrected` (non-default output gains a `_correction`/`_corrected` suffix) |
-| `--dynamic-axis` | `sample_temperature` | Axis for dynamic-segment alignment |
+| `-b, --baseline` | — | Baseline file for subtraction — a `.ngb-bs3`/`.ngb-cla`, or a `.ngb-ds3`/`.ngb-dla` whose embedded correction is used (output gains a `_baseline_subtracted` suffix) |
+| `--run` | `sample` | What to export from `.ngb-ds3`/`.ngb-dla` files: `sample`, `correction`, or `corrected` (non-default output gains a `_correction`/`_corrected` suffix) |
+| `--dynamic-axis` | `time` for DIL, `sample_temperature` otherwise | Axis for dynamic-segment alignment |
 | `-v, --verbose` | off | Debug logging |
 
 ### pyngb inspect

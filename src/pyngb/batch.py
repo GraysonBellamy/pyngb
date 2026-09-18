@@ -50,9 +50,11 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 #: Default directory patterns: every file type whose primary content is a
-#: sample measurement (.ngb-ds3 is "Sample + Correction"; read_ngb returns
-#: its sample run).
-DEFAULT_PATTERNS: tuple[str, ...] = ("*.ngb-ss3", "*.ngb-ds3")
+#: sample measurement — STA sample and Sample + Correction files and the
+#: dilatometer's Sample + Correction files (read_ngb returns the sample run
+#: of the latter two). Correction-only files (.ngb-bs3, .ngb-cla) are left
+#: out.
+DEFAULT_PATTERNS: tuple[str, ...] = ("*.ngb-ss3", "*.ngb-ds3", "*.ngb-dla")
 
 
 def _matching_files(directory: Path, pattern: str | Sequence[str]) -> list[Path]:
@@ -198,7 +200,7 @@ class BatchProcessor:
         Args:
             directory: Directory containing NGB files
             pattern: File pattern to match, or several (default: sample
-                measurements — "*.ngb-ss3" and "*.ngb-ds3")
+                measurements — "*.ngb-ss3", "*.ngb-ds3" and "*.ngb-dla")
             output_format: Output format ("parquet", "csv", "both")
             output_dir: Output directory (default: same as input)
             skip_errors: Whether to continue processing if individual files fail
@@ -415,7 +417,7 @@ class NGBDataset:
         Args:
             directory: Directory containing NGB files
             pattern: File pattern to match, or several (default: sample
-                measurements — "*.ngb-ss3" and "*.ngb-ds3")
+                measurements — "*.ngb-ss3", "*.ngb-ds3" and "*.ngb-dla")
 
         Returns:
             NGBDataset instance
@@ -623,7 +625,7 @@ def process_directory(
     Args:
         directory: Directory containing NGB files
         pattern: File pattern to match, or several (default: sample
-            measurements — "*.ngb-ss3" and "*.ngb-ds3")
+            measurements — "*.ngb-ss3", "*.ngb-ds3" and "*.ngb-dla")
         output_format: Output format ("parquet", "csv", "both")
         max_workers: Maximum parallel processes
 

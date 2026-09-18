@@ -1,6 +1,6 @@
 {
   "column_dtypes": {
-    "31": "double",
+    "cooling_power": "double",
     "dsc_signal": "double",
     "furnace_power": "double",
     "furnace_temperature": "double",
@@ -11,7 +11,7 @@
     "time": "double"
   },
   "column_sha256": {
-    "31": "c87d9be8ffddb1c4cf6cc7faecf381401ba86eec36a1d733f86b747f808e24fb",
+    "cooling_power": "c87d9be8ffddb1c4cf6cc7faecf381401ba86eec36a1d733f86b747f808e24fb",
     "dsc_signal": "3a392ee7bfa28dffeffdb325d200b9bcfa0fa8572948c29935a2d186765d892b",
     "furnace_power": "c6e26908b6ffac45d23eb82ad196599fd9930a65cdbd86213a4fe93e41879199",
     "furnace_temperature": "b1a81b9f7a5dc2c1761e5852254207a8a3af95844defee438a7d893c46888059",
@@ -22,7 +22,7 @@
     "time": "5bc7df271f89f8c4da8a073f689796f454f33a7284d4cf59798d171227de70d3"
   },
   "column_stats": {
-    "31": {
+    "cooling_power": {
       "first": 0.0,
       "last": 0.0,
       "max": 0.0,
@@ -94,7 +94,7 @@
     "protective_flow",
     "mass",
     "furnace_temperature",
-    "31",
+    "cooling_power",
     "furnace_power"
   ],
   "fixture": "01_Messung_Probe_G_300_Grad_Ar.ngb-ds3",
@@ -115,6 +115,7 @@
     "crucible_mass": 23.0,
     "crucible_type": "DSC/TG pan Al",
     "date_performed": "2026-08-04T09:38:15+00:00",
+    "dsc_range": 5000.0,
     "file_hash": {
       "file": "01_Messung_Probe_G_300_Grad_Ar.ngb-ds3",
       "hash": "3ce16eb952c10d3132ca6aa538f74fc575e604470ccc39a5dc4977c0a9d866850e14dae8e037fc145cd36924fbcf76c1efab13a351d8355392a8142209b1bb6b",
@@ -127,7 +128,9 @@
     "instrument": "STA449F3A-0042-M",
     "lab": "WST",
     "licensed_to": "HTWK Leipzig\nFachbereich Maschinen- und Energietechnik\nD-04416 Markkleeberg",
+    "mass_range": 35000.0,
     "material": "Papier G",
+    "measurement_type": "sample_correction",
     "operator": "Ja",
     "project": "Trocknung",
     "protective_mfc_flow": 20.0,
@@ -202,6 +205,8 @@
         0.0,
         0.0
       ],
+      "comment": "TCALZERO.TCX may only be used for temperature recalibration measurements with Curie standards.",
+      "date_measured": "1999-10-04T08:30:30+00:00",
       "fixpoints": [
         {
           "actual_c": 74.0,
@@ -245,7 +250,9 @@
           "name": "CURIE_F",
           "weight": 1.0
         }
-      ]
+      ],
+      "gas": "N2",
+      "record_path": "C:\\NETZSCH\\Proteus6\\cal\\TCALZERO.TCX"
     },
     "temperature_program": {
       "stage_0": {

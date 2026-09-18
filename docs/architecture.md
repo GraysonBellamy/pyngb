@@ -6,10 +6,12 @@ description: pyngb internal architecture — the strictly layered format package
 
 ## Overview
 
-pyNGB parses proprietary NETZSCH STA (Simultaneous Thermal Analysis) NGB
-binary files into structured, analyzable data. Since 0.4.0 the backbone is a
-**strict record-grammar tokenizer**: each stream is parsed once, in full, into
-a queryable document, and every extraction rule is a lookup over that document.
+pyNGB parses proprietary NETZSCH NGB binary files — from STA (Simultaneous
+Thermal Analysis) instruments and push-rod dilatometers, which share one
+container and record grammar — into structured, analyzable data. Since 0.4.0
+the backbone is a **strict record-grammar tokenizer**: each stream is parsed
+once, in full, into a queryable document, and every extraction rule is a
+lookup over that document.
 
 Three invariants shape the design:
 
@@ -84,7 +86,7 @@ layer as the optional `limits=` argument.
 | `grammar.py` | Single source of byte-level truth: record header/END_FIELD constants, `DType`/`Mode` enums, `ITEM_SIZE`, string decoders, scalar/array decoding, and `tokenize()` — the strict linear walk emitting `FieldToken | UnknownSpan`. Never raises on corruption (only `NGBResourceLimitError` on oversized declared arrays). |
 | `document.py` | Assembles tokens into `Table` objects (category, type_ref, unique-keyed fields) and the queryable `NGBDocument` (`find`/`first`/`by_category`/`unknown_fields`/`defects`). `load_document()` is the public entry point. |
 | `maps.py` | ALL declarative format knowledge: `FIELD_MAP` (metadata key ↔ category/field), `CHANNEL_MAP`, type_ref constants, named field-id groups (PID, stages, calibration, MFC, …). Frozen module-level tables — source edits are the extension point. |
-| `extract.py` | `build_metadata(doc) -> FileMetadata`: applies `FIELD_MAP`, then eight plain extractor functions in a tuple, each wrapped in a warn-and-continue net. Adding one function to the tuple = adding an extraction domain. |
+| `extract.py` | `build_metadata(doc) -> FileMetadata`: applies `FIELD_MAP`, then a tuple of plain extractor functions, each wrapped in a warn-and-continue net. Adding one function to the tuple = adding an extraction domain. |
 | `channels.py` | `build_dataframe(doc) -> pl.DataFrame`: a type_ref state machine over streams 2/3 — channel header tables open channels, segment-value tables append data arrays. Gates hard on any malformed/truncated span in a data stream. |
 | `census.py` | `document_census(doc)`: per-stream record/span/coverage accounting and the unknown-field census; powers `pyngb inspect` and the structural test goldens. |
 
@@ -226,8 +228,9 @@ types and attributes, not message prose.
 
 ## Testing Strategy
 
-1. **Parity goldens**: full metadata + per-column hashes for all six real
-   fixtures, pinned with zero tolerances, asserted through both parse paths.
+1. **Parity goldens**: full metadata + per-column hashes for every real
+   fixture (STA and dilatometer), pinned with zero tolerances, asserted
+   through both parse paths.
 2. **Structural tests**: byte-coverage accounting (every gap byte
    classified), dtype/census goldens, unknown-field census as a format-drift
    tripwire.

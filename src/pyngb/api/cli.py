@@ -32,11 +32,16 @@ from .loaders import read_ngb
 
 logger = logging.getLogger(__name__)
 
+#: File extensions NETZSCH Proteus writes in the NGB container: STA sample,
+#: correction and Sample + Correction files, and the dilatometer's Sample +
+#: Correction and correction files. Anything else is accepted with a warning.
+NGB_EXTENSIONS = frozenset({".ngb-ss3", ".ngb-bs3", ".ngb-ds3", ".ngb-dla", ".ngb-cla"})
+
 
 def build_parser() -> argparse.ArgumentParser:
     """Create and configure the subcommand argument parser."""
     parser = argparse.ArgumentParser(
-        prog="pyngb", description="Work with NETZSCH STA NGB files"
+        prog="pyngb", description="Work with NETZSCH NGB files (STA and DIL)"
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -56,23 +61,25 @@ def build_parser() -> argparse.ArgumentParser:
     convert.add_argument(
         "-b",
         "--baseline",
-        help="Baseline file path for baseline subtraction (a .ngb-bs3, or a "
-        ".ngb-ds3 whose embedded correction run is used; to subtract a "
-        ".ngb-ds3's own embedded correction, use --run corrected instead)",
+        help="Baseline file path for baseline subtraction (a .ngb-bs3 or "
+        ".ngb-cla, or a .ngb-ds3/.ngb-dla whose embedded correction run is "
+        "used; to subtract a file's own embedded correction, use --run "
+        "corrected instead)",
     )
     convert.add_argument(
         "--run",
         choices=["sample", "correction", "corrected"],
         default="sample",
-        help="What to export from Sample + Correction .ngb-ds3 files: the "
-        "raw sample run (default), the embedded correction run, or the "
-        "sample with the embedded correction subtracted",
+        help="What to export from Sample + Correction (.ngb-ds3, .ngb-dla) "
+        "files: the raw sample run (default), the embedded correction run, "
+        "or the sample with the embedded correction subtracted",
     )
     convert.add_argument(
         "--dynamic-axis",
         choices=["time", "sample_temperature", "furnace_temperature"],
-        default="sample_temperature",
-        help="Axis for dynamic segment alignment during baseline subtraction (default: sample_temperature)",
+        default=None,
+        help="Axis for dynamic segment alignment during baseline subtraction "
+        "(default: time for dilatometer files, sample_temperature otherwise)",
     )
 
     inspect = sub.add_parser(
@@ -131,8 +138,7 @@ def validate_input_file(input_path: Path) -> None:
         raise ValueError(f"Input path is not a file: {input_path}")
 
     # Check if it's a valid NGB file extension
-    valid_extensions = {".ngb-ss3", ".ngb-bs3", ".ngb-ds3"}
-    if input_path.suffix.lower() not in valid_extensions:
+    if input_path.suffix.lower() not in NGB_EXTENSIONS:
         logger.warning(
             f"File extension '{input_path.suffix}' may not be a standard NGB format. Proceeding anyway."
         )
@@ -154,8 +160,7 @@ def validate_baseline_file(baseline_path: Path) -> None:
     if not baseline_path.is_file():
         raise ValueError(f"Baseline path is not a file: {baseline_path}")
 
-    valid_extensions = {".ngb-ss3", ".ngb-bs3", ".ngb-ds3"}
-    if baseline_path.suffix.lower() not in valid_extensions:
+    if baseline_path.suffix.lower() not in NGB_EXTENSIONS:
         logger.warning(
             f"Baseline file extension '{baseline_path.suffix}' may not be a standard NGB format. Proceeding anyway."
         )
@@ -186,22 +191,28 @@ def validate_output_directory(output_path: Path) -> None:
 
 
 def load_data(
-    input_file: str, baseline_file: str | None, dynamic_axis: str, run: str = "sample"
+    input_file: str,
+    baseline_file: str | None,
+    dynamic_axis: str | None,
+    run: str = "sample",
 ) -> pa.Table:
     """Load NGB data with optional baseline subtraction.
 
     Args:
         input_file: Path to input NGB file
         baseline_file: Optional path to baseline NGB file
-        dynamic_axis: Axis for dynamic segment alignment
-        run: Which embedded measurement to load ("sample" or "correction")
+        dynamic_axis: Axis for dynamic segment alignment (None: the
+            instrument's default)
+        run: Which embedded measurement to load ("sample", "correction",
+            or "corrected")
 
     Returns:
         PyArrow Table with loaded data
     """
     if baseline_file:
         logger.info(
-            f"Loading data with baseline subtraction (dynamic_axis={dynamic_axis})"
+            "Loading data with baseline subtraction "
+            f"(dynamic_axis={dynamic_axis or 'default'})"
         )
         return read_ngb(
             input_file, baseline_file=baseline_file, dynamic_axis=dynamic_axis
@@ -209,7 +220,7 @@ def load_data(
     if run == "correction":
         return read_ngb(input_file, run="correction")
     if run == "corrected":
-        return read_ngb(input_file, run="corrected")
+        return read_ngb(input_file, run="corrected", dynamic_axis=dynamic_axis)
     return read_ngb(input_file)
 
 
@@ -247,7 +258,7 @@ def process_file(
     output_path: Path,
     output_format: str,
     baseline_file: str | None,
-    dynamic_axis: str,
+    dynamic_axis: str | None,
     run: str = "sample",
 ) -> None:
     """Parse one NGB file and write its output file(s).
@@ -527,11 +538,12 @@ def main(argv: list[str] | None = None) -> int:
         # Baseline-subtract every input against the same baseline
         pyngb convert *.ngb-ss3 -b baseline.ngb-bs3
 
-        # Sample + Correction files: raw sample run, embedded correction run,
-        # or corrected curves (subtract the file's own embedded correction)
+        # Sample + Correction files (.ngb-ds3, .ngb-dla): raw sample run,
+        # embedded correction run, or corrected curves (subtract the file's
+        # own embedded correction)
         pyngb convert run.ngb-ds3
         pyngb convert run.ngb-ds3 --run correction
-        pyngb convert run.ngb-ds3 --run corrected
+        pyngb convert run.ngb-dla --run corrected
 
         # Structural inspection and cross-file field comparison
         pyngb inspect sample.ngb-ss3 --stream 1 --values

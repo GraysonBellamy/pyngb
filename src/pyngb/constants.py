@@ -11,6 +11,8 @@ __all__ = [  # noqa: RUF022 - order chosen for logical grouping
     "BaseColumnMetadata",
     "BaselinableColumnMetadata",
     "DEFAULT_COLUMN_METADATA",
+    "ExpansionCurve",
+    "ExpansionStandard",
     "FIELD_APPLICABILITY",
     "FileMetadata",
     "SensitivityCalibration",
@@ -154,6 +156,49 @@ class SensitivityCalibration(TypedDict, total=False):
     fixpoints: list[SensitivityFixpoint]
 
 
+class ExpansionCurve(TypedDict):
+    """Literature expansion of a dilatometer reference standard.
+
+    Two parallel lists (the shape ``numpy.interp`` takes): the temperature
+    in °C and the relative expansion ``dL/L0`` at that temperature, as
+    stored — relative to 20 °C, dimensionless.
+    """
+
+    temperature_c: list[float]
+    expansion: list[float]
+
+
+class ExpansionStandard(TypedDict, total=False):
+    """The reference-material expansion record of a dilatometer run.
+
+    A push-rod dilatometer measures the sample against its own sample holder
+    and push rod, whose expansion Proteus removes with a blank correction
+    run and then restores over the sample length from this literature
+    curve (see :func:`pyngb.baseline.apply_expansion_standard`)::
+
+        corrected dL = dL_sample - dL_correction + L0 * curve(T_sample)
+
+    Fields:
+        name: Standard material as recorded, e.g. ``FUSED SILICA``.
+        source: Literature reference of the curve, e.g. ``NBS 739/1971``.
+        comment: Comment stored on the record.
+        temperature_min: Lower end of the curve's validity range (°C).
+        temperature_max: Upper end of the curve's validity range (°C).
+        record_path: Path of the ``.scl`` record file.
+        date: Date of the record (ISO 8601, UTC).
+        curve: The literature curve (:class:`ExpansionCurve`).
+    """
+
+    name: str
+    source: str
+    comment: str
+    temperature_min: float
+    temperature_max: float
+    record_path: str
+    date: str
+    curve: ExpansionCurve
+
+
 class FileMetadata(TypedDict, total=False):
     """Type definition for file metadata dictionary.
 
@@ -170,6 +215,8 @@ class FileMetadata(TypedDict, total=False):
     """
 
     instrument: str
+    instrument_model: str
+    measurement_type: str  # "sample", "correction", or "sample_correction"
     project: str
     date_performed: str
     lab: str
@@ -185,6 +232,18 @@ class FileMetadata(TypedDict, total=False):
     crucible_mass: float
     reference_mass: float
     reference_crucible_mass: float
+    # Dilatometer sample descriptors (mm, mm) and the reference standard
+    sample_length: float
+    sample_diameter: float
+    sample_cross_section: float
+    expansion_standard: ExpansionStandard
+    # Push-rod force setpoint (N), emitted when uniform across the body
+    # stages (per-stage values live in temperature_program)
+    force_setpoint: float
+    # Measuring ranges of the primary channels, in the column's units
+    length_change_range: float
+    mass_range: float
+    dsc_range: float
     # Other descriptors
     material: str
     application_version: str
@@ -242,9 +301,9 @@ class BaseColumnMetadata(TypedDict, total=False):
 class BaselinableColumnMetadata(BaseColumnMetadata, total=False):
     """Extended metadata for columns that support baseline correction and calibration.
 
-    This includes the baseline_subtracted field for signals like mass and DSC
-    that can be baseline-corrected, and calibration_applied for DSC signals
-    that can be calibrated from µV to mW.
+    This includes the baseline_subtracted field for signals that can be
+    baseline-corrected (mass, DSC and the dilatometer's length change), and
+    calibration_applied for DSC signals that can be calibrated from µV to mW.
     """
 
     baseline_subtracted: bool  # True if baseline correction has been applied
@@ -259,6 +318,7 @@ FIELD_APPLICABILITY = {
     "baseline_subtracted": [
         "mass",
         "dsc_signal",
+        "length_change",
     ],  # Only these can be baseline corrected
     "calibration_applied": [
         "dsc_signal",
@@ -311,8 +371,35 @@ DEFAULT_COLUMN_METADATA = {
         "processing_history": ["raw"],
         "source": "measurement",
     },
+    # Heater output as a percentage of maximum. No unit is stored in the file;
+    # watts are physically implausible (the DIL holds 952 °C at 7-12 and the
+    # STA 449 holds 834 °C at 37), and no fixture exceeds 100.
     "furnace_power": {
-        "units": "W",
+        "units": "%",
+        "processing_history": ["raw"],
+        "source": "measurement",
+    },
+    # Stream-3 "Cooling" channel: same channel class as furnace_power, so
+    # presumably also percent output; it has never been observed non-zero.
+    "cooling_power": {
+        "units": "%",
+        "processing_history": ["raw"],
+        "source": "measurement",
+    },
+    # Dilatometer channels
+    "length_change": {
+        "units": "µm",
+        "processing_history": ["raw"],
+        "source": "measurement",
+        "baseline_subtracted": False,
+    },
+    "force": {
+        "units": "N",
+        "processing_history": ["raw"],
+        "source": "measurement",
+    },
+    "force_setpoint": {
+        "units": "N",
         "processing_history": ["raw"],
         "source": "measurement",
     },

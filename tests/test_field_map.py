@@ -67,8 +67,15 @@ class TestChannelMap:
         assert CHANNEL_MAP[0x9D] == "purge_flow_2"
         assert CHANNEL_MAP[0x9E] == "protective_flow"
 
+    def test_dilatometer_channels(self) -> None:
+        assert CHANNEL_MAP[0x8F] == "length_change"
+        assert CHANNEL_MAP[0x4E] == "force"
+        assert CHANNEL_MAP[0x4F] == "force_setpoint"
+        assert 0x82 not in CHANNEL_MAP  # all-zero second displacement, unknown
+
     def test_stream_3_channels(self) -> None:
         assert CHANNEL_MAP[0x30] == "furnace_temperature"
+        assert CHANNEL_MAP[0x31] == "cooling_power"
         assert CHANNEL_MAP[0x32] == "furnace_power"
         assert CHANNEL_MAP[0x33] == "h_foil_temperature"
         assert CHANNEL_MAP[0x34] == "uc_module"
@@ -78,13 +85,14 @@ class TestChannelMap:
         assert CHANNEL_MAP[0x38] == "environmental_acceleration_z"
 
     def test_unmapped_ids_pass_through_as_hex(self) -> None:
-        assert channel_name(0x7531) == "31"
+        assert channel_name(0x1882) == "82"  # dilatometer's zero channel
         assert channel_name(0x1787) == "87"  # data-less trailer, unmapped
         assert 0x87 not in CHANNEL_MAP
 
     def test_channel_name_uses_low_byte(self) -> None:
         assert channel_name(0x178C) == "time"
         assert channel_name(0x758D) == "sample_temperature"
+        assert channel_name(0x184E) == "force"  # dilatometer 0x18xx high byte
 
 
 class TestNamedIds:

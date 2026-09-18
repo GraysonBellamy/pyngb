@@ -1,5 +1,5 @@
 ---
-description: Learn the pyngb API for reading NETZSCH STA NGB files, working with Polars DataFrames and PyArrow tables, and accessing embedded experiment metadata.
+description: Learn the pyngb API for reading NETZSCH NGB files (STA and dilatometer), working with Polars DataFrames and PyArrow tables, and accessing embedded experiment metadata.
 ---
 
 # User Guide
@@ -50,14 +50,16 @@ corrected_table = read_ngb(
 
 **How it works:**
 - Automatically detects isothermal vs dynamic segments
-- Aligns data using specified axis (default: sample_temperature)
-- Subtracts only `mass` and `dsc_signal` columns
+- Aligns dynamic segments on the specified axis (default: `time` for
+  dilatometer files, `sample_temperature` otherwise)
+- Subtracts only the `mass`, `dsc_signal` and `length_change` columns
 - Preserves time, temperature, and flow data from sample
 
-### Sample + Correction Files (.ngb-ds3)
+### Sample + Correction Files (.ngb-ds3, .ngb-dla)
 
 Measurements saved in Proteus' "Sample + Correction" mode embed **two
-complete raw measurements** in one `.ngb-ds3` file: the sample run and a
+complete raw measurements** in one `.ngb-ds3` (STA) or `.ngb-dla`
+(dilatometer) file: the sample run and a
 verbatim copy of the correction run it was measured against. Nothing is
 pre-subtracted — Proteus applies the correction at display time, and so can
 you:
@@ -70,11 +72,42 @@ corr = read_ngb("run.ngb-ds3", run="correction")   # embedded correction run
 corrected = read_ngb("run.ngb-ds3", run="corrected")
 ```
 
-Any `.ngb-ds3` passed as `baseline_file` contributes its embedded correction
-run, so a correction shared by several measurements can be taken from any of
-them. Metadata always describes the sample measurement; the correction it
-was measured against is identified by the `correction_file_path` key, and
-the run a table holds is recorded in its schema metadata under `run`.
+Any `.ngb-ds3` or `.ngb-dla` passed as `baseline_file` contributes its
+embedded correction run, so a correction shared by several measurements can
+be taken from any of them. Metadata always describes the sample measurement;
+the correction it was measured against is identified by the
+`correction_file_path` key, and the run a table holds is recorded in its
+schema metadata under `run`.
+
+### Dilatometer Files (.ngb-dla, .ngb-cla)
+
+Push-rod dilatometer measurements (NETZSCH DIL 402) read exactly like STA
+files. Instead of `mass` and `dsc_signal` they carry `length_change` (the
+push-rod displacement dL, in µm), `force` and `force_setpoint` (N); the
+metadata adds the initial sample length `sample_length` (mm), the sample
+diameter and cross-section, the push-rod `force_setpoint`, and the
+`expansion_standard` the instrument is corrected against.
+
+A dilatometer's correction run is measured blank, without a sample, and
+records the expansion of the sample holder and push rod. Correcting a run
+takes two steps, which `run="corrected"` performs: subtract the correction
+run, then add back the reference standard's literature expansion over the
+sample length (the blank run removed it along with the holder's). The result
+is the corrected dL that Proteus displays; divide by L0 for dL/L0:
+
+```python
+from pyngb import normalize_to_initial_length, read_ngb
+
+corrected = read_ngb("run.ngb-dla", run="corrected")   # corrected dL (µm)
+relative = normalize_to_initial_length(corrected)      # dL/L0 (µm/µm)
+
+# A stand-alone correction file works as a baseline too:
+same = read_ngb("run.ngb-dla", baseline_file="run_Correction.ngb-cla")
+```
+
+This reproduces Proteus's exported dL/L0 to about 2e-6. Only blank
+corrections are supported; a correction measured with a reference sample
+raises `ValueError`.
 
 ### DTG Analysis
 

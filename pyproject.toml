@@ -1,14 +1,14 @@
 [project]
 name = "pyngb"
-version = "0.5.0"
-description = "Unofficial parser for NETZSCH STA (Simultaneous Thermal Analysis) NGB instrument binary files. Not affiliated with, endorsed by, or approved by NETZSCH-Gerätebau GmbH."
+version = "0.6.0"
+description = "Unofficial parser for NETZSCH NGB instrument binary files: STA (Simultaneous Thermal Analysis) and push-rod dilatometer (DIL). Not affiliated with, endorsed by, or approved by NETZSCH-Gerätebau GmbH."
 readme = "README.md"
 authors = [
     { name = "Grayson Bellamy", email = "gbellamy@umd.edu" }
 ]
 license = "MIT"
 license-files = ["LICENSE"]
-keywords = ["ngb", "netzsch", "sta", "thermal-analysis", "scientific-data", "binary-parsing", "unofficial"]
+keywords = ["ngb", "netzsch", "sta", "simultaneous-thermal-analysis", "thermal-analysis", "dilatometer", "dilatometry", "thermal-expansion", "scientific-data", "binary-parsing", "unofficial"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",

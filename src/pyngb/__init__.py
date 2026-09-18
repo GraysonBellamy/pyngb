@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 """
-pyngb: A Python library for parsing NETZSCH STA NGB files.
+pyngb: A Python library for parsing NETZSCH NGB files (STA and DIL).
 """
 
 from importlib.metadata import PackageNotFoundError, version
@@ -13,6 +13,7 @@ from .api.analysis import (
     add_dtg,
     apply_dsc_calibration,
     calculate_table_dtg,
+    normalize_to_initial_length,
     normalize_to_initial_mass,
 )
 from .api.loaders import read_ngb, read_ngb_metadata
@@ -23,7 +24,7 @@ from .api.metadata import (
     get_column_baseline_status,
     inspect_column_metadata,
 )
-from .baseline import BaselineSubtractor
+from .baseline import BaselineSubtractor, apply_expansion_standard
 from .batch import (
     BatchProcessor,
     BatchResult,
@@ -36,6 +37,8 @@ from .constants import (
     FileMetadata,
     BaseColumnMetadata,
     BaselinableColumnMetadata,
+    ExpansionCurve,
+    ExpansionStandard,
     SensitivityCalibration,
     SensitivityFixpoint,
     TemperatureCalibration,
@@ -64,6 +67,8 @@ __all__ = [
     "BaselineSubtractor",
     "BatchProcessor",
     "BatchResult",
+    "ExpansionCurve",
+    "ExpansionStandard",
     "Field",
     "FileMetadata",
     "NGBCorruptedFileError",
@@ -86,6 +91,7 @@ __all__ = [
     "__version__",
     "add_dtg",
     "apply_dsc_calibration",
+    "apply_expansion_standard",
     "calculate_table_dtg",
     "dtg",
     "dtg_custom",
@@ -95,6 +101,7 @@ __all__ = [
     "inspect_column_metadata",
     "load_document",
     "mark_baseline_corrected",
+    "normalize_to_initial_length",
     "normalize_to_initial_mass",
     # Other functions
     "process_directory",

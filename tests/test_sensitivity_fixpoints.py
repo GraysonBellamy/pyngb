@@ -90,11 +90,16 @@ class TestSensitivityFixpointRegression:
         assert all("actual_c" not in fp for fp in sens_fixpoints)
 
 
-@pytest.mark.skipif(not list(TEST_DIR.glob("*.ngb-*")), reason="no real test files")
-class TestSensitivityFixpointStability:
-    """The block should extract consistently across all available files."""
+# STA fixtures only: dilatometer files (.ngb-dla/.ngb-cla) carry no DSC
+# sensitivity calibration.
+STA_FIXTURES = sorted(TEST_DIR.glob("*.ngb-*s3"))
 
-    @pytest.mark.parametrize("path", sorted(TEST_DIR.glob("*.ngb-*")))
+
+@pytest.mark.skipif(not STA_FIXTURES, reason="no real test files")
+class TestSensitivityFixpointStability:
+    """The block should extract consistently across all available STA files."""
+
+    @pytest.mark.parametrize("path", STA_FIXTURES)
     def test_well_formed(self, path: Path) -> None:
         md = _metadata(path)
         sens = md.get("sensitivity_calibration")
@@ -116,7 +121,7 @@ class TestSensitivityFixpointStability:
             assert fp["measured_sensitivity"] > 0.0
             assert fp["fitted_sensitivity"] > 0.0
 
-    @pytest.mark.parametrize("path", sorted(TEST_DIR.glob("*.ngb-*")))
+    @pytest.mark.parametrize("path", STA_FIXTURES)
     def test_measured_is_area_over_enthalpy(self, path: Path) -> None:
         """measured_sensitivity == peak_area / enthalpy for every standard.
 
@@ -131,7 +136,7 @@ class TestSensitivityFixpointStability:
                 rel_tol=1e-5,
             )
 
-    @pytest.mark.parametrize("path", sorted(TEST_DIR.glob("*.ngb-*")))
+    @pytest.mark.parametrize("path", STA_FIXTURES)
     def test_fitted_is_calibration_curve(self, path: Path) -> None:
         """fitted_sensitivity == calibration_constants curve at temperature_c.
 

@@ -1,6 +1,6 @@
 {
   "column_dtypes": {
-    "31": "double",
+    "cooling_power": "double",
     "dsc_signal": "double",
     "environmental_acceleration_x": "double",
     "environmental_acceleration_y": "double",
@@ -17,7 +17,7 @@
     "uc_module": "double"
   },
   "column_sha256": {
-    "31": "d6b7be5ecf492158d13b8a678c974b1f6884f46de36a3de9c60b1f1b31e4826b",
+    "cooling_power": "d6b7be5ecf492158d13b8a678c974b1f6884f46de36a3de9c60b1f1b31e4826b",
     "dsc_signal": "ebe111b41c16da7de646937e969f2c6697cded5771cba5fba6c3e4f73f4fd870",
     "environmental_acceleration_x": "9090d773ab8184543d430c685279967f885c2dc5caa1c7f2d23cca0ff5ccc838",
     "environmental_acceleration_y": "d924d0624b991cedbdd4384dd1aa9d38c4c72c5ee4738fb96bd423f9b01a732b",
@@ -34,7 +34,7 @@
     "uc_module": "f075defd3995fc321b78f20598d10a34cf678121628585ab6a6c10025af4436e"
   },
   "column_stats": {
-    "31": {
+    "cooling_power": {
       "first": 0.0,
       "last": 0.0,
       "max": 0.0,
@@ -148,7 +148,7 @@
     "protective_flow",
     "mass",
     "furnace_temperature",
-    "31",
+    "cooling_power",
     "furnace_power",
     "h_foil_temperature",
     "uc_module",
@@ -175,6 +175,7 @@
     "crucible_mass": 250.52,
     "crucible_type": "PtRh20 85 µl, with lid",
     "date_performed": "2025-01-29T18:05:05+00:00",
+    "dsc_range": 5000.0,
     "file_hash": {
       "file": "RO_FILED_STA_N2_10K_250129_R29.ngb-ss3",
       "hash": "088c6b51bd9635b6fc472a6182b7174d53c35ad7135f2742843e2c7d0e1353794dc7824270759118638a0758137bf62da784c229c1c377ef303233681d604967",
@@ -185,9 +186,12 @@
     "furnace_type": "Standard Pt S",
     "furnace_xp": 4.0,
     "instrument": "STA449F3A-0157-M",
+    "instrument_model": "NETZSCH STA 449 F3 Jupiter",
     "lab": "UL FSRI",
     "licensed_to": "Underwriters Laboratories\nColumbia\nUSA",
+    "mass_range": 35000.0,
     "material": "Red Oak",
+    "measurement_type": "sample",
     "operator": "Mark",
     "project": "Oxidative Pyrolysis",
     "protective_mfc_flow": 20.0,

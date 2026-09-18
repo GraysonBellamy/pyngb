@@ -1,5 +1,5 @@
 ---
-description: Install pyngb and parse your first NETZSCH STA NGB file in Python. Covers installation requirements, a quick example, and verification steps.
+description: Install pyngb and parse your first NETZSCH NGB file in Python. Covers installation requirements, a quick example, and verification steps.
 ---
 
 # Getting Started
@@ -212,8 +212,10 @@ pyngb supports these NETZSCH file extensions:
 - `.ngb-bs3` - Baseline files (for correction)
 - `.ngb-ds3` - Sample + Correction files (a sample run with its correction
   run embedded in the same file)
+- `.ngb-dla` - Dilatometer Sample + Correction files
+- `.ngb-cla` - Dilatometer correction files
 
-All share the same container structure. For `.ngb-ds3` files, `read_ngb`
-returns the raw sample run by default; `run="correction"` returns the
-embedded correction, and `run="corrected"` returns the corrected curves
+All share the same container structure. For Sample + Correction files,
+`read_ngb` returns the raw sample run by default; `run="correction"` returns
+the embedded correction, and `run="corrected"` returns the corrected curves
 (see the [User Guide](user-guide.md)).

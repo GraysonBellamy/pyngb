@@ -94,7 +94,8 @@ def get_column_units(table: pa.Table, column: str) -> str | None:
 def mark_baseline_corrected(table: pa.Table, columns: list[str] | str) -> pa.Table:
     """Mark columns as baseline corrected.
 
-    Only applies to columns that support baseline correction (mass, dsc_signal).
+    Only applies to columns that support baseline correction (mass,
+    dsc_signal, length_change).
     Other columns are silently ignored.
 
     Parameters

@@ -2,21 +2,50 @@
 High-level API functions for loading NGB data.
 """
 
+import re
 from pathlib import Path
 from typing import Literal, overload
 
 import polars as pl
 import pyarrow as pa
 
-from ..baseline import BaselineSubtractor
+from ..baseline import BaselineSubtractor, apply_expansion_standard
 from ..config import ParsingConfig
-from ..constants import FileMetadata
+from ..constants import FIELD_APPLICABILITY, FileMetadata
 from ..exceptions import NGBStreamNotFoundError
 from ..format import build_dataframe, build_metadata, count_runs, load_document
-from ..util import get_hash, initialize_table_column_metadata, set_metadata
+from ..format.extract import embedded_correction_sample_length
+from ..util import (
+    add_processing_step,
+    get_hash,
+    initialize_table_column_metadata,
+    set_metadata,
+)
 from .metadata import mark_baseline_corrected
 
 __all__ = ["read_ngb", "read_ngb_metadata"]
+
+_INSTRUMENT_FAMILY_RE = re.compile(r"^\s*([A-Za-z]+)")
+
+
+def _instrument_family(metadata: FileMetadata) -> str:
+    """The instrument family tag ("STA", "DIL", ...) for the schema metadata.
+
+    Taken from the leading letters of the ``instrument`` string
+    (``STA449F3A-0333-M``, ``DIL402SEA-0342-L``), falling back to the word
+    after the maker in ``instrument_model`` (``NETZSCH DIL 402 …``).
+    """
+    for key, skip_maker in (("instrument", False), ("instrument_model", True)):
+        value = metadata.get(key)
+        if not isinstance(value, str):
+            continue
+        if skip_maker and value.upper().startswith("NETZSCH"):
+            value = value[len("NETZSCH") :]
+        match = _INSTRUMENT_FAMILY_RE.match(value)
+        if match:
+            return match.group(1).upper()
+    return "unknown"
+
 
 #: Measurement runs a file can physically contain, in stream order.
 _RUNS = ("sample", "correction")
@@ -47,18 +76,18 @@ def _parse(
     Single seam shared by every full-parse path (plain, baseline sample,
     baseline reference) so the two halves can never diverge.
 
-    ``run`` is "sample" or "correction". "Sample + Correction" ``.ngb-ds3``
-    files embed both measurements; "correction" selects the embedded
-    correction and raises on files that carry none. The metadata is
-    file-level and always describes the sample measurement (the correction's
-    provenance is recorded in its ``correction_file_path`` key).
+    ``run`` is "sample" or "correction". "Sample + Correction" files
+    (``.ngb-ds3``, ``.ngb-dla``) embed both measurements; "correction"
+    selects the embedded correction and raises on files that carry none. The
+    metadata is file-level and always describes the sample measurement (the
+    correction's provenance is recorded in its ``correction_file_path`` key).
     """
     doc = _load(path, limits)
     run_index = _RUNS.index(run)
     if run_index > 0 and count_runs(doc) < 2:
         raise ValueError(
             f"{path} contains no embedded correction run; only "
-            '"Sample + Correction" .ngb-ds3 files carry one'
+            '"Sample + Correction" .ngb-ds3/.ngb-dla files carry one'
         )
     return build_metadata(doc), build_dataframe(doc, run=run_index)
 
@@ -68,25 +97,37 @@ def _parse_baseline(
 ) -> tuple[FileMetadata, pl.DataFrame]:
     """Parse a file *as a baseline*: the correction curves it provides.
 
-    A standalone ``.ngb-bs3`` IS a correction measurement, so its single run
-    is the baseline. A ``.ngb-ds3`` passed as a baseline (typically the
-    sample file itself) contributes its embedded correction run — this is
-    what makes ``run="corrected"`` reproduce the corrected curves Proteus
-    displays for a Sample + Correction measurement.
+    A standalone ``.ngb-bs3`` / ``.ngb-cla`` IS a correction measurement, so
+    its single run is the baseline. A ``.ngb-ds3`` / ``.ngb-dla`` passed as
+    a baseline (typically the sample file itself) contributes its embedded
+    correction run — this is what makes ``run="corrected"`` reproduce the
+    corrected curves Proteus displays for a Sample + Correction measurement.
 
     ``require_embedded`` demands an embedded correction run (the
     ``run="corrected"`` path, where the file must be its own baseline);
     without it a single-run file contributes its only run.
+
+    The metadata returned describes the correction run as far as the
+    dilatometer correction needs it: file-level metadata reports the
+    sample's length, so for an embedded correction ``sample_length`` is
+    replaced by the embedded correction's own descriptor (absent when it
+    was measured blank).
     """
     doc = _load(path, limits)
     n_runs = count_runs(doc)
     if require_embedded and n_runs < 2:
         raise ValueError(
             f"{path} contains no embedded correction run; only "
-            '"Sample + Correction" .ngb-ds3 files carry one'
+            '"Sample + Correction" .ngb-ds3/.ngb-dla files carry one'
         )
     run_index = 1 if n_runs >= 2 else 0
-    return build_metadata(doc), build_dataframe(doc, run=run_index)
+    metadata = build_metadata(doc)
+    if run_index == 1:
+        metadata.pop("sample_length", None)
+        length = embedded_correction_sample_length(doc)
+        if length is not None and length > 0:
+            metadata["sample_length"] = length
+    return metadata, build_dataframe(doc, run=run_index)
 
 
 @overload
@@ -96,7 +137,7 @@ def read_ngb(
     return_metadata: Literal[False] = False,
     run: Literal["sample", "correction", "corrected"] = "sample",
     baseline_file: None = None,
-    dynamic_axis: str = "sample_temperature",
+    dynamic_axis: str | None = None,
     limits: ParsingConfig | None = None,
 ) -> pa.Table: ...
 
@@ -108,7 +149,7 @@ def read_ngb(
     return_metadata: Literal[True],
     run: Literal["sample", "correction", "corrected"] = "sample",
     baseline_file: None = None,
-    dynamic_axis: str = "sample_temperature",
+    dynamic_axis: str | None = None,
     limits: ParsingConfig | None = None,
 ) -> tuple[FileMetadata, pa.Table]: ...
 
@@ -120,7 +161,7 @@ def read_ngb(
     return_metadata: Literal[False] = False,
     run: Literal["sample", "correction", "corrected"] = "sample",
     baseline_file: str | Path,
-    dynamic_axis: str = "sample_temperature",
+    dynamic_axis: str | None = None,
     limits: ParsingConfig | None = None,
 ) -> pa.Table: ...
 
@@ -132,7 +173,7 @@ def read_ngb(
     return_metadata: Literal[True],
     run: Literal["sample", "correction", "corrected"] = "sample",
     baseline_file: str | Path,
-    dynamic_axis: str = "sample_temperature",
+    dynamic_axis: str | None = None,
     limits: ParsingConfig | None = None,
 ) -> tuple[FileMetadata, pa.Table]: ...
 
@@ -143,7 +184,7 @@ def read_ngb(
     return_metadata: bool = False,
     run: Literal["sample", "correction", "corrected"] = "sample",
     baseline_file: str | Path | None = None,
-    dynamic_axis: str = "sample_temperature",
+    dynamic_axis: str | None = None,
     limits: ParsingConfig | None = None,
 ) -> pa.Table | tuple[FileMetadata, pa.Table]:
     """
@@ -153,20 +194,33 @@ def read_ngb(
     a PyArrow table with embedded metadata. For direct metadata access, use return_metadata=True.
     When baseline_file is provided, baseline subtraction is performed automatically.
 
-    "Sample + Correction" measurements (``.ngb-ds3``) embed two complete raw
-    measurements in one file: the sample run and a verbatim copy of the
-    correction run it was measured against. Neither is subtracted from the
-    other in the stored data — Proteus applies the correction at display
-    time. By default the raw sample run is returned; ``run="correction"``
-    returns the embedded correction, and ``run="corrected"`` subtracts the
-    embedded correction from the sample run, reproducing the corrected
-    curves Proteus displays.
+    Both instrument families NETZSCH writes in this container are read the
+    same way: STA files (``.ngb-ss3`` sample, ``.ngb-bs3`` correction,
+    ``.ngb-ds3`` Sample + Correction; mass and DSC columns) and push-rod
+    dilatometer files (``.ngb-dla`` Sample + Correction, ``.ngb-cla``
+    correction; ``length_change``, ``force`` and ``force_setpoint``
+    columns).
+
+    "Sample + Correction" measurements (``.ngb-ds3``, ``.ngb-dla``) embed two
+    complete raw measurements in one file: the sample run and a verbatim
+    copy of the correction run it was measured against. Neither is
+    subtracted from the other in the stored data — Proteus applies the
+    correction at display time. By default the raw sample run is returned;
+    ``run="correction"`` returns the embedded correction, and
+    ``run="corrected"`` subtracts the embedded correction from the sample
+    run, reproducing the corrected curves Proteus displays. On dilatometer
+    files the correction also restores the reference standard's literature
+    expansion over the sample length (see
+    :func:`pyngb.baseline.apply_expansion_standard`), so ``length_change``
+    matches Proteus's corrected ``dL`` and, after
+    :func:`~pyngb.api.analysis.normalize_to_initial_length`, its ``dL/L0``.
 
     Parameters
     ----------
     path : str or Path
-        Path to the NGB file (.ngb-ss3, .ngb-bs3, .ngb-ds3 or similar).
-        Supports absolute and relative paths, as strings or Path objects.
+        Path to the NGB file (.ngb-ss3, .ngb-bs3, .ngb-ds3, .ngb-dla,
+        .ngb-cla). Supports absolute and relative paths, as strings or Path
+        objects.
     return_metadata : bool, default False
         If False (default), return PyArrow table with embedded metadata.
         If True, return (metadata, data) tuple.
@@ -174,19 +228,25 @@ def read_ngb(
         What to return: the raw sample run, the embedded correction run, or
         the sample run with the embedded correction subtracted. "correction"
         and "corrected" are only valid for files that embed a correction
-        (.ngb-ds3) and cannot be combined with baseline_file. Metadata
-        always describes the sample measurement; the correction's provenance
-        is in its ``correction_file_path`` key. The selected run is recorded
-        in the returned table's schema metadata under the ``run`` key.
+        (.ngb-ds3, .ngb-dla) and cannot be combined with baseline_file.
+        Metadata always describes the sample measurement; the correction's
+        provenance is in its ``correction_file_path`` key. The selected run
+        is recorded in the returned table's schema metadata under the
+        ``run`` key.
     baseline_file : str, Path, or None, default None
         Path to a file providing correction curves for baseline subtraction.
-        A ``.ngb-bs3`` contributes its (only) run; a ``.ngb-ds3`` — typically
-        the sample file itself — contributes its embedded correction run.
-        The baseline must have an identical temperature program to the
-        sample file.
-    dynamic_axis : str, default "sample_temperature"
+        A ``.ngb-bs3`` / ``.ngb-cla`` contributes its (only) run; a
+        ``.ngb-ds3`` / ``.ngb-dla`` — typically the sample file itself —
+        contributes its embedded correction run. The baseline must have an
+        identical temperature program to the sample file. Dilatometer
+        corrections must have been measured blank (no reference sample).
+    dynamic_axis : str or None, default None
         Axis to use for dynamic segment alignment in baseline subtraction.
-        Options: "time", "sample_temperature", "furnace_temperature"
+        Options: "time", "sample_temperature", "furnace_temperature". None
+        picks the axis that reproduces Proteus for the instrument: "time"
+        for dilatometer data (its maximum deviation from Proteus's
+        corrected dL/L0 is 3-10x smaller than with temperature alignment),
+        "sample_temperature" otherwise.
     limits : ParsingConfig or None, default None
         Resource limits (stream size, array size, table count) enforced while
         parsing. None uses the defaults, which leave orders of magnitude of
@@ -204,7 +264,9 @@ def read_ngb(
     ValueError
         If dynamic_axis or run is not a recognized value, a non-"sample" run
         is combined with baseline_file or requested from a file with no
-        embedded correction run
+        embedded correction run, or a dilatometer correction cannot be
+        completed (correction not measured blank, or the sample length or
+        expansion standard missing from the metadata)
     FileNotFoundError
         If the specified file does not exist
     NGBStreamNotFoundError
@@ -277,12 +339,18 @@ def read_ngb(
     ...     print(f"Mass loss: {mass_loss:.2f}%")
     Mass loss: 12.3%
 
-    Sample + Correction files (.ngb-ds3):
+    Sample + Correction files (.ngb-ds3, .ngb-dla):
 
     >>> raw = read_ngb("run.ngb-ds3")                      # raw sample run
     >>> corr = read_ngb("run.ngb-ds3", run="correction")   # embedded correction
     >>> # Corrected curves, as Proteus displays them:
     >>> corrected = read_ngb("run.ngb-ds3", run="corrected")
+
+    Dilatometer files: corrected length change, then dL/L0:
+
+    >>> from pyngb import normalize_to_initial_length
+    >>> table = read_ngb("run.ngb-dla", run="corrected")
+    >>> relative = normalize_to_initial_length(table)      # length_change in µm/µm
 
     Performance Notes
     -----------------
@@ -298,7 +366,7 @@ def read_ngb(
     BatchProcessor : Process multiple files efficiently
     """
     valid_axes = ["time", "sample_temperature", "furnace_temperature"]
-    if dynamic_axis not in valid_axes:
+    if dynamic_axis is not None and dynamic_axis not in valid_axes:
         raise ValueError(
             f"dynamic_axis must be one of {valid_axes}, got '{dynamic_axis}'"
         )
@@ -327,13 +395,23 @@ def read_ngb(
         }
 
     # Handle baseline subtraction if requested
+    expansion_restored = False
     if baseline_file is not None:
         baseline_metadata, baseline_df = _parse_baseline(
             baseline_file, limits, require_embedded=self_correct
         )
-        data_df = BaselineSubtractor().process_baseline_subtraction(
-            data_df, baseline_df, metadata, baseline_metadata, dynamic_axis
+        axis = dynamic_axis or (
+            "time" if "length_change" in data_df.columns else "sample_temperature"
         )
+        data_df = BaselineSubtractor().process_baseline_subtraction(
+            data_df, baseline_df, metadata, baseline_metadata, axis
+        )
+        if "length_change" in data_df.columns:
+            # Dilatometer: the blank correction removed the sample holder's
+            # expansion along the sample; restore it from the literature
+            # curve, as Proteus does.
+            data_df = apply_expansion_standard(data_df, metadata, baseline_metadata)
+            expansion_restored = True
 
     # Convert to PyArrow at the API boundary for cross-language compatibility
     # and metadata embedding.
@@ -346,15 +424,28 @@ def read_ngb(
         # metadata alone cannot distinguish the exports.
         data = set_metadata(
             data,
-            tbl_meta={"file_metadata": metadata, "type": "STA", "run": run},
+            tbl_meta={
+                "file_metadata": metadata,
+                "type": _instrument_family(metadata),
+                "run": run,
+            },
         )
 
     # Column metadata (units, processing history, source) is present on every
-    # return path; baseline subtraction changes the meaning of the mass/DSC
+    # return path; baseline subtraction changes the meaning of the corrected
     # columns, so tag them as corrected.
     data = initialize_table_column_metadata(data)
     if baseline_file is not None:
-        data = mark_baseline_corrected(data, ["mass", "dsc_signal"])
+        present = [
+            column
+            for column in FIELD_APPLICABILITY["baseline_subtracted"]
+            if column in data.column_names
+        ]
+        data = mark_baseline_corrected(data, present)
+        if expansion_restored:
+            data = add_processing_step(
+                data, "length_change", "expansion_standard_applied"
+            )
 
     if return_metadata:
         return metadata, data
@@ -375,12 +466,12 @@ def read_ngb_metadata(
     key — the hash covers the whole file, which this path deliberately does
     not read in full.
 
-    Metadata is file-level: for "Sample + Correction" ``.ngb-ds3`` files it
-    describes the sample measurement, with the correction identified by the
-    ``correction_file_path`` key.
+    Metadata is file-level: for "Sample + Correction" files (``.ngb-ds3``,
+    ``.ngb-dla``) it describes the sample measurement, with the correction
+    identified by the ``correction_file_path`` key.
 
     Args:
-        path: Path to the .ngb-ss3 file to parse
+        path: Path to the NGB file to parse
         limits: Resource limits enforced while parsing; None uses defaults.
 
     Returns:

@@ -5,6 +5,13 @@ This module subtracts baseline measurements from sample data, handling
 isothermal and dynamic segments appropriately. It operates purely on parsed
 DataFrames and metadata; loading files and orchestrating the subtraction is
 the API layer's job (``read_ngb(path, baseline_file=...)``).
+
+Every column listed under ``baseline_subtracted`` in
+:data:`~pyngb.constants.FIELD_APPLICABILITY` is subtracted when both frames
+carry it: the STA mass and DSC signals, and the dilatometer's length change.
+For a dilatometer the blank correction alone is not the corrected curve —
+Proteus restores the reference standard's literature expansion over the
+sample length afterwards; :func:`apply_expansion_standard` is that step.
 """
 
 import logging
@@ -15,12 +22,15 @@ from typing import Any, Literal
 import numpy as np
 import polars as pl
 
-from .constants import FileMetadata
+from .constants import FIELD_APPLICABILITY, FileMetadata
 
-__all__ = ["BaselineSubtractor", "Segment"]
+__all__ = ["BaselineSubtractor", "Segment", "apply_expansion_standard"]
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
+
+#: Columns baseline subtraction operates on (when present in both frames).
+CORRECTABLE_COLUMNS: tuple[str, ...] = tuple(FIELD_APPLICABILITY["baseline_subtracted"])
 
 
 @dataclass(frozen=True)
@@ -125,7 +135,7 @@ class BaselineSubtractor:
         interpolated_data = {"axis_values": sample_axis}
 
         # Interpolate each column we need for subtraction
-        for col in ["mass", "dsc_signal"]:
+        for col in CORRECTABLE_COLUMNS:
             if col in baseline_segment.columns:
                 baseline_values = baseline_segment[col].to_numpy()
 
@@ -217,8 +227,8 @@ class BaselineSubtractor:
         # Start with the original sample data
         result = sample_segment.clone()
 
-        # Subtract mass and dsc_signal if available
-        for col in ["mass", "dsc_signal"]:
+        # Subtract every correctable column present on both sides
+        for col in CORRECTABLE_COLUMNS:
             if col in result.columns and col in interpolated_baseline.columns:
                 baseline_values = interpolated_baseline[col]
                 result = result.with_columns(
@@ -420,3 +430,92 @@ class BaselineSubtractor:
             )
 
         return result
+
+
+def apply_expansion_standard(
+    df: pl.DataFrame,
+    metadata: FileMetadata,
+    baseline_metadata: FileMetadata | None = None,
+) -> pl.DataFrame:
+    """Restore the reference standard's expansion after a blank correction.
+
+    A push-rod dilatometer records the sample's length change against its
+    own sample holder and push rod. The blank correction run subtracted by
+    :class:`BaselineSubtractor` removes the whole system's expansion, which
+    over-corrects by the expansion of the holder material along the sample
+    length; Proteus adds that back from the literature curve of the
+    reference standard (``expansion_standard`` in the metadata)::
+
+        length_change += sample_length * curve(sample_temperature)
+
+    with ``sample_length`` converted from mm to µm and the curve linearly
+    interpolated (verified against Proteus exports of four runs to a
+    residual of ~2e-6 in dL/L0; cubic interpolation changes nothing). The
+    curve is used as stored, relative to 20 °C — it is not re-zeroed at the
+    run's start temperature.
+
+    Only blank corrections are supported: a correction measured with a
+    reference sample would need a length-scaling term that has not been
+    verified, so a ``baseline_metadata`` carrying a positive
+    ``sample_length`` is refused.
+
+    Parameters
+    ----------
+    df : pl.DataFrame
+        Baseline-subtracted data with ``length_change`` (µm) and
+        ``sample_temperature`` (°C) columns.
+    metadata : FileMetadata
+        The sample's metadata: ``sample_length`` (mm) and
+        ``expansion_standard["curve"]`` are required.
+    baseline_metadata : FileMetadata, optional
+        The correction's metadata, used to refuse non-blank corrections.
+
+    Returns
+    -------
+    pl.DataFrame
+        ``df`` with ``length_change`` corrected in place (same units).
+
+    Raises
+    ------
+    ValueError
+        A required column or metadata key is missing, or the correction
+        was not measured blank.
+    """
+    for column in ("length_change", "sample_temperature"):
+        if column not in df.columns:
+            raise ValueError(f"Column '{column}' not found in table")
+
+    if baseline_metadata is not None:
+        baseline_length = baseline_metadata.get("sample_length")
+        if isinstance(baseline_length, (int, float)) and baseline_length > 0:
+            raise ValueError(
+                f"the correction run was measured with a {baseline_length} mm "
+                "reference sample; only blank corrections (no sample) are "
+                "supported"
+            )
+
+    sample_length = metadata.get("sample_length")
+    if not isinstance(sample_length, (int, float)) or sample_length <= 0:
+        raise ValueError(
+            "sample_length (the initial sample length L0) is missing from the "
+            "metadata; the reference standard's expansion cannot be scaled"
+        )
+    curve = (metadata.get("expansion_standard") or {}).get("curve")
+    if not curve or len(curve.get("temperature_c", ())) < 2:
+        raise ValueError(
+            "expansion_standard curve is missing from the metadata; the "
+            "reference standard's expansion cannot be restored"
+        )
+
+    temperatures = np.asarray(curve["temperature_c"], dtype=np.float64)
+    expansion = np.asarray(curve["expansion"], dtype=np.float64)
+    order = np.argsort(temperatures, kind="stable")
+    sample_temperature = df["sample_temperature"].to_numpy()
+    restored = (
+        float(sample_length)
+        * 1000.0
+        * np.interp(sample_temperature, temperatures[order], expansion[order])
+    )
+    return df.with_columns(
+        (pl.col("length_change") + pl.Series(restored)).alias("length_change")
+    )

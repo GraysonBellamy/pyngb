@@ -38,6 +38,9 @@ FIXTURES = (
     "Douglas_Fir_STA_Baseline_10K_250813_R15.ngb-bs3",
     "Red_Oak_STA_10K_250731_R7.ngb-ss3",
     "RO_FILED_STA_N2_10K_250129_R29.ngb-ss3",
+    "RO_Para_N2_10K_260910_Correction_R1.ngb-cla",
+    "RO_Para_N2_10K_260910_R1.ngb-dla",
+    "RO_Perp_N2_10K_260917_R1.ngb-dla",
 )
 
 

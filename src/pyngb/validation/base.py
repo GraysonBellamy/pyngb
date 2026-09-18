@@ -73,7 +73,7 @@ class ValidationResult:
 
     def report(self) -> str:
         """Generate a formatted validation report."""
-        lines = ["=== STA Data Validation Report ===\n"]
+        lines = ["=== NGB Data Validation Report ===\n"]
 
         # Summary
         summary = self.summary()

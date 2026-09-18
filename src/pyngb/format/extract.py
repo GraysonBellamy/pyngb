@@ -1,7 +1,7 @@
 """Metadata extraction: FileMetadata as queries over the document model.
 
 ``build_metadata`` applies the declarative :data:`~pyngb.format.maps.FIELD_MAP`
-first, then nine plain extraction functions. Each function is one metadata
+first, then a tuple of plain extraction functions. Each function is one metadata
 concern expressed against tables and fields; adding a Phase-2 field means
 adding a function to :data:`_EXTRACTORS` (or an entry to FIELD_MAP), nothing
 else. Every function is wrapped in a warn-and-continue net — all FileMetadata
@@ -21,23 +21,30 @@ from __future__ import annotations
 
 import logging
 import re
-from collections.abc import Callable, Iterator
+import struct
+from collections.abc import Callable
 from datetime import datetime, timezone
 from itertools import islice
 
 import numpy as np
 
 from ..constants import (
+    ExpansionCurve,
+    ExpansionStandard,
     FileMetadata,
     SensitivityCalibration,
     TemperatureCalibration,
 )
 from .document import NGBDocument, Table
-from .grammar import DType
+from .grammar import DType, Mode
 from .maps import (
     APP_LICENSE_CATEGORY,
     CAL_CONSTANTS,
     CAL_CONSTANTS_CATEGORY,
+    CAL_RECORD_PATH_FIELD,
+    CHANNEL_CONFIG_TYPE,
+    CHANNEL_RANGE_FIELD,
+    CHANNEL_RANGE_KEYS,
     CORRECTION_LINK_CATEGORY,
     CORRECTION_LINK_FIELD,
     CRUCIBLE_CATEGORY,
@@ -46,15 +53,24 @@ from .maps import (
     DEVICE_ID_FIELD,
     DEVICE_KIND_FIELD,
     DEVICE_STATE_TYPE,
+    EXPANSION_CURVE_FIELD,
+    EXPANSION_CURVE_TYPE,
+    EXPANSION_STANDARD_FIELDS,
+    EXPANSION_STANDARD_TYPE,
     FIELD_MAP,
     FIXPOINT_CATEGORIES,
     FIXPOINT_FIELDS,
+    FORCE_DEVICE_ID,
     GAS_FORMULA_FIELD,
     GAS_GUID_FIELD,
     GAS_NAME_FIELD,
     GAS_RECORD_GUID_FIELD,
     GAS_RECORD_TYPE,
+    INSTRUMENT_MODEL_FIELD,
+    INSTRUMENT_TABLE_TYPE,
     KNOWN_FIELD_IDS,  # noqa: F401  (re-exported for census tooling)
+    MEASUREMENT_TYPE_FIELD,
+    MEASUREMENT_TYPES,
     MFC_DEVICE_KIND,
     MFC_RANGE_FIELD,
     MFC_RANGE_TYPE,
@@ -62,26 +78,32 @@ from .maps import (
     PID_FIELDS,
     PROVENANCE_FIELDS,
     REF_NEIGHBOR_FIELD,
+    SAMPLE_GEOMETRY_CATEGORY,
+    SAMPLE_GEOMETRY_FIELDS,
+    SAMPLE_LENGTH_FIELD,
     SAMPLE_NEIGHBOR_FIELD,
-    SENSITIVITY_SUFFIX,
+    SAMPLE_TABLE_TYPE,
+    SENS_CAL_RECORD_TYPE,
     SENS_FIXPOINT_EXCLUDES,
     SENS_FIXPOINT_FIELDS,
     SENS_FIXPOINT_REQUIRES,
     STAGE_CATEGORY_BASE,
     STAGE_FIELDS,
     STAGE_FLOW_FIELD,
+    STAGE_FORCE_FIELD,
     STAGE_TABLE_TYPE,
     STAGE_TYPE_BODY,
     TEMP_CAL_CATEGORY,
     TEMP_CAL_COEFF_FIELD,
-    TEMP_CAL_SUFFIX,
+    TEMP_CAL_RECORD_TYPE,
     TEMP_FIXPOINT_EXCLUDES,
     TEMP_FIXPOINT_REQUIRES,
     TIMEZONE_CATEGORY,
     TIMEZONE_FIELDS,
+    channel_name,
 )
 
-__all__ = ["build_metadata"]
+__all__ = ["build_metadata", "embedded_correction_sample_length"]
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -249,15 +271,32 @@ def _mfc_role(table: Table) -> str | None:
     return MFC_ROLES.get(device_id) if isinstance(device_id, int) else None
 
 
-def _stage_mfc_flows(doc: NGBDocument) -> dict[int, dict[str, float]]:
-    """Per-stage MFC flow setpoints: {stage ordinal: {role: ml/min}}.
+def _stage_setpoint_key(table: Table) -> tuple[str, int] | None:
+    """(stage key, range-table field) for a device state table, or None.
+
+    MFCs contribute ``<role>_mfc_flow`` from the flow field; the
+    dilatometer's force controller (device id 58) contributes
+    ``force_setpoint`` from the force field. Other devices, and MFCs with
+    an unmapped id (extract_mfc warns once), contribute nothing.
+    """
+    role = _mfc_role(table)
+    if role is not None:
+        return f"{role}_mfc_flow", STAGE_FLOW_FIELD
+    if table.value(DEVICE_ID_FIELD) == FORCE_DEVICE_ID:
+        return "force_setpoint", STAGE_FORCE_FIELD
+    return None
+
+
+def _stage_device_setpoints(doc: NGBDocument) -> dict[int, dict[str, float]]:
+    """Per-stage device setpoints: {stage ordinal: {stage key: value}}.
 
     After each stage table the file snapshots every device as a
     type-0x2B11 state table whose following range table (type 0x2B0A)
-    carries the stage's flow setpoint in field 0x1047.
+    carries the stage's setpoint: flow in field 0x1047 (ml/min) for MFCs,
+    force in field 0x10FA (N) for the dilatometer's push-rod controller.
     """
     tables = doc.tables_of(_STREAM)
-    flows: dict[int, dict[str, float]] = {}
+    setpoints: dict[int, dict[str, float]] = {}
     current: int | None = None
     for table in tables:
         ordinal = _stage_ordinal(table)
@@ -266,19 +305,53 @@ def _stage_mfc_flows(doc: NGBDocument) -> dict[int, dict[str, float]]:
             continue
         if current is None or table.type_ref != DEVICE_STATE_TYPE:
             continue
-        role = _mfc_role(table)
-        if role is None:
-            continue  # non-MFC device, or unmapped id (extract_mfc warns once)
+        target = _stage_setpoint_key(table)
+        if target is None:
+            continue
+        key, field_id = target
         follower = tables[table.index + 1] if table.index + 1 < len(tables) else None
         if follower is None or follower.type_ref != MFC_RANGE_TYPE:
             continue
-        entry = follower.get(STAGE_FLOW_FIELD)
+        entry = follower.get(field_id)
         if entry is None or entry.dtype != DType.F32:
             continue
         value = _numeric(entry.value)
         if value is not None:
-            flows.setdefault(current, {}).setdefault(role, value)
-    return flows
+            setpoints.setdefault(current, {}).setdefault(key, value)
+    return setpoints
+
+
+def _uniform_body_value(
+    metadata: FileMetadata, key: str, snapshot_keys: tuple[str, ...]
+) -> float | None:
+    """The run-level value of a per-stage setpoint, or None if it varies.
+
+    The value is summarized from the per-stage entries already merged into
+    ``temperature_program`` (single source of truth, so the scalar can
+    never contradict them): it is emitted only when every body stage
+    (stage_type 1 — the initial stage may hold a device off, and the final
+    type-2 stage is the never-executed emergency-reset entry) carries the
+    same value. Programs without typed body stages fall back to every stage
+    snapshotted with any of ``snapshot_keys``. A program that varies the
+    setpoint per stage, or with body stages missing their snapshot, yields
+    None.
+    """
+    program = metadata.get("temperature_program") or {}
+    body = [
+        stage
+        for stage in program.values()
+        if stage.get("stage_type") == STAGE_TYPE_BODY
+    ]
+    if not body:
+        body = [
+            stage
+            for stage in program.values()
+            if any(name in stage for name in snapshot_keys)
+        ]
+    values = {stage[key] for stage in body if key in stage}
+    if body and len(values) == 1 and all(key in stage for stage in body):
+        return float(values.pop())
+    return None
 
 
 def extract_temperature_program(doc: NGBDocument, metadata: FileMetadata) -> None:
@@ -286,8 +359,9 @@ def extract_temperature_program(doc: NGBDocument, metadata: FileMetadata) -> Non
 
     Each stage carries the four f32 program fields (times x60: stored in
     minutes, exposed in seconds), the i32 stage_type (0 = initial, 1 =
-    ramp/isothermal, 2 = final/emergency-reset entry), and the stage's MFC
-    flow setpoints from the device-state snapshots that follow it.
+    ramp/isothermal, 2 = final/emergency-reset entry), and the stage's
+    device setpoints — MFC flows and, on dilatometers, the push-rod force —
+    from the device-state snapshots that follow it.
     """
     stages: dict[int, dict[str, float | int]] = {}
     for ordinal, table in _stage_tables(doc):
@@ -310,12 +384,11 @@ def extract_temperature_program(doc: NGBDocument, metadata: FileMetadata) -> Non
             stages[ordinal] = stage
     if not stages:
         return
-    for ordinal, stage_flows in _stage_mfc_flows(doc).items():
+    for ordinal, stage_setpoints in _stage_device_setpoints(doc).items():
         target = stages.get(ordinal)
         if target is None:
             continue
-        for role, flow in stage_flows.items():
-            target[f"{role}_mfc_flow"] = flow
+        target.update(stage_setpoints)
     metadata["temperature_program"] = {  # type: ignore[typeddict-item]
         f"stage_{ordinal}": stage for ordinal, stage in sorted(stages.items())
     }
@@ -415,23 +488,29 @@ def extract_mfc(doc: NGBDocument, metadata: FileMetadata) -> None:
 
     # Run-level flow setpoints, summarized from the per-stage values in
     # temperature_program (single source of truth).
-    program = metadata.get("temperature_program") or {}
-    body = [
-        stage
-        for stage in program.values()
-        if stage.get("stage_type") == STAGE_TYPE_BODY
-    ]
-    if not body:  # no typed body stages: fall back to every snapshotted stage
-        body = [
-            stage
-            for stage in program.values()
-            if any(f"{role}_mfc_flow" in stage for role in MFC_ROLES.values())
-        ]
-    for role in MFC_ROLES.values():
-        key = f"{role}_mfc_flow"
-        values = {stage[key] for stage in body if key in stage}
-        if body and len(values) == 1 and all(key in stage for stage in body):
-            metadata[key] = values.pop()  # type: ignore[literal-required]
+    flow_keys = tuple(f"{role}_mfc_flow" for role in MFC_ROLES.values())
+    for key in flow_keys:
+        value = _uniform_body_value(metadata, key, flow_keys)
+        if value is not None:
+            metadata[key] = value  # type: ignore[literal-required]
+
+
+# -- Dilatometer push-rod force -----------------------------------------------------
+
+
+def extract_force_setpoint(
+    doc: NGBDocument,  # noqa: ARG001  (uniform extractor signature)
+    metadata: FileMetadata,
+) -> None:
+    """Run-level push-rod force setpoint (N), from the per-stage values.
+
+    Same rule as the MFC flows: the per-stage ``force_setpoint`` entries are
+    merged into ``temperature_program`` by extract_temperature_program, and
+    the scalar is emitted only when uniform across the body stages.
+    """
+    value = _uniform_body_value(metadata, "force_setpoint", ("force_setpoint",))
+    if value is not None:
+        metadata["force_setpoint"] = value
 
 
 # -- DSC sensitivity calibration constants --------------------------------------------
@@ -453,20 +532,23 @@ def extract_calibration_constants(doc: NGBDocument, metadata: FileMetadata) -> N
 # -- Temperature calibration ------------------------------------------------------------
 
 
-def _string_fields_ending_in(table: Table, suffix: str) -> Iterator[str]:
-    for entry in table.fields.values():
-        if (
-            entry.dtype == DType.STRING
-            and isinstance(entry.value, str)
-            and entry.value.endswith(suffix)
-        ):
-            yield entry.value
+def _record_path(table: Table) -> str | None:
+    value = table.value(CAL_RECORD_PATH_FIELD)
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
 
 
-def _find_record_table(doc: NGBDocument, suffix: str) -> tuple[Table, str] | None:
-    """The calibration-source table whose record path ends in ``suffix``."""
-    for table in doc.tables_of(_STREAM):
-        path = next(_string_fields_ending_in(table, suffix), None)
+def _find_record_table(doc: NGBDocument, type_ref: int) -> tuple[Table, str] | None:
+    """The first calibration-source table of ``type_ref`` carrying a record path.
+
+    Records are told apart by table type, never by the path's suffix: the
+    identity calibrations Proteus ships (TCALZERO.TMX / .TCX, SENSZERO.EXX)
+    carry the same table types as measured ``.ngb-ts3`` / ``.ngb-es3``
+    records.
+    """
+    for table in doc.find(_STREAM, type_ref=type_ref):
+        path = _record_path(table)
         if path is not None:
             return table, path
     return None
@@ -556,9 +638,9 @@ def extract_temperature_calibration(doc: NGBDocument, metadata: FileMetadata) ->
     if fixpoints:
         cal["fixpoints"] = fixpoints  # type: ignore[typeddict-item]
 
-    ts3 = _find_record_table(doc, TEMP_CAL_SUFFIX)
-    if ts3 is not None:
-        table, path = ts3
+    record = _find_record_table(doc, TEMP_CAL_RECORD_TYPE)
+    if record is not None:
+        table, path = record
         cal["record_path"] = path
         cal.update(_extract_provenance(table))  # type: ignore[typeddict-item]
     if cal:
@@ -580,13 +662,164 @@ def extract_sensitivity_calibration(doc: NGBDocument, metadata: FileMetadata) ->
     if fixpoints:
         sensitivity["fixpoints"] = fixpoints  # type: ignore[typeddict-item]
 
-    es3 = _find_record_table(doc, SENSITIVITY_SUFFIX)
-    if es3 is not None:
-        table, path = es3
+    record = _find_record_table(doc, SENS_CAL_RECORD_TYPE)
+    if record is not None:
+        table, path = record
         sensitivity["record_path"] = path
         sensitivity.update(_extract_provenance(table))  # type: ignore[typeddict-item]
     if sensitivity:
         metadata["sensitivity_calibration"] = sensitivity
+
+
+# -- Dilatometer expansion standard ---------------------------------------------------------
+
+
+def _decode_expansion_curve(raw: bytes) -> ExpansionCurve | None:
+    """``u16 byte_length, u16 n, n x (f32 T, f32 dL/L0)`` -> parallel lists."""
+    if len(raw) < 4:
+        return None
+    byte_length, count = struct.unpack_from("<HH", raw, 0)
+    if count == 0 or 4 + 8 * count > len(raw):
+        logger.debug(
+            f"expansion curve declares {count} points in {len(raw)} bytes; ignored"
+        )
+        return None
+    if byte_length != len(raw):
+        logger.debug(f"expansion curve byte length {byte_length} != payload {len(raw)}")
+    points = np.frombuffer(raw, dtype="<f4", count=2 * count, offset=4).reshape(-1, 2)
+    return {
+        "temperature_c": [float(t) for t in points[:, 0]],
+        "expansion": [float(e) for e in points[:, 1]],
+    }
+
+
+def extract_expansion_standard(doc: NGBDocument, metadata: FileMetadata) -> None:
+    """The reference-material record and its literature expansion curve.
+
+    Dilatometer files only. The record (name, source, validity range,
+    provenance) is the first EXPANSION_STANDARD_TYPE table; the curve is the
+    byte array of the first EXPANSION_CURVE_TYPE table carrying one. The
+    stream holds nested copies of both (identical curves; records differing
+    only in path and date), and first match wins.
+    """
+    standard: ExpansionStandard = {}
+    table = doc.first(_STREAM, type_ref=EXPANSION_STANDARD_TYPE)
+    if table is not None:
+        for name, field_id in EXPANSION_STANDARD_FIELDS.items():
+            value = table.value(field_id)
+            if name == "date":
+                if isinstance(value, int) and value > 0:
+                    standard["date"] = datetime.fromtimestamp(
+                        value, tz=timezone.utc
+                    ).isoformat()
+            elif name in ("temperature_min", "temperature_max"):
+                if (numeric := _numeric(value)) is not None:
+                    standard[name] = numeric  # type: ignore[literal-required]
+            elif isinstance(value, str) and value.strip():
+                standard[name] = value.strip()  # type: ignore[literal-required]
+
+    curve_table = doc.first(
+        _STREAM, type_ref=EXPANSION_CURVE_TYPE, with_fields=(EXPANSION_CURVE_FIELD,)
+    )
+    if curve_table is not None:
+        entry = curve_table.get(EXPANSION_CURVE_FIELD)
+        if entry is not None and entry.mode is Mode.ARRAY and entry.dtype == DType.U8:
+            curve = _decode_expansion_curve(bytes(entry.raw))
+            if curve is not None:
+                standard["curve"] = curve
+
+    if standard:
+        metadata["expansion_standard"] = standard
+
+
+def extract_sample_geometry(doc: NGBDocument, metadata: FileMetadata) -> None:
+    """Dilatometer sample diameter and cross-section, for a real sample only.
+
+    The geometry table is written for every run, but a blank correction
+    (no sample: ``sample_length`` absent) can carry stale values left in the
+    Proteus form, so the keys are emitted only alongside a sample length.
+    """
+    if "sample_length" not in metadata:
+        return
+    table = doc.first(
+        _STREAM,
+        category=SAMPLE_GEOMETRY_CATEGORY,
+        with_fields=tuple(SAMPLE_GEOMETRY_FIELDS.values()),
+    )
+    if table is None:
+        return
+    for key, field_id in SAMPLE_GEOMETRY_FIELDS.items():
+        value = _numeric(table.value(field_id))
+        if value is not None and value > 0:
+            metadata[key] = value  # type: ignore[literal-required]
+
+
+def embedded_correction_sample_length(doc: NGBDocument) -> float | None:
+    """The initial sample length (mm) recorded for an embedded correction run.
+
+    "Sample + Correction" files describe both measurements in the main
+    metadata document: the sample's descriptor table first, then the
+    embedded correction's. File-level metadata reports the sample's; this
+    returns the correction's length field, or None when the document holds
+    no second descriptor. 0.0 means the correction was measured blank.
+    """
+    doc = _sample_metadata_view(doc)
+    descriptors = list(
+        doc.find(
+            _STREAM, type_ref=SAMPLE_TABLE_TYPE, with_fields=(SAMPLE_LENGTH_FIELD,)
+        )
+    )
+    if len(descriptors) < 2:
+        return None
+    return _numeric(descriptors[1].value(SAMPLE_LENGTH_FIELD))
+
+
+# -- Instrument and measurement kind ---------------------------------------------------------
+
+
+def extract_instrument_model(doc: NGBDocument, metadata: FileMetadata) -> None:
+    """Model string from the first instrument table carrying a non-empty one."""
+    for table in doc.find(_STREAM, type_ref=INSTRUMENT_TABLE_TYPE):
+        value = table.value(INSTRUMENT_MODEL_FIELD)
+        if isinstance(value, str) and value.strip():
+            metadata["instrument_model"] = value.strip()
+            return
+
+
+def extract_measurement_type(doc: NGBDocument, metadata: FileMetadata) -> None:
+    """sample / correction / sample_correction, from the measurement definition."""
+    table = doc.first(
+        _STREAM,
+        category=CORRECTION_LINK_CATEGORY,
+        with_fields=(MEASUREMENT_TYPE_FIELD,),
+    )
+    if table is None:
+        return
+    code = table.value(MEASUREMENT_TYPE_FIELD)
+    kind = MEASUREMENT_TYPES.get(code) if isinstance(code, int) else None
+    if kind is None:
+        logger.warning(f"unknown measurement type code {code!r}")
+        return
+    metadata["measurement_type"] = kind
+
+
+def extract_channel_ranges(doc: NGBDocument, metadata: FileMetadata) -> None:
+    """Measuring ranges of the primary channels, from the channel-config tables.
+
+    One CHANNEL_CONFIG_TYPE table per stream-2 channel, categorised like the
+    channel's header, so the column name resolves through the same map as
+    the data; only the channels in CHANNEL_RANGE_KEYS are surfaced.
+    """
+    for table in doc.find(_STREAM, type_ref=CHANNEL_CONFIG_TYPE):
+        key = CHANNEL_RANGE_KEYS.get(channel_name(table.category))
+        if key is None or key in metadata:
+            continue
+        entry = table.get(CHANNEL_RANGE_FIELD)
+        if entry is None or entry.dtype != DType.F32:
+            continue
+        value = _numeric(entry.value)
+        if value is not None and value > 0:
+            metadata[key] = value  # type: ignore[literal-required]
 
 
 # -- Run environment -----------------------------------------------------------------------
@@ -683,14 +916,20 @@ def extract_app_license(doc: NGBDocument, metadata: FileMetadata) -> None:
 
 _EXTRACTORS: tuple[Callable[[NGBDocument, FileMetadata], None], ...] = (
     extract_masses,
+    extract_sample_geometry,
     extract_temperature_program,
     extract_pid,
     extract_mfc,
+    extract_force_setpoint,
     extract_calibration_constants,
     extract_temperature_calibration,
     extract_sensitivity_calibration,
+    extract_expansion_standard,
     extract_run_environment,
     extract_app_license,
+    extract_instrument_model,
+    extract_measurement_type,
+    extract_channel_ranges,
 )
 
 

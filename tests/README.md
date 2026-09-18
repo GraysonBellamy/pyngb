@@ -1,15 +1,16 @@
 # pyngb Test Suite
 
-Tests for the pyngb library. The suite is anchored on two things: **six real
-NGB fixtures** in `test_files/` (2022- and 2025-vintage Proteus runs,
-including two baselines) and a **synthetic byte builder** that constructs
-grammar-valid NGB files from scratch.
+Tests for the pyngb library. The suite is anchored on two things: **real
+NGB fixtures** in `test_files/` (STA: 2022- and 2025-vintage Proteus runs,
+including two baselines and two Sample + Correction `.ngb-ds3` files;
+dilatometer: DIL 402 Expedis `.ngb-dla`/`.ngb-cla` runs) and a **synthetic
+byte builder** that constructs grammar-valid NGB files from scratch.
 
 ## Layout
 
 - `conftest.py` — shared fixtures; `sample_ngb_file` is a builder-generated
   minimal NGB file
-- `test_files/` — the six real fixtures (their presence is itself asserted,
+- `test_files/` — the real fixtures (their presence is itself asserted,
   so a missing fixture fails loudly instead of silently skipping)
 - `goldens/` — committed snapshots, two families per fixture:
   - `*.parity.json` — full metadata, column names/dtypes, per-column
@@ -34,6 +35,7 @@ grammar-valid NGB files from scratch.
 | `test_format_structural.py` | All fixtures × streams: byte coverage with every gap byte classified, census goldens, table-open invariants |
 | `test_format_properties.py`, `test_property_based.py` | Hypothesis: build/tokenize round-trips (bitwise float equality), random-bytes and mutation fuzzing (any outcome other than a result or `NGBParseError` is a bug), coverage accounting |
 | `test_corruption.py` | Corruption matrix: truncations, count overruns, directory corruption, oversized declarations → structured exceptions (types + attributes asserted, never message prose); each case first proves the uncorrupted input parses |
+| `test_dil.py` | Dilatometer files: channels, metadata, the embedded correction, `run="corrected"` against the verified formula, `normalize_to_initial_length`, CLI; an opt-in cross-check against Proteus CSV exports (`PYNGB_DIL_CSV_DIR`) |
 | Extraction pins: `test_temperature_program.py`, `test_temperature_calibration.py`, `test_reference_mass.py`, `test_reference_crucible_mass.py`, `test_run_environment.py`, `test_application_license.py`, `test_channel_attribution.py`, `test_column_metadata.py` | Field-level golden values on the real fixtures |
 | `test_api.py`, `test_api_analysis.py`, `test_integration.py`, `test_workflows.py` | Public API surface and end-to-end flows |
 | `test_cli_*.py` | `convert` / `inspect` / `validate` subcommands, incl. baseline and metadata flows |

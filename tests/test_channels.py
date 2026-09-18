@@ -113,9 +113,9 @@ class TestAssemblyRules:
     def test_unmapped_channel_passes_through_as_hex(self, tmp_path: Path) -> None:
         frame = dataframe_of(
             tmp_path,
-            [header(0x31, high_byte=0x75, class_def=True), segment([0.0, 0.0])],
+            [header(0x82, high_byte=0x18, class_def=True), segment([0.0, 0.0])],
         )
-        assert frame.columns == ["31"]
+        assert frame.columns == ["82"]
 
     def test_missing_channel_yields_absent_column_not_zeros(
         self, tmp_path: Path

@@ -111,13 +111,19 @@ def test_channel_data_element_counts_match_the_parity_goldens(
     fixture: Path,
 ) -> None:
     """Token-level cross-check against the C0 goldens: within stream 2,
-    every channel's data-array elements sum to the pinned row count."""
+    every channel's data-array elements sum to the pinned row count.
+
+    Sample + Correction files hold a second run (a header repeating a
+    channel starts it) whose length may differ from the sample's by a row
+    or two; every run must be internally uniform, and the first run — the
+    one the golden pins — must match the golden's row count."""
     golden_path = GOLDEN_DIR / f"{fixture.name}.parity.json"
     assert golden_path.exists(), f"missing parity golden for {fixture.name}"
     num_rows = json.loads(golden_path.read_text(encoding="utf-8"))["num_rows"]
 
     stream = open_ngb(fixture, streams=[2])[2]
-    per_channel: list[int] = []
+    runs: list[list[int]] = [[]]
+    seen: set[int] = set()
     current: int | None = None
     for item in tokenize_section(stream, stream.main):
         if not isinstance(item, FieldToken):
@@ -125,16 +131,22 @@ def test_channel_data_element_counts_match_the_parity_goldens(
         if item.dtype == DType.REF:
             type_ref = ref_type_ref(item.raw)
             if type_ref == CHANNEL_HEADER_TYPE:
-                per_channel.append(0)
-                current = len(per_channel) - 1
+                if item.field_id in seen:
+                    runs.append([])
+                    seen = set()
+                seen.add(item.field_id)
+                runs[-1].append(0)
+                current = len(runs[-1]) - 1
             elif type_ref is not None and type_ref != SEGMENT_VALUES_TYPE:
                 current = None
         elif (item.field_id, item.dtype) in DATA_FIELDS and current is not None:
-            per_channel[current] += item.element_count or 0
-    assert per_channel, "no channel header tables found in stream 2"
-    assert all(total == num_rows for total in per_channel), (
-        f"per-channel element counts {per_channel} != golden num_rows {num_rows}"
+            runs[-1][current] += item.element_count or 0
+    assert runs[0], "no channel header tables found in stream 2"
+    assert all(total == num_rows for total in runs[0]), (
+        f"per-channel element counts {runs[0]} != golden num_rows {num_rows}"
     )
+    for run in runs[1:]:
+        assert len(set(run)) == 1, f"channels of a later run disagree: {run}"
 
 
 @pytest.mark.parametrize("fixture", ALL_FIXTURES, ids=lambda p: p.name)

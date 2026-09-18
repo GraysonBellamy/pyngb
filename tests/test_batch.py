@@ -192,14 +192,21 @@ class TestNGBDataset:
 
     def test_ngb_dataset_from_directory(self) -> None:
         """from_directory defaults to every sample-measurement fixture —
-        .ngb-ss3 and Sample + Correction .ngb-ds3, never baselines."""
+        .ngb-ss3 and the Sample + Correction .ngb-ds3/.ngb-dla files, never
+        corrections."""
         test_dir = Path(__file__).parent / "test_files"
         if not test_dir.exists():
             pytest.skip("No test files available")
 
         dataset = NGBDataset.from_directory(str(test_dir))
 
-        expected = sorted([*test_dir.glob("*.ngb-ss3"), *test_dir.glob("*.ngb-ds3")])
+        expected = sorted(
+            [
+                *test_dir.glob("*.ngb-ss3"),
+                *test_dir.glob("*.ngb-ds3"),
+                *test_dir.glob("*.ngb-dla"),
+            ]
+        )
         assert sorted(dataset.files) == expected
         assert len(dataset) == len(expected)
 
