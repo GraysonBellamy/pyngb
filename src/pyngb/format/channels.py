@@ -177,7 +177,10 @@ def _assemble_stream(
                     declared=len(values),
                     available=frame.height,
                 )
-            frame = frame.with_columns(pl.Series(name=title, values=values))
+            column = pl.Series(name=title, values=values)
+            # polars >= 2 no longer broadcasts a zero-width frame to the
+            # first column's height, so seed the frame from that column.
+            frame = frame.with_columns(column) if frame.width else column.to_frame()
         chunks = []
         return frame
 
