@@ -162,6 +162,9 @@ ignore = [
 per-file-ignores = {}
 
 [tool.ruff.format]
+# ruff >= 0.17 formats Python blocks in Markdown by default; doc snippets are
+# hand-aligned (trailing comments, elided dicts), so leave them as written.
+exclude = ["*.md"]
 quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false

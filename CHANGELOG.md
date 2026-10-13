@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Every read failed under polars 2.0 with `ShapeError: can't broadcast
+  Series 'time' of length N to length 0`: polars 2 no longer sizes an empty
+  frame from the first column added to it. The frame is now seeded from its
+  first channel; polars 1.6 and later still work.
+
 ## [0.6.0] - 2026-09-18
 
 Support for NETZSCH push-rod dilatometer files (DIL 402 Expedis, Proteus
