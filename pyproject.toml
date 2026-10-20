@@ -1,6 +1,6 @@
 [project]
 name = "pyngb"
-version = "0.6.0"
+version = "0.6.1"
 description = "Unofficial parser for NETZSCH NGB instrument binary files: STA (Simultaneous Thermal Analysis) and push-rod dilatometer (DIL). Not affiliated with, endorsed by, or approved by NETZSCH-Gerätebau GmbH."
 readme = "README.md"
 authors = [
